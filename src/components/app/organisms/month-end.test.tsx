@@ -1,7 +1,13 @@
 import type { RenderResult } from "@testing-library/react";
 import type { ComponentProps } from "react";
 
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -44,9 +50,28 @@ const opening = {
   today: "2026-10-04",
 } satisfies ComponentProps<typeof MonthEnd>;
 
-// The note over a draft this tab kept.
+// The note over a draft this tab kept, and over one holding a note.
 const restored =
   "The balances are as they were left in this tab, kept until saved or the tab is closed.";
+const restoredNote =
+  "The balances and the note are as they were left in this tab, kept until saved or the tab is closed.";
+
+// An invented note on August's progress point, the latest, and the month
+// end opened again on August while its balances are updated.
+const boiler = "Boiler replaced from savings";
+const august = { month: 7, year: 2026 };
+const updating = {
+  isUpdating: true,
+  latest: { month: august, note: boiler },
+  month: august,
+} satisfies Partial<ComponentProps<typeof MonthEnd>>;
+
+// The hints the note's field gives: for a month whose point keeps it,
+// and for one before the latest point's.
+const keptWith = (month: string): string =>
+  `Optional, up to 200 characters. Kept with ${month}'s progress point, to read back on Progress.`;
+const keptNone =
+  "A month before August 2026 records no progress point, so it keeps no note.";
 
 // The month end as above, with whatever a test gives in its place. Save
 // reports through the toast manager, which needs its Toaster mounted.
@@ -688,5 +713,286 @@ describe("MonthEnd", () => {
 
     expect(field("Stocks & shares ISA")).toHaveValue("£274,711");
     expect(notes()).not.toContain(restored);
+  });
+
+  // Opened again on August, whose point keeps no note, it opens empty
+  // too.
+  it("opens the note empty after the balances the month leaves, saying the month whose point keeps it", () => {
+    const { rerender } = drawWorksheet();
+    const sum = screen.getAllByRole("listitem").at(-1);
+
+    expect(field("Note")).toHaveValue("");
+    expect(field("Note")).toHaveAccessibleDescription(keptWith("September"));
+    expect(field("Note")).not.toHaveAttribute("aria-invalid");
+    expect(
+      (sum?.compareDocumentPosition(field("Note")) ?? 0) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    rerender(
+      <MonthEnd {...opening} {...updating} latest={{ month: august }} />,
+    );
+
+    expect(field("Note")).toHaveValue("");
+    expect(field("Note")).toHaveAccessibleDescription(keptWith("August"));
+  });
+
+  // The note goes as typed, for the action to trim; a blank one is none,
+  // and the call is the one a worksheet with no note makes.
+  it("sends the note typed with the balances and says it was recorded, and sends none where it is blank", async () => {
+    const sheet = openWorksheet();
+    vi.mocked(closeBalances).mockResolvedValue(
+      saved({ asOf: { month: 8, year: 2026 }, isRecorded: true }),
+    );
+
+    fireEvent.change(field("Note"), {
+      target: { value: " Car serviced from savings " },
+    });
+    fireEvent.click(within(sheet).getByRole("button", { name: "Save" }));
+
+    expect(closeBalances).toHaveBeenCalledExactlyOnceWith({
+      asOf: { month: 8, year: 2026 },
+      balances: [],
+      note: " Car serviced from savings ",
+    });
+    expect(
+      await screen.findByRole("dialog", { name: "Balances updated" }),
+    ).toHaveAccessibleDescription(
+      "0 balances set as of 25 Sep 2026, its progress point and note recorded",
+    );
+    await waitFor(() => {
+      expect(field("Note")).toHaveValue("");
+    });
+
+    fireEvent.change(field("Note"), { target: { value: "   " } });
+    fireEvent.click(within(sheet).getByRole("button", { name: "Save" }));
+
+    expect(closeBalances).toHaveBeenLastCalledWith({
+      asOf: { month: 8, year: 2026 },
+      balances: [],
+    });
+  });
+
+  // Two hundred and one characters, one past the rule: the field says
+  // so as it is typed, and Save still asks the action, which refuses it.
+  it("says a note past the rule is one as it is typed, and leaves the refusal to the action", async () => {
+    const sheet = openWorksheet();
+    vi.mocked(closeBalances).mockResolvedValue(
+      refused("A note is one line of up to 200 characters"),
+    );
+
+    fireEvent.change(field("Note"), { target: { value: "x".repeat(200) } });
+
+    expect(field("Note")).not.toHaveAttribute("aria-invalid");
+
+    fireEvent.change(field("Note"), { target: { value: "x".repeat(201) } });
+
+    expect(field("Note")).toHaveAttribute("aria-invalid", "true");
+    expect(field("Note")).toHaveAccessibleDescription(
+      `${keptWith("September")} A note is one line of up to 200 characters`,
+    );
+
+    fireEvent.click(within(sheet).getByRole("button", { name: "Save" }));
+
+    expect(
+      await screen.findByRole("dialog", { name: "Balances not saved" }),
+    ).toHaveAccessibleDescription("A note is one line of up to 200 characters");
+  });
+
+  // August's point is the latest: July records none, so the field says
+  // none is kept there, and a note typed before July was picked stays,
+  // as an error naming what to do, until September is picked again.
+  it("says a month before the latest point's keeps no note, and a note typed there is to be cleared", async () => {
+    const view = drawWorksheet({ latest: { month: august } });
+    vi.mocked(closeBalances).mockResolvedValue(
+      refused(
+        "A month before August 2026 records no progress point, so it keeps no note",
+      ),
+    );
+
+    fireEvent.change(field("Note"), { target: { value: "Car serviced" } });
+    fireEvent.change(select("Month"), { target: { value: "6" } });
+
+    expect(field("Note")).toHaveValue("Car serviced");
+    expect(field("Note")).toHaveAttribute("aria-invalid", "true");
+    expect(field("Note")).toHaveAccessibleDescription(
+      `${keptNone} Clear the note to close July 2026`,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(
+      await screen.findByRole("dialog", { name: "Balances not saved" }),
+    ).toHaveAccessibleDescription(
+      "A month before August 2026 records no progress point, so it keeps no note",
+    );
+
+    reload(view, { latest: { month: august } });
+
+    expect(select("Month")).toHaveValue("6");
+    expect(field("Note")).toHaveValue("Car serviced");
+    expect(notes()).toContain(restoredNote);
+
+    fireEvent.change(select("Month"), { target: { value: "8" } });
+
+    expect(field("Note")).not.toHaveAttribute("aria-invalid");
+    expect(field("Note")).toHaveAccessibleDescription(keptWith("September"));
+
+    fireEvent.change(field("Note"), { target: { value: "" } });
+    fireEvent.change(select("Month"), { target: { value: "6" } });
+
+    expect(field("Note")).not.toHaveAttribute("aria-invalid");
+    expect(field("Note")).toHaveAccessibleDescription(keptNone);
+  });
+
+  // On ?update the field opens on the note August's point keeps, which
+  // a close made again writes as it shows, and leaves it for July, which
+  // records no point, and finds it again on August.
+  it("opens the note kept on the month picked where it is the latest point's, and sends what it shows", async () => {
+    drawWorksheet(updating);
+    vi.mocked(closeBalances).mockResolvedValue(
+      saved({ asOf: august, isRecorded: true }),
+    );
+
+    expect(field("Note")).toHaveValue(boiler);
+    expect(field("Note")).toHaveAccessibleDescription(keptWith("August"));
+
+    fireEvent.change(select("Month"), { target: { value: "6" } });
+
+    expect(field("Note")).toHaveValue("");
+    expect(field("Note")).toHaveAccessibleDescription(keptNone);
+
+    fireEvent.change(select("Month"), { target: { value: "7" } });
+
+    expect(field("Note")).toHaveValue(boiler);
+    expect(sessionStorage).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(closeBalances).toHaveBeenCalledExactlyOnceWith({
+      asOf: august,
+      balances: [],
+      note: boiler,
+    });
+    await screen.findByRole("dialog", { name: "Balances updated" });
+
+    fireEvent.change(field("Note"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(closeBalances).toHaveBeenLastCalledWith({
+      asOf: august,
+      balances: [],
+    });
+  });
+
+  // A note alone is a draft: it comes back after a reload under the
+  // note naming it, with nothing checked, and starting again goes back
+  // to the field as it opened.
+  it("keeps a note alone through a reload, under the note naming it, and starts again from the field as it opened", () => {
+    const view = drawWorksheet();
+    fireEvent.change(field("Note"), { target: { value: "Car serviced" } });
+
+    reload(view);
+
+    expect(field("Note")).toHaveValue("Car serviced");
+    expect(notes()).toContain(restoredNote);
+    expect(notes()).not.toContain(restored);
+    expect(screen.getByText("0 of 5 checked")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Start again" }));
+
+    expect(field("Note")).toHaveValue("");
+    expect(notes()).not.toContain(restoredNote);
+    expect(sessionStorage).toHaveLength(0);
+  });
+
+  // On ?update, a note typed over the kept one stands over it after a
+  // reload, as a balance typed stands over the plan's; starting again
+  // brings the kept note back; and the kept note typed back keeps
+  // nothing, since it is the field as it opened.
+  it("restores a note typed over the kept one, starts again onto the kept note, and keeps nothing once it is typed back", () => {
+    const view = drawWorksheet(updating);
+    fireEvent.change(field("Note"), { target: { value: "Boiler" } });
+
+    reload(view, updating);
+
+    expect(field("Note")).toHaveValue("Boiler");
+    expect(notes()).toContain(restoredNote);
+
+    fireEvent.click(screen.getByRole("button", { name: "Start again" }));
+
+    expect(field("Note")).toHaveValue(boiler);
+
+    fireEvent.change(field("Note"), { target: { value: "Boiler" } });
+    fireEvent.change(field("Note"), { target: { value: boiler } });
+
+    expect(sessionStorage).toHaveLength(0);
+  });
+
+  // A draft kept before the worksheet took a note holds none, and comes
+  // back as it was, under the note it had then; one holding a note past
+  // the rule comes back, saying so, rather than not at all.
+  it.each([
+    {
+      error: "",
+      note: undefined,
+      over: restored,
+      shown: "",
+      what: "kept before the note, with none",
+    },
+    {
+      error: " A note is one line of up to 200 characters",
+      note: "x".repeat(300),
+      over: restoredNote,
+      shown: "x".repeat(300),
+      what: "holding a note past the rule",
+    },
+  ])("restores a draft $what", ({ error, note, over, shown }) => {
+    sessionStorage.setItem(
+      "month-end-draft",
+      JSON.stringify({
+        draft: {
+          asOf: { month: 8, year: 2026 },
+          checked: [isa.id],
+          note,
+          typed: [[isa.id, 275_000]],
+        },
+        month: { month: 8, year: 2026 },
+        touched: [[isa.id, isa.kind, isa.name]],
+      }),
+    );
+
+    openWorksheet();
+
+    expect(field("Stocks & shares ISA")).toHaveValue("£275,000");
+    expect(field("Note")).toHaveValue(shown);
+    expect(field("Note")).toHaveAccessibleDescription(
+      `${keptWith("September")}${error}`,
+    );
+    expect(notes()).toContain(over);
+  });
+
+  // The server cannot read the tab, so it and the hydration draw the
+  // note kept, and the note typed over it lands in the render after.
+  it("draws the note kept on the server and through hydration, then the draft's", () => {
+    const { unmount } = drawWorksheet(updating);
+    fireEvent.change(field("Note"), { target: { value: "Boiler" } });
+    unmount();
+
+    // eslint-disable-next-line testing-library/render-result-naming-convention -- renderToString returns a string, not a Testing Library render result
+    const markup = renderToString(<MonthEnd {...opening} {...updating} />);
+
+    expect(markup).toContain(`value="${boiler}"`);
+    expect(markup).not.toContain('value="Boiler"');
+
+    const container = document.createElement("div");
+    container.innerHTML = markup;
+    document.body.append(container);
+    render(<MonthEnd {...opening} {...updating} />, {
+      container,
+      hydrate: true,
+    });
+
+    expect(field("Note")).toHaveValue("Boiler");
   });
 });

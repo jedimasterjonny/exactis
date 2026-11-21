@@ -199,6 +199,17 @@ function links(): (null | string)[][] {
     .map((link) => [link.textContent, link.getAttribute("href")]);
 }
 
+// The reference household with the note given on its latest point,
+// August's.
+function notedOn(note: string): Kept {
+  return {
+    ...kept,
+    points: kept.points.map((point, index) =>
+      index === kept.points.length - 1 ? { ...point, note } : point,
+    ),
+  };
+}
+
 // The notes beneath what moved.
 function notes(): (null | string)[] {
   return within(screen.getByRole("region", { name: "What moved" }))
@@ -749,6 +760,59 @@ describe("Close", () => {
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "August closed £2,140 ahead of plan; retirement still out of reach",
+    );
+  });
+
+  // August's point keeps an invented note: it is read back beneath the
+  // balances August's close set, after what they come to.
+  it("reads the note the month closed keeps back beneath its balances", async () => {
+    await renderClose({ household: notedOn("Boiler replaced from savings") });
+
+    expect(
+      within(screen.getByRole("region", { name: "Balances on 25 Aug 2026" }))
+        .getAllByRole("paragraph")
+        .map(({ textContent }) => textContent),
+    ).toStrictEqual([
+      "As the balances stand on 25 Aug 2026£902,140",
+      "Your note\u00a0Boiler replaced from savings",
+    ]);
+  });
+
+  it("draws nothing beneath the balances where the month closed keeps no note", async () => {
+    await renderClose();
+
+    expect(
+      within(
+        screen.getByRole("region", { name: "Balances on 25 Aug 2026" }),
+      ).queryByText("Your note"),
+    ).not.toBeInTheDocument();
+  });
+
+  // August is the household's first close, so nothing is compared: the
+  // note is read back beneath why.
+  it("reads the note back beneath why there is nothing to compare with", async () => {
+    await renderClose({
+      household: notedOn("Boiler replaced from savings"),
+      since: null,
+    });
+
+    expect(
+      within(screen.getByRole("region", { name: "What moved" }))
+        .getAllByRole("paragraph")
+        .map(({ textContent }) => textContent)
+        .at(-1),
+    ).toBe("Your note\u00a0Boiler replaced from savings");
+  });
+
+  // Opened again on August, the worksheet's note opens on the one kept.
+  it("opens the worksheet's note on the note the month closed keeps while the balances are updated", async () => {
+    await renderClose({
+      address: { update: "" },
+      household: notedOn("Boiler replaced from savings"),
+    });
+
+    expect(screen.getByRole("textbox", { name: "Note" })).toHaveValue(
+      "Boiler replaced from savings",
     );
   });
 

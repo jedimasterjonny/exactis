@@ -64,6 +64,7 @@ import {
   monthOfYear,
   named,
   ownerValues,
+  pointNote,
   portfolioValues,
   pounds,
   recordId,
@@ -402,10 +403,12 @@ const owners = z
 // the words an account is held to the same, cash and the GIAs absent on
 // a point not read with them rather than nothing, and the house nothing
 // or more and no more than the property and vehicles it is a share of;
-// and the month end's reading, absent on a point that keeps none: the
-// band one of the five, the months whole from one to twelve, the share
-// from none of the futures to all of them, the ages whole and the
-// liquid worth whole pounds.
+// the note as a point keeps one, absent on a point that keeps none;
+// and the month end's reading and the year planned, each absent on a
+// point that keeps none: the band one of the five, the months whole
+// from one to twelve, the share from none of the futures to all of
+// them, the ages whole and the liquid worth whole pounds, and the year
+// twelve moves, each whole pounds.
 const point = z
   .object({
     assets: z.number().int().nonnegative(rules.belowNothing),
@@ -423,6 +426,8 @@ const point = z
       .exactOptional(),
     loans: z.number().int().nonpositive(rules.owes),
     month,
+    note: pointNote.exactOptional(),
+    planned: z.array(z.number().int()).length(12).exactOptional(),
     standing: z
       .object({
         age: z.number().int().positive(),

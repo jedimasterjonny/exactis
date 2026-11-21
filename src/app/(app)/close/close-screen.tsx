@@ -15,6 +15,7 @@ import type { KeptClose, Landed, Passed } from "@/lib/landed";
 import type { Group, Moved, RateSource, Standing } from "@/lib/moved";
 import type { SinceClose } from "@/store/household";
 
+import { KeptNote } from "@/components/app/atoms/kept-note";
 import { Ledger } from "@/components/app/atoms/ledger";
 import { Note } from "@/components/app/atoms/note";
 import { PortfolioImport } from "@/components/app/atoms/portfolio-import";
@@ -147,8 +148,9 @@ interface Stood {
 // cut of the month after the latest point's, or that none is closed yet
 // with no point kept. Once it is, the balances the close set against those it
 // closed from, with what the plan paid in beside what Portfolio
-// Performance says was, where it says, what moved the plan since the
-// close before as the steps movedSince takes, drawn as a waterfall of
+// Performance says was, where it says, and beneath them, ruled off, the
+// note the latest point keeps, where it keeps one; what moved the plan
+// since the close before as the steps movedSince takes, drawn as a waterfall of
 // the liquid worth where two steps or more moved it, the caption saying
 // the order they are taken in and a note the ends of the scale, with a
 // note where the plan now ends before the age the worth is held at that
@@ -166,13 +168,16 @@ interface Stood {
 // due and what mostly moved said in the meta line, and the balances to
 // update in the header, which opens the same worksheet on the month
 // closed, for a close to be made again or another month picked, with the
-// way back. A close before the latest kept in a form this app cannot read
-// whole is compared by the balances it set alone, carried on by the plan
+// way back, the worksheet's note opening on the latest point's where the
+// month picked is its month. A close before the latest kept in a form
+// this app cannot read whole is compared by the balances it set alone,
+// carried on by the plan
 // now, which takes in the rates and the household's changes since, and
 // the screen says so. A household with no close before the latest, one
 // whose balances cannot be read either, one the rules refuse moved on
 // now, or one whose balances have since been closed back onto that
-// close's month or before it, has nothing to compare with, and says why.
+// close's month or before it, has nothing to compare with, and says why,
+// with the latest point's note beneath, as the balances would have it.
 // A month is closed in the household alone, so while a scenario is open
 // the screen says to leave it, and nothing else, rather than lay the
 // scenario's balances out to be refused. The month cut last and the day
@@ -209,7 +214,7 @@ export function CloseScreen({
       household.schedule,
       household.plan,
     );
-    const latest = household.points.at(-1)?.month;
+    const latest = household.points.at(-1);
     return (
       <Screen
         {...(!isOpen && {
@@ -223,12 +228,13 @@ export function CloseScreen({
           ),
         })}
         label={label}
-        meta={isOpen ? dueSince(latest) : next}
+        meta={isOpen ? dueSince(latest?.month) : next}
         title={isOpen ? `${month} isn't closed yet` : `${month} is closed`}
       >
         <MonthEnd
           accounts={household.accounts}
           isUpdating={isUpdating}
+          latest={latest}
           month={due}
           plan={plan}
           schedule={schedule}
@@ -241,6 +247,10 @@ export function CloseScreen({
     );
   }
   const compared = comparedOf(since, month);
+  const note = household.points.at(-1)?.note;
+  const noted = note !== undefined && (
+    <KeptNote className="border-t pt-4" note={note} />
+  );
   const update = (
     <Link
       className={buttonVariants({ size: "sm" })}
@@ -259,7 +269,7 @@ export function CloseScreen({
         title={`${month} is closed`}
       >
         <SectionCard label={subsectionLabel(monthEnd, 1)} title="What moved">
-          <CardContent>
+          <CardContent className="grid gap-4">
             <EmptyState
               description={
                 compared === null
@@ -269,6 +279,7 @@ export function CloseScreen({
               icon={History}
               title="Nothing to compare with"
             />
+            {noted}
           </CardContent>
         </SectionCard>
       </Screen>
@@ -299,7 +310,7 @@ export function CloseScreen({
         label={subsectionLabel(monthEnd, 1)}
         title={`Balances on ${formatDay(cutOf(due))}`}
       >
-        <CardContent>
+        <CardContent className="grid gap-4">
           <Ledger
             steps={[
               {
@@ -323,6 +334,7 @@ export function CloseScreen({
             total={formatGbp(moved.balances.now)}
             totalName={`As the balances stand on ${formatDay(cutOf(due))}`}
           />
+          {noted}
         </CardContent>
       </SectionCard>
       <SectionCard

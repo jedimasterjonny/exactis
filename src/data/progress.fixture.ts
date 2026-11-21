@@ -1,4 +1,4 @@
-import type { ProgressPoint } from "@/data/progress";
+import type { KeptPoint, ProgressPoint } from "@/data/progress";
 
 // The reference kit's invented plan as its progress points: the six
 // months to the one its balances are as of, oldest first, the home the
@@ -60,3 +60,15 @@ export const points = [
     unsecured: -2180,
   },
 ] as const satisfies readonly ProgressPoint[];
+
+// The kit's first point as the household keeps one, invented: a note on
+// its month, and the plan's year ahead from it, each month's move whole
+// pounds.
+export const noted = {
+  ...points[0],
+  note: "Boiler replaced from savings",
+  planned: [
+    1420, 2910, 4350, 5880, 7260, 8790, 10230, 11740, 13180, 14690, 16120,
+    17650,
+  ],
+} as const satisfies KeptPoint;
