@@ -6,6 +6,7 @@ import type { Curve } from "@/data/inflation";
 import { Toaster } from "@/components/kit/toast";
 import { curve } from "@/data/inflation.fixture";
 import { formatDay } from "@/lib/months";
+import { bySlot } from "@/test/dom";
 
 import { InflationSource } from "./inflation-source";
 
@@ -27,6 +28,11 @@ describe("InflationSource", () => {
     expect(within(card).getByText("BoE implied curve")).not.toHaveClass(
       "label",
     );
+    // Marked with the curve it reads, a glyph meaning that alone.
+    expect(
+      // eslint-disable-next-line testing-library/no-node-access -- the glyph is an icon hidden from the tree, with no role or text of its own
+      within(card).getByText("BoE implied curve").querySelector("svg"),
+    ).toHaveClass("lucide-chart-spline");
     expect(
       within(card).getByRole("button", { name: "Pull latest curve" }),
     ).toBeEnabled();
@@ -80,6 +86,12 @@ describe("InflationSource", () => {
 
     expect(screen.getByText("No curve pulled yet")).toBeInTheDocument();
     expect(screen.getByText("Pull the latest curve.")).toBeInTheDocument();
+    expect(
+      screen
+        .getByText(bySlot("empty-icon"), { suggest: false })
+        // eslint-disable-next-line testing-library/no-node-access -- the glyph is an icon hidden from the tree, with no role or text of its own
+        .querySelector("svg"),
+    ).toHaveClass("lucide-chart-spline");
     expect(screen.queryByRole("listitem")).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Pull latest curve" }),

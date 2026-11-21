@@ -2,7 +2,7 @@
 
 import type { JSX } from "react";
 
-import { Landmark } from "lucide-react";
+import { ChartSpline } from "lucide-react";
 import { useId } from "react";
 
 import type { Curve } from "@/data/inflation";
@@ -47,7 +47,7 @@ export function InflationSource({ curve }: InflationSourceProps): JSX.Element {
       actions={
         <>
           <Badge variant="secondary">
-            <Landmark aria-hidden />
+            <ChartSpline aria-hidden />
             BoE implied curve
           </Badge>
           <CurvePull />
@@ -60,7 +60,7 @@ export function InflationSource({ curve }: InflationSourceProps): JSX.Element {
         {curve === null ? (
           <EmptyState
             description="Pull the latest curve."
-            icon={Landmark}
+            icon={ChartSpline}
             title="No curve pulled yet"
           />
         ) : (
