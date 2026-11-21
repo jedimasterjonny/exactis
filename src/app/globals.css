@@ -357,6 +357,21 @@
   }
 }
 
+/* A Lucide icon where colours are forced takes the colour its parent is
+   forced to: the text's, a link's or a button's. Chrome keeps an svg's
+   own colour there, since its sheet gives every svg
+   `forced-color-adjust: preserve-parent-color`, so an icon set muted by a
+   utility kept the theme's grey, which on a contrast theme the other way
+   round from the app's stood at 1.91:1. It sits outside every layer, so
+   it outranks the utility, and it finds the icons by the class Lucide
+   gives them, so the charts' svgs are left be; an icon wanting a forced
+   colour of its own must say it outside the layers too. */
+@media (forced-colors: active) {
+  .lucide {
+    color: inherit;
+  }
+}
+
 /* The phone's tab bar steps aside while a field raising the keyboard has
    the focus, as a native tab bar does, since iOS lays a fixed bar out
    against the page and can float it over the field. Only on a touch
