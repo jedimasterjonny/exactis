@@ -6,6 +6,7 @@ import type { JSX } from "react";
 import { cn } from "cn";
 import { Ban, ChartPie, FolderSync, TriangleAlert } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 
 import type { Target, Targets } from "@/data/targets";
 import type { Ladder, Rung } from "@/lib/trades";
@@ -28,6 +29,7 @@ import {
   TableRow,
 } from "@/components/kit/table";
 import { counted } from "@/lib/count";
+import { listed } from "@/lib/feeders";
 import {
   formatGbp,
   formatPercent,
@@ -200,9 +202,28 @@ function rowsOf(ladder: Ladder): readonly Row[] {
   return rows;
 }
 
+// What a screen reader is told of the tiles: the rung recommended and
+// what each of its trades puts into or takes out of its category, or,
+// with no trade, the No-trade tile's own caption, opening on its name
+// where the caption does not.
+function saidOf({ recommended }: Ladder, reason: string): string {
+  if (recommended.count === 0) {
+    return reason.startsWith("No trade") ? reason : `No trade. ${reason}`;
+  }
+  const trades = recommended.trades.map(({ category, pounds }) =>
+    pounds > 0
+      ? `${formatGbp(pounds)} into ${category.name}`
+      : `${formatGbp(-pounds)} out of ${category.name}`,
+  );
+  return `${nameOf(recommended)}: ${listed.format(trades)}.`;
+}
+
 // The tiles, the ladder and the ledger over an allocation that can be
 // bought toward, for the amount and the sales typed and the account
-// chosen.
+// chosen; and a status saying what the tiles lay, empty from the first
+// paint and holding their words once any of the three is committed
+// afresh, so a screen reader hears the trades laid anew but nothing as
+// the screen opens. Unseen, and out of the flow, so it moves nothing.
 function Trades({
   account,
   amount,
@@ -230,8 +251,17 @@ function Trades({
   );
   const total = held + bought;
   const reason = reasonOf(ladder, amount, sales);
+  const laid = JSON.stringify([account, amount, sales]);
+  const [opened] = useState(laid);
+  const [isRelaid, setIsRelaid] = useState(false);
+  if (laid !== opened && !isRelaid) {
+    setIsRelaid(true);
+  }
   return (
     <>
+      <p className="sr-only" role="status">
+        {isRelaid ? saidOf(ladder, reason) : ""}
+      </p>
       <TileGrid>
         {recommended.count === 0 ? (
           <StatTile

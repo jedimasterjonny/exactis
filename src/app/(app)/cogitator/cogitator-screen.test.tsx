@@ -187,11 +187,68 @@ describe("CogitatorScreen", () => {
     render(<CogitatorScreen targets={reference} today="2026-09-15" />);
     invest("50");
 
-    expect(
-      screen.getAllByText(
-        "No trade. Trade 1 would put only £50 into A, under the £100 minimum.",
-      ),
-    ).toHaveLength(1);
+    expect(toned("inverse")).toHaveTextContent(
+      "No trade. Trade 1 would put only £50 into A, under the £100 minimum.",
+    );
+  });
+
+  // Nothing is said as the screen opens; each commit says what the tiles
+  // now lay, a sale as what it takes out, and an amount cleared back to
+  // the one the screen opened on is said too, since the tiles changed.
+  it("says the trades to a screen reader once an amount or a sale is committed, and not before", () => {
+    render(
+      <CogitatorScreen
+        targets={allocation([
+          target("A", 0.5, 1000),
+          target("B", 0.25, 1500),
+          target("C", 0.25, 950),
+        ])}
+        today="2026-09-15"
+      />,
+    );
+
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+
+    commit(field("Sales at most"), "2");
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "2 trades: £637 into A and £637 out of B.",
+    );
+
+    commit(field("Sales at most"), "0");
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "No trade. Type an amount to invest.",
+    );
+  });
+
+  it("says no trade to a screen reader in the No-trade tile's words", () => {
+    render(<CogitatorScreen targets={reference} today="2026-09-15" />);
+    invest("2000");
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "2 trades: £1,745 into A and £255 into C.",
+    );
+
+    invest("50");
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "No trade. Trade 1 would put only £50 into A, under the £100 minimum.",
+    );
+  });
+
+  // The month end offered £2,000, which the tiles lay as the screen
+  // opens, unsaid.
+  it("says nothing as the screen opens on an amount offered", () => {
+    render(
+      <CogitatorScreen
+        offered={{ amount: 2000, month: { month: 7, year: 2026 } }}
+        targets={reference}
+        today="2026-09-15"
+      />,
+    );
+
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
   });
 
   it("names the first of trades the next rung would put the same into", () => {
