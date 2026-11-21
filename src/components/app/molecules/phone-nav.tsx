@@ -25,14 +25,14 @@ interface PhoneNavProps {
 // screen's edges, and where colours are forced, which take the ring
 // away, an outline in the text colour is drawn inside in its place.
 const classes =
-  "relative flex min-h-11 w-full flex-col items-center justify-center gap-1 text-xs font-medium text-muted-foreground outline-none before:absolute before:inset-x-3 before:top-0 before:h-0.5 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset aria-[current=page]:text-foreground aria-[current=page]:before:bg-brand data-current:text-foreground data-current:before:bg-brand forced-colors:aria-[current=page]:before:bg-[CanvasText] forced-colors:data-current:before:bg-[CanvasText] forced-colors:focus-visible:outline-solid forced-colors:focus-visible:outline-2 forced-colors:focus-visible:-outline-offset-2 forced-colors:focus-visible:outline-[CanvasText] [&_svg]:size-5";
+  "relative flex min-h-11 w-full flex-col items-center justify-center gap-1 text-xs font-medium text-muted-foreground outline-none before:absolute before:inset-x-3 before:top-0 before:h-0.5 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset aria-[current=page]:text-foreground aria-[current=page]:before:bg-brand data-current:text-foreground data-current:before:bg-brand forced-colors:aria-[current=page]:before:bg-[CanvasText] forced-colors:data-current:before:bg-[CanvasText] forced-colors:focus-visible:-outline-offset-2 [&_svg]:size-5";
 
 // A row of More's list: 44px tall for a thumb, the icon, the label and
 // the numeral, the current screen in weight with a rail in brand at its
 // start, in the system's text colour where colours are forced, and its
 // focus drawn inside as a tab's is.
 const rowClasses =
-  "relative flex min-h-11 items-center gap-2 rounded-md px-3 text-sm outline-none before:absolute before:inset-y-2.5 before:left-0 before:w-0.5 before:rounded-full focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset aria-[current=page]:font-medium aria-[current=page]:before:bg-brand forced-colors:aria-[current=page]:before:bg-[CanvasText] forced-colors:focus-visible:outline-solid forced-colors:focus-visible:outline-2 forced-colors:focus-visible:-outline-offset-2 forced-colors:focus-visible:outline-[CanvasText] [&_svg]:size-4";
+  "relative flex min-h-11 items-center gap-2 rounded-md px-3 text-sm outline-none before:absolute before:inset-y-2.5 before:left-0 before:w-0.5 before:rounded-full focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset aria-[current=page]:font-medium aria-[current=page]:before:bg-brand forced-colors:aria-[current=page]:before:bg-[CanvasText] forced-colors:focus-visible:-outline-offset-2 [&_svg]:size-4";
 
 // The screens More reaches: every screen the tabs leave out, in order.
 const reached = screens.filter((screen) => !tabs.includes(screen));

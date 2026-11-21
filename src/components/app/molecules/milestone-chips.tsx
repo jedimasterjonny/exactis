@@ -39,8 +39,8 @@ interface MilestoneChipsProps {
 // whether it is the one chosen. Where colours are forced, the chip chosen
 // is filled in the system's highlight, its name in the highlight's text,
 // and is kept from the forcing, which would draw the page's colour behind
-// the name; kept, its focus outline would stay unseen, so it is drawn in
-// the system's text colour.
+// the name; kept, its focus is still drawn in the system's text colour,
+// by the focus rule every control takes there.
 export function MilestoneChips({
   markers,
   onSelect,
@@ -82,7 +82,7 @@ export function MilestoneChips({
             className={cn(
               "relative inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-sm font-medium after:absolute after:inset-x-0 after:inset-y-[calc(50%-22px)] focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-hidden",
               isChosen
-                ? "border-brand bg-brand text-brand-foreground forced-colors:border-[Highlight] forced-colors:bg-[Highlight] forced-colors:text-[HighlightText] forced-colors:forced-color-adjust-none forced-colors:focus-visible:outline-[CanvasText]"
+                ? "border-brand bg-brand text-brand-foreground forced-colors:border-[Highlight] forced-colors:bg-[Highlight] forced-colors:text-[HighlightText] forced-colors:forced-color-adjust-none"
                 : "bg-card hover:bg-muted",
             )}
             key={marker.id}

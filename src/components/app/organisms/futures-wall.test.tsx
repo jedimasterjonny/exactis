@@ -199,7 +199,6 @@ describe("FuturesWall", () => {
       "forced-color-adjust-none",
       "forced-colors:aria-pressed:bg-[Highlight]",
       "forced-colors:aria-pressed:text-[HighlightText]",
-      "forced-colors:focus-visible:outline-[CanvasText]",
     );
   });
 

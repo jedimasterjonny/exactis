@@ -166,17 +166,15 @@ describe("AppNav", () => {
   });
 
   // Forced colours box every row in the link colour and take the focus
-  // ring away, so a row is unboxed at rest and boxed only when focused.
+  // ring away, so a row is unboxed at rest, and the focus rule boxes the
+  // one focused, in the text colour.
   it("boxes only the focused row, in the text colour, under forced colours", () => {
     renderNav("/", closed);
 
     for (const link of within(
       screen.getByRole("navigation", { name: "Screens" }),
     ).getAllByRole("link")) {
-      expect(link).toHaveClass(
-        "forced-colors:outline-[Canvas]",
-        "forced-colors:focus-visible:outline-[CanvasText]",
-      );
+      expect(link).toHaveClass("forced-colors:outline-[Canvas]");
     }
   });
 
