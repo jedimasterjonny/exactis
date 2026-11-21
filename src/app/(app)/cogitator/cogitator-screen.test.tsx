@@ -349,8 +349,9 @@ describe("CogitatorScreen", () => {
     expect(rows[2]).not.toHaveClass("text-muted-foreground");
   });
 
-  // August's close offered the £2,000; typed over, it is the screen's own.
-  it("opens on the amount a month end offered, saying so until it is typed over", () => {
+  // August's close offered the £2,000; typed over, the field still says
+  // what was offered.
+  it("opens on the amount a month end offered, saying so and what it was however it is typed over", () => {
     render(
       <CogitatorScreen
         offered={{ amount: 2000, month: { month: 7, year: 2026 } }}
@@ -361,13 +362,15 @@ describe("CogitatorScreen", () => {
 
     expect(field("Amount to invest")).toHaveValue("£2,000");
     expect(field("Amount to invest")).toHaveAccessibleDescription(
-      "From August's close",
+      "£2,000 from August's close",
     );
     expect(toned("inverse")).toHaveTextContent("£1,745");
 
     invest("1,500");
 
-    expect(field("Amount to invest")).not.toHaveAccessibleDescription();
+    expect(field("Amount to invest")).toHaveAccessibleDescription(
+      "£2,000 from August's close",
+    );
   });
 
   // jsdom lays nothing out, so the class that lines the fields up is read.
@@ -389,8 +392,8 @@ describe("CogitatorScreen", () => {
   });
 
   // The plan pays the £2,000 into the ISAs and GIA in September, its
-  // first month; typed over, it is the screen's own.
-  it("opens on what the plan pays into the ISAs and GIA in its first month, saying so until it is typed over", () => {
+  // first month; typed over, the field still says what the plan pays.
+  it("opens on what the plan pays into the ISAs and GIA in its first month, saying so and what it is however it is typed over", () => {
     render(
       <CogitatorScreen
         planned={{ amount: 2000, month: { month: 8, year: 2026 } }}
@@ -401,13 +404,15 @@ describe("CogitatorScreen", () => {
 
     expect(field("Amount to invest")).toHaveValue("£2,000");
     expect(field("Amount to invest")).toHaveAccessibleDescription(
-      "Planned for the ISAs and GIA in September",
+      "£2,000 planned for the ISAs and GIA in September",
     );
     expect(toned("inverse")).toHaveTextContent("A£1,745");
 
     invest("1,500");
 
-    expect(field("Amount to invest")).not.toHaveAccessibleDescription();
+    expect(field("Amount to invest")).toHaveAccessibleDescription(
+      "£2,000 planned for the ISAs and GIA in September",
+    );
   });
 
   it("shows the amount and sales held when their fields come back", () => {
