@@ -48,8 +48,11 @@ describe("ProgressYear", () => {
 
     const band = screen.getByRole("region", { name: "What the year came to" });
 
+    // A step smaller on a phone, where a long move would widen the card.
     expect(within(band).getAllByRole("paragraph")[0]).toHaveClass(
       "display-figure",
+      "text-4xl",
+      "sm:text-5xl",
     );
     expect(
       within(band)
