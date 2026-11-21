@@ -39,11 +39,13 @@ export function forget(): void {
 // a bump of next checks that the two do not compete. The title is never
 // tabbed to, and is handed the focus too by a screen that takes away the
 // control that had it. A client component, since a ref cannot cross from
-// the server.
+// the server. A title of three words or more keeps its last word with the
+// one before it, so no word stands alone on its last line; a title of two
+// is left to break, since bound whole it may not fit a phone's width.
 export function ScreenTitle({ children }: ScreenTitleProps): JSX.Element {
   return (
     <h1 className="heading text-3xl" ref={arrive} tabIndex={-1}>
-      {children}
+      {bound(children)}
     </h1>
   );
 }
@@ -64,4 +66,13 @@ function arrive(title: HTMLHeadingElement | null): void {
     title.focus({ preventScroll: true });
     handed = title;
   }
+}
+
+// The title with the space before its last word made a no-break one,
+// where it holds three words or more, and as it is where it holds fewer.
+function bound(title: string): string {
+  const last = title.lastIndexOf(" ");
+  return title.indexOf(" ") < last
+    ? `${title.slice(0, last)}\u00a0${title.slice(last + 1)}`
+    : title;
 }
