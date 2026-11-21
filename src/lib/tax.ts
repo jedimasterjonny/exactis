@@ -121,7 +121,7 @@ const basicRate = 0.2;
 const frozenThrough = 2030;
 
 // The least a year's payments into a person's pensions out of taxed
-// money are relieved on, whatever they earn.
+// money are relieved on, whatever they earn, while they are under 75.
 const leastRelievable = 3600;
 
 // The most a life's draws on a pension may take free of tax, which
@@ -134,6 +134,10 @@ export const lumpSumAllowance = 268275;
 // forward unused allowance is lost with it, which is not modelled since
 // carry-forward is not.
 const moneyPurchaseAllowance = 10000;
+
+// The age from which a payment into a pension out of taxed money
+// claims no tax relief at all, under FA 2004 s.188(3)(a).
+const reliefStopsAt = 75;
 
 // Where the pension allowance is tapered: a pound for every two of
 // adjusted income over £260,000, down to a £10,000 floor, which is
@@ -359,14 +363,14 @@ export function reliefOf(account: { readonly kind: AccountKind }): number {
 }
 
 // The most a person's pensions may take in with relief in a month, on
-// what is paid out of taxed money, in what lands: a twelfth of what they
-// earn in a year, from a salary or from self-employment, or of £3,600
-// when they earn less, even nothing, so a month earning nothing
-// relieves £300. What a salary sacrifices is not earned, being given up
-// before it is paid, and a pension or any other income earns no relief
-// at all.
-export function relievableOn(earned: number): number {
-  return Math.max(leastRelievable / 12, earned);
+// what is paid out of taxed money, in what lands: nothing at 75 or
+// over, when relief stops; otherwise a twelfth of what they earn in a
+// year, from a salary or from self-employment, or of £3,600 when they
+// earn less, even nothing, so a month earning nothing relieves £300.
+// What a salary sacrifices is not earned, being given up before it is
+// paid, and a pension or any other income earns no relief at all.
+export function relievableOn(earned: number, age = 0): number {
+  return age >= reliefStopsAt ? 0 : Math.max(leastRelievable / 12, earned);
 }
 
 // The stamp duty on a home bought for the price, in the pounds it is

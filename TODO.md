@@ -33,10 +33,9 @@ pension that would make drawing past need pay.
 
 Smaller gaps sit beside it. The employer's NI is credited at the full rate on
 the whole sacrifice, ignoring the threshold and what the scheme passes on, and
-from April 2029 a sacrifice over £2,000 a year pays both NIs. A pension paid out
-of taxed money still claims relief after 75, when relief stops. The employee's
-NI runs past the State Pension age, when it stops. Cash interest is not taxed,
-and nor is a GIA: neither the dividends it is paid each year nor the gain a draw
+from April 2029 a sacrifice over £2,000 a year pays both NIs. The employee's NI
+runs past the State Pension age, when it stops. Cash interest is not taxed, and
+nor is a GIA: neither the dividends it is paid each year nor the gain a draw
 realises, which would need what it cost held beside what it is worth, and an
 owner for the allowances and bands it is charged under. The bands are those
 outside Scotland. From April 2031 every band rises with prices together, where

@@ -423,12 +423,14 @@ relief a higher or an additional rate taxpayer claims on top, and the personal
 allowance restored where the gross brings adjusted net income back below
 £125,140, come back to the household when April settles the tax year, under The
 tax on the month; a pound paid past what is relievable claims neither. Relief is
-claimed on no more than the owner earns a year from their own salary or
-self-employment, less what they sacrifice, or £3,600 when that is more, a
+claimed only until the owner reaches 75, read off the year they were born as
+every age is, and on no more than the owner earns a year from their own salary
+or self-employment, less what they sacrifice, or £3,600 when that is more, a
 twelfth of it a month shared across the owner's pensions in the order the month
-pays them; a pound paid past it lands as a pound. So a pension paid after its
-owner retires, or one of an owner who earns nothing whatever the rest of the
-household earns, lands a pound for a pound once £300 has landed in the month.
+pays them; a pound paid past it, or from 75 on, lands as a pound. So a pension
+paid after its owner retires and before 75, or one of an owner who earns nothing
+whatever the rest of the household earns, lands a pound for a pound once £300
+has landed in the month, and from 75 on claims nothing at all.
 
 ## The run
 

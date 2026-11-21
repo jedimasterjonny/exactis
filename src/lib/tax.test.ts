@@ -423,11 +423,17 @@ describe("reliefOf", () => {
 
 describe("relievableOn", () => {
   // A month earning £1,000 relieves the £1,000, and one earning £200 or
-  // nothing still relieves £300, a twelfth of the £3,600 a year.
-  it("relieves what a month earns, and £300 when that is less", () => {
+  // nothing still relieves £300, a twelfth of the £3,600 a year, up to
+  // age 74; from 75 relief stops altogether.
+  it("relieves what a month earns, and £300 when that is less, until age 75", () => {
     expect(relievableOn(1000)).toBe(1000);
     expect(relievableOn(200)).toBe(300);
     expect(relievableOn(0)).toBe(300);
+    expect(relievableOn(1000, 74)).toBe(1000);
+    expect(relievableOn(0, 74)).toBe(300);
+    expect(relievableOn(1000, 75)).toBe(0);
+    expect(relievableOn(0, 75)).toBe(0);
+    expect(relievableOn(1000, 80)).toBe(0);
   });
 });
 

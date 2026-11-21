@@ -1820,6 +1820,58 @@ describe("project", () => {
     ]);
   });
 
+  // An owner born in 1952 is 74 through 2026 and turns 75 in January
+  // 2027, part way through the 2026/27 tax year. Paying £240 a month
+  // into a SIPP on £60,000 a year of pension income claims £60 a month
+  // basic-rate relief over April–December 2026 (£2,700 gross, refunding
+  // 20% = £540 in April 2027), then £0 from January 2027 onward, so
+  // April 2028 refunds nothing.
+  it("stops basic-rate and higher-rate pension relief from the calendar year an owner turns 75", () => {
+    const older = { born: 1952, id: 1, name: "Owner", retirement: atAge(90) };
+    const sipp: Account = {
+      balance: 0,
+      contribution: { amount: 2880, cadence: "year", kind: "fixed" },
+      growth: { kind: "fixed", rate: 0 },
+      id: 1,
+      isDroppable: true,
+      kind: "tax-deferred",
+      name: "SIPP",
+      owner: 1,
+    };
+    const spareCash: Account = {
+      ...cash,
+      balance: 0,
+      contribution: { cap: null, kind: "spare" },
+    };
+    const annuity = {
+      ...salary,
+      amount: 60000,
+      bonus: 0,
+      feeds: null,
+      kind: "pension" as const,
+      lastYear: null,
+      rsu: 0,
+      sacrifice: 0,
+    };
+    const spending = {
+      ...household,
+      amount: (48568 - 2880) / 12,
+      lastYear: null,
+    };
+    const points = project(
+      [sipp, spareCash],
+      { expenses: [spending], income: [annuity] },
+      { ...plan, born: 1952, month: 3, owners: [older], retires: 90, years: 3 },
+    );
+
+    expect(points.map(({ deferred }) => deferred)).toStrictEqual([
+      0, 2700, 5580, 8460,
+    ]);
+    expect(points.map(({ balances }) => balances[spareCash.id])).toStrictEqual([
+      0, 0, 540, 540,
+    ]);
+  });
+
   // Under pension-to-basic-rate, gross relief-at-source contributions
   // made earlier in the tax year extend the basic-rate band (not the
   // personal allowance). An owner aged 60 in 2026 earns £60,000 a year
