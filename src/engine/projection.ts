@@ -3,7 +3,7 @@ import type { ExpenseLine } from "@/data/expenses";
 import type { Condition, Measured } from "@/data/milestones";
 import type { Drawdown, Plan } from "@/data/plan";
 import type { Month } from "@/data/schedule";
-import type { CashFlow, Earned, Paid, Schedule } from "@/engine/cash-flow";
+import type { CashFlow, Earned, Fed, Paid, Schedule } from "@/engine/cash-flow";
 
 import { isAsset, isPension } from "@/data/accounts";
 import { isReached, retiresOn, retiringAt, timed } from "@/data/milestones";
@@ -458,8 +458,9 @@ export function measuredOf(
 // though not drawn, is counted off what they have to keep it paid, as the
 // projection, having drawn it, counts it, so a month end closed after a
 // long gap stops keeping the pension paid when the projection would;
-// nor is a tax year settled. No months leave every
-// account where it stands, paid nothing.
+// nor is a tax year settled, and post-April-2029 salary sacrifice NI
+// relief is read at a twelfth a month alongside the other allowances.
+// No months leave every account where it stands, paid nothing.
 export function monthsOn(
   accounts: readonly Account[],
   schedule: Schedule,
@@ -563,7 +564,8 @@ export function movedYears(
 // the flow pays it and grown, or a debt paid down. What a month cannot
 // read afresh is carried to the next: each owner's lump sum allowance
 // left, the owners who have drawn on a pension as income, what has
-// landed under each allowance since April and each owner's tax year. A
+// landed under each allowance and each owner's salary sacrifice since
+// April, and each owner's tax year. A
 // point is the balances entering its year, with what the year went
 // short and drew early, in today's money. The rules, and why, are under
 // The State Pension, The tax on the month, Debts, The allowances and
@@ -594,6 +596,7 @@ export function project(
   }
   let allowances: ReadonlyMap<number, number> = new Map();
   let drawn: ReadonlySet<number> = new Set();
+  let sacrificed: ReadonlyMap<number, number> = new Map();
   let taxYears: ReadonlyMap<number, TaxYear> = new Map();
   let used: ReadonlyMap<string, number> = new Map();
   let moved: Run = { accounts, plan, schedule };
@@ -661,6 +664,7 @@ export function project(
               )
             : 0;
         if (month === april) {
+          sacrificed = new Map();
           taxYears = new Map();
           used = new Map();
         }
@@ -669,10 +673,12 @@ export function project(
           drawn,
           plan: carried.plan,
           reserve: reserveOf(held),
+          sacrificed,
           settlement: settlement - due,
           used,
         };
         const flow = cashFlow(carried.accounts, carried.schedule, reading);
+        sacrificed = sacrificedWith(sacrificed, flow.fed);
         used = landedWith(used, flow.landed);
         const draw = drawnFrom(held, shortOf(carried, flow, reading), {
           allowances,
@@ -1453,6 +1459,25 @@ function reserveOf(held: readonly Held[]): number {
   return held
     .filter(({ account }) => isReserve(account))
     .reduce((sum, { balance }) => sum + balance, 0);
+}
+
+// What each owner has sacrificed into a pension since April once a
+// month's feeds are added to it, used to hold the £2,000 National
+// Insurance exemption across the tax year from April 2029.
+function sacrificedWith(
+  soFar: ReadonlyMap<number, number>,
+  fed: readonly Fed[],
+): ReadonlyMap<number, number> {
+  if (fed.length === 0) {
+    return soFar;
+  }
+  const sum = new Map(soFar);
+  for (const { line, sacrificed } of fed) {
+    if (sacrificed > 0) {
+      sum.set(line.owner, (sum.get(line.owner) ?? 0) + sacrificed);
+    }
+  }
+  return sum;
 }
 
 // What a tax year is refunded once it closes, or owes as a negative:

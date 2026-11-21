@@ -32,20 +32,19 @@ to spare leaves the bands unused, and nothing counts the inheritance tax on a
 pension that would make drawing past need pay.
 
 Smaller gaps sit beside it. The employer's NI is credited at the full rate on
-the whole sacrifice, ignoring the threshold and what the scheme passes on, and
-from April 2029 a sacrifice over £2,000 a year pays both NIs. The employee's NI
-runs past the State Pension age, when it stops. Cash interest is not taxed, and
-nor is a GIA: neither the dividends it is paid each year nor the gain a draw
-realises, which would need what it cost held beside what it is worth, and an
-owner for the allowances and bands it is charged under. The bands are those
-outside Scotland. From April 2031 every band rises with prices together, where
-the law raises the personal allowance and the basic rate band and leaves the
-£100,000 the allowance is withdrawn from where it is. A draw before the pension
-age is charged a flat 55% however small against the pension, and the lump sum
-allowance is taken to be whole when the plan opens. The month keeps a pension
-paid only as far as the savings cover the spending and the kept payment
-together, where a drawdown drawing the pension for the spending leaves the
-savings for the kept payment alone. The pension age is read off the year its
+the NI-exempt sacrifice, ignoring the threshold and what the scheme passes on.
+The employee's NI runs past the State Pension age, when it stops. Cash interest
+is not taxed, and nor is a GIA: neither the dividends it is paid each year nor
+the gain a draw realises, which would need what it cost held beside what it is
+worth, and an owner for the allowances and bands it is charged under. The bands
+are those outside Scotland. From April 2031 every band rises with prices
+together, where the law raises the personal allowance and the basic rate band
+and leaves the £100,000 the allowance is withdrawn from where it is. A draw
+before the pension age is charged a flat 55% however small against the pension,
+and the lump sum allowance is taken to be whole when the plan opens. The month
+keeps a pension paid only as far as the savings cover the spending and the kept
+payment together, where a drawdown drawing the pension for the spending leaves
+the savings for the kept payment alone. The pension age is read off the year its
 owner was born and not the day, so the whole of the year an age is reached
 counts as reaching it, and a protected pension age some schemes give is not
 held. The pension ages are constants in the engine until the assumptions screen

@@ -4,6 +4,7 @@ import type { LineValues } from "@/data/schedule";
 
 import { retirementYearOf } from "@/data/milestones";
 import { earnerOf, retirementYear } from "@/data/plan";
+import { employerNi } from "@/lib/tax";
 
 export type BonusCadence = (typeof bonusCadences)[number];
 
@@ -99,13 +100,6 @@ export const incomeKinds = [
   "state-pension",
 ] as const;
 
-// The employer's National Insurance on pay, fifteen per cent from April
-// 2025, which a salary sacrifice saves the employer on what is given up
-// and which a scheme that reclaims it pays into the pension with the
-// sacrifice. The employee's own saving is the flow's to find, since a
-// sacrifice comes off the salary before its tax is charged.
-const employerNi = 0.15;
-
 // A line as it is paid: one earned by working that runs into the year
 // the owner who earns it retires in is paid to the year before and no
 // further, whatever its own end says, since the engine pays no salary or
@@ -140,10 +134,19 @@ export function asPaid<TLine extends IncomeLineValues>(
 }
 
 // What lands in the pension a line feeds, at the line's cadence: the
-// sacrifice, the employer's NI saved on it, passed on in full, and the
-// employer's match.
-export function contributionOf(line: IncomeLineValues): number {
-  return sacrificeOf(line) * (1 + employerNi) + matchOf(line);
+// sacrifice, the employer's NI saved on the NI-exempt portion of it
+// (passed on in full), and the employer's match. Without an explicit
+// exempt sum, the whole sacrifice is taken to be exempt.
+export function contributionOf(
+  line: IncomeLineValues,
+  exempt = sacrificeOf(line),
+): number {
+  const sacrificed = sacrificeOf(line);
+  return (
+    sacrificed +
+    Math.max(0, Math.min(sacrificed, exempt)) * employerNi +
+    matchOf(line)
+  );
 }
 
 // Whether the line is money earned by working, a salary or a

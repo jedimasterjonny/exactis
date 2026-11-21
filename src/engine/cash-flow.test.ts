@@ -865,8 +865,10 @@ describe("cashFlow", () => {
     expect(flowAt(ending, { month: 6, year: 2030 }).fed).toStrictEqual([]);
     expect(flowAt(ending, { month: 6, year: 2030 }).left).toBe(0);
     expect(flowAt(ending, { month: 5, year: 2030 }).fed).toHaveLength(1);
+    // In June 2030 (standalone), only £2,000/12 of the £1,200 sacrifice
+    // is NI-exempt; the £1,033.33 above it pays 2% Class 1 (£20.67).
     expect(flowAt(ending, { month: 5, year: 2030 }).left).toBeCloseTo(
-      6706.2,
+      6706.2 - (1200 - 2000 / 12) * 0.02,
       10,
     );
   });
@@ -1601,6 +1603,291 @@ describe("cashFlow", () => {
     expect(reliefAt(2067, [earning])).toStrictEqual([
       { account: paying, amount: 0 },
     ]);
+  });
+
+  // Through March 2029 the whole sacrifice is exempt from both NIs.
+  // From April 2029, a month read on its own caps the exemption at a
+  // twelfth of £2,000 (£166.67):
+  // - On a £36,000 salary sacrificing 10% (£300/mo, in the 8% NI band)
+  //   with a 5% match (£150/mo), the excess £133.33 pays 8% employee NI
+  //   (£10.67 more than March 2029), employer NI adds 15% of £166.67
+  //   (£25 instead of £45), and income tax and match stay unchanged.
+  // - On a £120,000 salary sacrificing 10% (£1,000/mo, above the UEL),
+  //   the excess £833.33 pays 2% employee NI (£16.67 more).
+  it("caps salary sacrifice NI relief at a twelfth of £2,000 a month on its own from April 2029", () => {
+    const unpaid: Account = {
+      balance: pension.balance,
+      growth: pension.growth,
+      id: pension.id,
+      kind: "tax-deferred",
+      name: pension.name,
+      owner: 1,
+    };
+    const matched: IncomeLine = {
+      ...salary,
+      amount: 36000,
+      bonus: 0,
+      match: 0.05,
+      rsu: 0,
+      sacrifice: 0.1,
+    };
+    const high: IncomeLine = {
+      ...salary,
+      amount: 120000,
+      bonus: 0,
+      rsu: 0,
+      sacrifice: 0.1,
+    };
+    const march = cashFlow(
+      [unpaid],
+      { expenses: [], income: [matched] },
+      { at: { month: 2, year: 2029 }, plan },
+    );
+    const april29 = cashFlow(
+      [unpaid],
+      { expenses: [], income: [matched] },
+      { at: { month: 3, year: 2029 }, plan },
+    );
+    const highMarch = cashFlow(
+      [unpaid],
+      { expenses: [], income: [high] },
+      { at: { month: 2, year: 2029 }, plan },
+    );
+    const highApril = cashFlow(
+      [unpaid],
+      { expenses: [], income: [high] },
+      { at: { month: 3, year: 2029 }, plan },
+    );
+
+    expect(april29.incomeTax).toBeCloseTo(march.incomeTax, 10);
+    expect(april29.insurance - march.insurance).toBeCloseTo(
+      (300 - 2000 / 12) * 0.08,
+      10,
+    );
+    expect(march.fed[0]?.amount).toBeCloseTo(300 + 45 + 150, 10);
+    expect(april29.fed[0]?.amount).toBeCloseTo(300 + 25 + 150, 10);
+    expect(highApril.insurance - highMarch.insurance).toBeCloseTo(
+      (1000 - 2000 / 12) * 0.02,
+      10,
+    );
+  });
+
+  // Carried by the projection from April 2029, each owner holds £2,000
+  // of NI-exempt sacrifice for the tax year, pro-rated in a partial
+  // first tax year, and shared across all salaries of that owner while
+  // each owner holds their own £2,000.
+  it("carries each owner's £2,000 salary sacrifice NI cap across the tax year", () => {
+    const unpaid: Account = {
+      balance: pension.balance,
+      growth: pension.growth,
+      id: pension.id,
+      kind: "tax-deferred",
+      name: pension.name,
+      owner: 1,
+    };
+    const partnerPension: Account = { ...unpaid, id: 7, owner: 2 };
+    const twoOwners = { ...plan, owners: [working, sam] };
+    const line1: IncomeLine = {
+      ...salary,
+      amount: 120000,
+      bonus: 0,
+      id: 1,
+      rsu: 0,
+      sacrifice: 0.15,
+    };
+    const line2: IncomeLine = {
+      ...line1,
+      amount: 60000,
+      id: 2,
+      sacrifice: 0.2,
+    };
+    const partnerLine: IncomeLine = {
+      ...line1,
+      feeds: partnerPension.id,
+      id: 3,
+      owner: 2,
+    };
+    // April 2029, nothing used: line1 sacrifices £1,500 (all exempt,
+    // +£225 employer NI) and line2 sacrifices £1,000 (£500 exempt,
+    // +£75 employer NI); partner gets their own £2,000 so all £1,500
+    // is exempt (+£225).
+    const fresh = cashFlow(
+      [unpaid, partnerPension],
+      { expenses: [], income: [line1, line2, partnerLine] },
+      { at: { month: 3, year: 2029 }, plan: twoOwners, sacrificed: new Map() },
+    );
+
+    expect(fresh.fed.map(({ amount }) => amount)).toStrictEqual([
+      1500 + 225,
+      1000 + 75,
+      1500 + 225,
+    ]);
+
+    // Already used £1,800 in the tax year: only £200 left for line1
+    // (+£30 employer NI); once £2,000 is gone, £0 employer NI.
+    const partUsed = cashFlow(
+      [unpaid],
+      { expenses: [], income: [line1] },
+      { at: { month: 4, year: 2029 }, plan, sacrificed: new Map([[1, 1800]]) },
+    );
+    const exhausted = cashFlow(
+      [unpaid],
+      { expenses: [], income: [line1] },
+      { at: { month: 5, year: 2029 }, plan, sacrificed: new Map([[1, 2500]]) },
+    );
+
+    expect(partUsed.fed[0]?.amount).toBeCloseTo(1500 + 30, 10);
+    expect(exhausted.fed[0]?.amount).toBeCloseTo(1500, 10);
+
+    // Plan opening in October 2029 (six months into 2029/30) starts
+    // with half the £2,000 cap (£1,000 exempt, +£150 employer NI).
+    const midYear = cashFlow(
+      [unpaid],
+      { expenses: [], income: [line1] },
+      {
+        at: { month: 9, year: 2029 },
+        plan: { ...plan, from: 2029, month: 9 },
+        sacrificed: new Map(),
+      },
+    );
+
+    expect(midYear.fed[0]?.amount).toBeCloseTo(1500 + 150, 10);
+  });
+
+  // When a droppable pension is listed ahead of a kept-paid pension
+  // and the month is short enough to drop the droppable sacrifice, the
+  // dropped line must not consume any of the owner's £2,000 NI cap.
+  it("does not let a dropped sacrifice consume a kept-paid pension's NI cap", () => {
+    const droppable: Account = {
+      balance: pension.balance,
+      growth: pension.growth,
+      id: 10,
+      isDroppable: true,
+      kind: "tax-deferred",
+      name: pension.name,
+      owner: 1,
+    };
+    const keptPaid: Account = {
+      balance: pension.balance,
+      growth: pension.growth,
+      id: 11,
+      kind: "tax-deferred",
+      name: pension.name,
+      owner: 1,
+    };
+    const dropLine: IncomeLine = {
+      ...salary,
+      amount: 36000,
+      bonus: 0,
+      feeds: droppable.id,
+      id: 1,
+      rsu: 0,
+      sacrifice: 0.5,
+    };
+    const keepLine: IncomeLine = {
+      ...salary,
+      amount: 36000,
+      bonus: 0,
+      feeds: keptPaid.id,
+      id: 2,
+      rsu: 0,
+      sacrifice: 0.5,
+    };
+    const flow = cashFlow(
+      [droppable, keptPaid],
+      {
+        expenses: [{ ...household, amount: 4000 }],
+        income: [dropLine, keepLine],
+      },
+      {
+        at: { month: 3, year: 2029 },
+        plan,
+        reserve: 10000,
+        sacrificed: new Map(),
+      },
+    );
+
+    expect(flow.fed).toHaveLength(1);
+    expect(flow.fed[0]?.account).toBe(keptPaid);
+    expect(flow.fed[0]?.amount).toBeCloseTo(1500 + 225, 10);
+  });
+
+  // From April 2029, the £2,000 NI cap front-loads up to £300 of
+  // employer NI into April, but adjusted income for the annual
+  // allowance taper counts the capped year's employer NI (£300) rather
+  // than multiplying April's £300 by twelve (£3,600) or dropping it to
+  // zero in May once the cap is exhausted.
+  it("annualises capped employer NI for the pension allowance taper rather than multiplying April's by twelve", () => {
+    const workplace: Account = {
+      balance: 0,
+      growth: pension.growth,
+      id: 10,
+      kind: "tax-deferred",
+      name: "Workplace",
+      owner: 1,
+    };
+    const spareSipp: Account = {
+      balance: 0,
+      contribution: { cap: null, kind: "spare" },
+      growth: pension.growth,
+      id: 11,
+      kind: "tax-deferred",
+      name: "SIPP",
+      owner: 1,
+    };
+    const highPay = (amount: number): IncomeLine => ({
+      ...salary,
+      amount,
+      bonus: 0,
+      feeds: workplace.id,
+      rsu: 0,
+      sacrifice: 0.1,
+    });
+    const used = new Map([["1 tax-deferred", 56000]]);
+
+    // £259,000 salary sacrificing 10% (£25,900/yr): adjusted income is
+    // £259,000 + £300 = £259,300 (< £260,000), so no taper applies in
+    // April 2029 (full £60,000 allowance, leaving £4,000 after £56,000
+    // used; April feeds £2,158.33 + £300 = £2,458.33, leaving £1,541.67
+    // of room for the SIPP).
+    const aprilNoTaper = cashFlow(
+      [workplace, spareSipp],
+      { expenses: [], income: [highPay(259000)] },
+      {
+        at: { month: 3, year: 2029 },
+        plan: { ...plan, from: 2029, month: 3 },
+        sacrificed: new Map(),
+        used,
+      },
+    );
+    expect(aprilNoTaper.landed.get("1 tax-deferred")).toBeCloseTo(4000, 10);
+
+    // £260,000 salary sacrificing 10% (£26,000/yr): adjusted income is
+    // £260,300, tapering the allowance by £150 to £59,850 in both April
+    // (when £300 employer NI lands) and May (once the cap is spent),
+    // leaving £3,850 of room after £56,000 used in either month.
+    const aprilTaper = cashFlow(
+      [workplace, spareSipp],
+      { expenses: [], income: [highPay(260000)] },
+      {
+        at: { month: 3, year: 2029 },
+        plan: { ...plan, from: 2029, month: 3 },
+        sacrificed: new Map(),
+        used,
+      },
+    );
+    const mayTaper = cashFlow(
+      [workplace, spareSipp],
+      { expenses: [], income: [highPay(260000)] },
+      {
+        at: { month: 4, year: 2029 },
+        plan: { ...plan, from: 2029, month: 3 },
+        sacrificed: new Map([[1, 26000 / 12]]),
+        used,
+      },
+    );
+    expect(aprilTaper.landed.get("1 tax-deferred")).toBeCloseTo(3850, 10);
+    expect(mayTaper.landed.get("1 tax-deferred")).toBeCloseTo(3850, 10);
   });
 
   // £2,453.30 after its tax and £1,000 of household leave £1,453.30

@@ -70,11 +70,12 @@ interface TaxYear {
   readonly taxable: number;
 }
 
-// What a tax year has used of the ISA's allowance and the pension's, in
-// what has landed in each.
+// What a tax year has used of the ISA's allowance, the pension's, and
+// salary sacrifice (for the £2,000 NI cap from April 2029).
 interface Used {
   readonly isa: number;
   readonly pension: number;
+  readonly sacrificed: number;
 }
 
 // Every kind of income, which income tax is charged on together.
@@ -184,15 +185,23 @@ function earnedFrom(
 ): Earning {
   const refund = at.month === april ? refundOf(earning.year) : 0;
   const year = at.month === april ? opened : earning.year;
-  const used = at.month === april ? { isa: 0, pension: 0 } : earning.used;
+  const used =
+    at.month === april ? { isa: 0, pension: 0, sacrificed: 0 } : earning.used;
   const profit = earnedIn(income, at, ["self-employment"]);
   const pensionLeft = Math.max(0, pensionAllowance - used.pension);
+  const isCapped = at.year > 2029 || (at.year === 2029 && at.month >= april);
+  const exemptOf = (sacrificed: number): number =>
+    isCapped
+      ? Math.min(sacrificed, Math.max(0, 2000 - used.sacrificed))
+      : sacrificed;
+  const landedOf = (sacrificed: number): number =>
+    sacrificed + exemptOf(sacrificed) * 0.15;
   const taxableOf = (sacrificed: number): number =>
     earnedIn(income, at, everyKind) -
     sacrificed +
-    Math.max(0, sacrificed * 1.15 - pensionLeft);
+    Math.max(0, landedOf(sacrificed) - pensionLeft);
   const netOf = (sacrificed: number): number => {
-    const pay = earnedIn(income, at, ["employment"]) - sacrificed;
+    const pay = earnedIn(income, at, ["employment"]) - exemptOf(sacrificed);
     return (
       earnedIn(income, at, everyKind) -
       sacrificed -
@@ -204,6 +213,7 @@ function earnedFrom(
   };
   const sacrifice = givenUpIn(income, at);
   const sacrificed = netOf(sacrifice) >= -1e-9 ? sacrifice : 0;
+  const fed = landedOf(sacrificed);
   const net = netOf(sacrificed);
   const relievable =
     at.year - born >= 75
@@ -212,7 +222,7 @@ function earnedFrom(
           3600 / 12,
           earnedIn(income, at, ["employment", "self-employment"]) - sacrificed,
         );
-  const room = Math.max(0, pensionLeft - sacrificed * 1.15);
+  const room = Math.max(0, pensionLeft - fed);
   const paid = Math.max(
     0,
     Math.min(
@@ -227,11 +237,12 @@ function earnedFrom(
     Math.min(net - paid, Math.max(0, isaAllowance - used.isa)),
   );
   return {
-    fed: earning.fed + sacrificed * 1.15 + paid + relief,
+    fed: earning.fed + fed + paid + relief,
     kept: earning.kept + saved,
     used: {
       isa: used.isa + saved,
-      pension: used.pension + sacrificed * 1.15 + paid + relief,
+      pension: used.pension + fed + paid + relief,
+      sacrificed: used.sacrificed + sacrificed,
     },
     year: yearWith(year, {
       profit,
@@ -431,13 +442,13 @@ function pick<TChoice>(
   return choice;
 }
 
-// A plan drawn at random: read in any month of 2026, for one to five
+// A plan drawn at random: read in any month of `from`, for one to five
 // years, at no growth so what lands is what is counted, and retiring
 // past its end, so a salary runs as long as its line says.
-function planFrom(random: () => number, born: number): Plan {
+function planFrom(random: () => number, born: number, from = 2026): Plan {
   return {
     born,
-    from: 2026,
+    from,
     inflation: 0,
     month: Math.floor(random() * 12),
     owners: [{ ...working, born }],
@@ -470,12 +481,15 @@ function seeded(seed: number): () => number {
 
 // What the months of a plan's first tax year before it opened are taken
 // to have used of each allowance, which the plan holds nothing of: a
-// twelfth each, from April to the month the plan opens in.
+// twelfth each, from April to the month the plan opens in, including
+// the £2,000 salary-sacrifice NI cap from the 2029/30 tax year on.
 function usedBefore(plan: Plan): Used {
   const before = (plan.month - april + 12) % 12;
+  const taxYear = plan.month < april ? plan.from - 1 : plan.from;
   return {
     isa: (isaAllowance * before) / 12,
     pension: (pensionAllowance * before) / 12,
+    sacrificed: taxYear >= 2029 ? (2000 * before) / 12 : 0,
   };
 }
 
@@ -582,6 +596,64 @@ describe("project against the law", () => {
       const expected = [earning];
       for (const { at, isLast } of monthsOf(plan)) {
         earning = earnedFrom(earning, at, { born, fixed, income });
+        expected.push(...(isLast ? [earning] : []));
+      }
+
+      project([pension, isa, deepCash], { expenses: [], income }, plan).forEach(
+        (point, index) => {
+          expect(isNear(point.free, expected[index]?.kept)).toBe(true);
+          expect(isNear(point.deferred, expected[index]?.fed)).toBe(true);
+        },
+      );
+    }
+  });
+
+  // Post-April-2029 salary sacrifice: plans opening across 2028–2030
+  // with one to three sacrificing salaries spanning both the 8% and 2%
+  // Class 1 NI bands, covering pre-cap to capped transitions, partial
+  // opening tax years in 2029/30+, and multiple lines sharing one
+  // £2,000 NI exemption.
+  it("caps salary sacrifice NI relief at £2,000 a tax year from April 2029", () => {
+    const random = seeded(20290406);
+    for (let run = 0; run < plans; run += 1) {
+      const from = pick(random, [2028, 2029, 2030]);
+      const plan = planFrom(random, 1992, from);
+      const fixed = pick(random, [0, 300, 1500]);
+      const pension: Account = {
+        balance: 0,
+        ...(fixed > 0 && {
+          contribution: { amount: fixed, cadence: "month", kind: "fixed" },
+        }),
+        growth: { kind: "fixed", rate: 0 },
+        id: 50,
+        isDroppable: true,
+        kind: "tax-deferred",
+        name: "Pension",
+        owner: 1,
+      };
+      const income = Array.from(
+        { length: 1 + Math.floor(random() * 3) },
+        (_, index) => {
+          const line = lineFrom(random, index + 1, plan.from);
+          return index === 0 || random() < 0.7
+            ? {
+                ...line,
+                feeds: 50,
+                kind: "employment" as const,
+                sacrifice: pick(random, [0.05, 0.1, 0.25]),
+              }
+            : line;
+        },
+      );
+      let earning: Earning = {
+        fed: 0,
+        kept: isa.balance,
+        used: usedBefore(plan),
+        year: opened,
+      };
+      const expected = [earning];
+      for (const { at, isLast } of monthsOf(plan)) {
+        earning = earnedFrom(earning, at, { born: plan.born, fixed, income });
         expected.push(...(isLast ? [earning] : []));
       }
 
