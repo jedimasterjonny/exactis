@@ -155,7 +155,10 @@
   --sidebar-border: rgb(255 255 255 / 8%);
   --sidebar-ring: var(--grey-25);
   /* Exactis additions */
-  --brand: #8c2f27; /* oxide-500: wordmark dot, active tab, chosen milestone */
+  /* oxide-500: the rule over the phone's current tab, the rail on More's
+     current row, the chosen milestone, a dialog's eyebrow and the inflation
+     curve's horizon */
+  --brand: #8c2f27;
   --brand-foreground: #ffffff;
   /* Gains, funded. 6.1:1 on paper, equal to loss */
   --positive: var(--jade-500);
