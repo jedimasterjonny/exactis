@@ -133,11 +133,11 @@ describe("movedSince", () => {
         unchecked: 0,
       },
       changes: [],
-      expected: { liquid: 336_628, retired: 2040 },
+      expected: { liquid: 334_834, retired: 2040 },
       fixed: 48,
       invested: 0,
       months: 1,
-      now: { liquid: 336_628, retired: 2040 },
+      now: { liquid: 334_834, retired: 2040 },
       rates: [],
       steps: [],
     });
@@ -156,7 +156,7 @@ describe("movedSince", () => {
     );
 
     expect(moved.steps).toStrictEqual([
-      { groups: ["balances"], standing: { liquid: 349_607, retired: 2040 } },
+      { groups: ["balances"], standing: { liquid: 347_813, retired: 2040 } },
     ]);
     expect(moved.balances.now - moved.balances.expected).toBe(10_000);
     expect(moved.now).toStrictEqual(moved.steps[0]?.standing);
@@ -292,7 +292,7 @@ describe("movedSince", () => {
     expect(moved.rates).toStrictEqual(["rates", "deductions"]);
     expect(moved.changes).toStrictEqual([]);
     expect(moved.steps).toStrictEqual([
-      { groups: ["rates"], standing: { liquid: 191_089, retired: 2038 } },
+      { groups: ["rates"], standing: { liquid: 189_174, retired: 2038 } },
     ]);
   });
 
@@ -431,7 +431,7 @@ describe("movedSince", () => {
     expect(moved.changes).toStrictEqual(["children", "schedule", "ages"]);
     expect(moved.rates).toStrictEqual([]);
     expect(moved.steps).toStrictEqual([
-      { groups: ["changes"], standing: { liquid: 282_265, retired: 2041 } },
+      { groups: ["changes"], standing: { liquid: 280_472, retired: 2042 } },
     ]);
   });
 

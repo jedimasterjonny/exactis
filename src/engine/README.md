@@ -191,11 +191,20 @@ pension it does not list, and removing a pension unlinks the salaries feeding
 it; a month handed one anyway earns it whole.
 
 A sacrifice comes off the salary before the tax is charged, since it is never
-paid to its owner at all: the salary pays income tax and National Insurance on
-what is left of it, so what the sacrifice saves in tax is what it saves the
-month, and it costs the month less than it puts in the pension. The pension is
-fed the sacrifice with the employer's National Insurance saved on it, over and
-above whatever fixed sum the pension is paid in its own right.
+paid to its owner at all: the salary pays income tax on what is left of it, so
+what the sacrifice saves in tax is what it saves the month, and it costs the
+month less than it puts in the pension. Through the 2028/29 tax year the whole
+sacrifice is exempt from National Insurance too, so the salary pays Class 1 on
+what is left of it and the pension is fed the sacrifice with the employer's
+National Insurance saved on it, over and above whatever fixed sum the pension is
+paid in its own right. From April 2029, each owner's National Insurance
+exemption is capped at £2,000 a tax year in nominal pounds across all of their
+salaries, in the order the salaries are listed, carried across the tax year as
+the allowances are (a twelfth a month in a month read on its own, and the months
+of a plan's first tax year before it opened taken to have used a twelfth each):
+what is sacrificed past £2,000 still comes off taxable income and earns any
+employer match, but pays employee Class 1 National Insurance and credits no
+employer National Insurance into the pension.
 
 An employer that matches the sacrifice pays its match into the same pension,
 pound for pound with the sacrifice up to the share of the base the line states,
@@ -485,7 +494,8 @@ either.
 From month to month the run carries what a month cannot read afresh: each
 owner's lump sum allowance left, under The draw; the owners who have drawn on a
 pension as income and what has landed under each allowance since April, under
-The allowances and relief; and each owner's tax year, under The tax on the
+The allowances and relief; each owner's salary sacrifice since April, under
+Salaries and what they feed; and each owner's tax year, under The tax on the
 month, which the draw reads as well, under The draw.
 
 What no account covered is the year's uncovered shortfall, summed over its
@@ -668,10 +678,11 @@ Everything an account states is in the pounds of the day, as a statement or an
 agreement gives it: its balance, its fixed sum, its cap and its rate, the plan
 rate among them, which is a nominal return. So are the figures the law sets and
 does not raise: the ISA and pension allowances, the lump sum allowance, the
-£3,600 of relief and the stamp duty bands. Held so, an allowance shrinks in
-today's money over a plan of decades as prices rise, as it would if no
-government changed it again. The tax bands are held flat in pounds until their
-freeze ends, under The tax on the month.
+£3,600 of relief, the £2,000 salary sacrifice National Insurance cap from April
+2029 and the stamp duty bands. Held so, an allowance shrinks in today's money
+over a plan of decades as prices rise, as it would if no government changed it
+again. The tax bands are held flat in pounds until their freeze ends, under The
+tax on the month.
 
 A point divides every balance by how far prices have risen by the start of its
 year, and what the year went short or drew early by, a month at a time, by how

@@ -1951,6 +1951,87 @@ describe("project", () => {
     expect(points[2]?.deferred).toBeLessThan(215000);
   });
 
+  // Read from April 2028 at no growth: £60,000 salary sacrificing 20%
+  // (£1,000/mo). In 2028/29 all £12,000 is NI-exempt, landing £13,800
+  // (+£1,800 employer NI). In 2029/30 only the first £2,000 (April and
+  // May) is exempt, landing £12,300 (+£300 employer NI), and April
+  // 2030 opens a fresh £2,000 cap (April–December 2030 lands £9,300).
+  it("caps salary sacrifice NI relief at £2,000 a tax year from April 2029 and resets each April", () => {
+    const sipp: Account = {
+      balance: 0,
+      growth: { kind: "fixed", rate: 0 },
+      id: 1,
+      kind: "tax-deferred",
+      name: "Workplace",
+      owner: 1,
+    };
+    const sacrificing = {
+      ...salary,
+      amount: 60000,
+      bonus: 0,
+      feeds: sipp.id,
+      lastYear: null,
+      rsu: 0,
+      sacrifice: 0.2,
+    };
+    const points = project(
+      [sipp],
+      { expenses: [], income: [sacrificing] },
+      { ...plan, from: 2028, month: 3, years: 3 },
+    );
+
+    // 2028 (Apr–Dec, 9 mo uncapped): 9 * 1150 = 10,350
+    // 2029 (Jan–Mar uncapped: 3 * 1150 = 3,450; Apr–Dec capped: 9 * 1000 + 300 = 9,300): +12,750 -> 23,100
+    // 2030 (Jan–Mar capped exhausted: 3 * 1000 = 3,000; Apr–Dec fresh £2,000: 9 * 1000 + 300 = 9,300): +12,300 -> 35,400
+    expect(points.map(({ deferred }) => deferred)).toStrictEqual([
+      0, 10350, 23100, 35400,
+    ]);
+  });
+
+  // A short month in April 2029 drops a droppable sacrifice (leaving
+  // only any employer floor) and consumes none of the £2,000 NI cap, so
+  // May 2029 still gets the full £2,000 exemption once spending falls.
+  it("keeps the £2,000 NI cap intact across a month whose droppable sacrifice was dropped", () => {
+    const sipp: Account = {
+      balance: 0,
+      growth: { kind: "fixed", rate: 0 },
+      id: 1,
+      isDroppable: true,
+      kind: "tax-deferred",
+      name: "Workplace",
+      owner: 1,
+    };
+    const sacrificing = {
+      ...salary,
+      amount: 120000,
+      bonus: 0,
+      feeds: sipp.id,
+      floor: 0.05,
+      lastYear: null,
+      rsu: 0,
+      sacrifice: 0.2,
+    };
+    // April 2029 alone has huge spending so sacrifice is dropped and
+    // only the £500 floor lands; May–December 2029 (8 months) each
+    // sacrifice £2,000, with May taking the full £2,000 NI exemption
+    // (+£300) and all 8 months taking £500 floor = 8 * 2500 + 300 =
+    // 20,300, plus April's £500 floor = 20,800.
+    const spike = {
+      ...household,
+      amount: 10000,
+      firstYear: 2029,
+      lastMonth: 3,
+      lastYear: 2029,
+    };
+    const points = project(
+      [sipp],
+      { expenses: [spike], income: [sacrificing] },
+      { ...plan, from: 2029, month: 3, years: 1 },
+    );
+
+    expect(points.map(({ deferred }) => deferred)).toStrictEqual([0, 20800]);
+  });
+
   // £400 of cash covers £400 of January and stops there rather than
   // going below nothing, so the ISA covers the £600 left of it and the
   // eleven whole months after, £11,600 in all: 20,000 − 11,600 = 8,400.

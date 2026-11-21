@@ -901,7 +901,7 @@ describe("ProjectionBoard", () => {
   // A year of expenses the plan holds from its first year, so it retires
   // then and runs out at 42, as retiring at 34 does; and spending twice
   // as much, it never reaches ten thousand years of them, and runs out
-  // at 87 while still working.
+  // at 86 while still working.
   it("says a retirement on conditions reached in the plan's first year, and one never reached by a plan that also runs out", () => {
     const spending: Schedule = {
       ...schedule,
@@ -919,7 +919,7 @@ describe("ProjectionBoard", () => {
     rerender(board(onConditions(10000), spending));
 
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
-      "The plan never reaches its retirement's conditions at its own rates, and runs out at 87.",
+      "The plan never reaches its retirement's conditions at its own rates, and runs out at 86.",
     );
   });
 

@@ -5,6 +5,7 @@ import {
   bandTopsOn,
   drawFor,
   drawOf,
+  employerNi,
   grossFilling,
   grossRelievedOf,
   incomeTaxOn,
@@ -16,6 +17,7 @@ import {
   pensionAllowanceOf,
   reliefOf,
   relievableOn,
+  sacrificeCapIn,
   stampDutyOn,
   upratingIn,
 } from "./tax";
@@ -418,6 +420,19 @@ describe("reliefOf", () => {
     for (const kind of ["cash", "tax-free", "debt"] as const) {
       expect(reliefOf({ kind })).toBe(0);
     }
+  });
+});
+
+describe("sacrificeCapIn", () => {
+  // Uncapped through March 2029 (the close of 2028/29), then £2,000 a
+  // year from April 2029 (2029/30) onwards, with employer NI at 15%.
+  it("caps NI-exempt salary sacrifice at £2,000 a year from April 2029", () => {
+    expect(employerNi).toBeCloseTo(0.15, 10);
+    expect(sacrificeCapIn({ month: 2, year: 2029 })).toBe(
+      Number.POSITIVE_INFINITY,
+    );
+    expect(sacrificeCapIn({ month: 3, year: 2029 })).toBe(2000);
+    expect(sacrificeCapIn({ month: 0, year: 2030 })).toBe(2000);
   });
 });
 

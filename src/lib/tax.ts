@@ -116,6 +116,12 @@ export const april = 3;
 // counted as drawn at.
 const basicRate = 0.2;
 
+// The employer's National Insurance on pay, fifteen per cent from April
+// 2025, which a salary sacrifice saves the employer on the NI-exempt
+// portion of what is given up and which a scheme that reclaims it pays
+// into the pension with the sacrifice.
+export const employerNi = 0.15;
+
 // The year the last tax year the bands are frozen for opens in:
 // 2030/31, the freeze ending in April 2031.
 const frozenThrough = 2030;
@@ -138,6 +144,15 @@ const moneyPurchaseAllowance = 10000;
 // The age from which a payment into a pension out of taxed money
 // claims no tax relief at all, under FA 2004 s.188(3)(a).
 const reliefStopsAt = 75;
+
+// The most salary sacrifice a person may exempt from employee and
+// employer National Insurance in a tax year from April 2029, held in
+// nominal pounds as the other statutory limits are.
+const sacrificeNiCap = 2000;
+
+// The tax year from which the £2,000 salary sacrifice National
+// Insurance cap applies: 2029/30, opening in April 2029.
+const sacrificeNiCappedFrom = 2029;
 
 // Where the pension allowance is tapered: a pound for every two of
 // adjusted income over £260,000, down to a £10,000 floor, which is
@@ -371,6 +386,16 @@ export function reliefOf(account: { readonly kind: AccountKind }): number {
 // paid, and a pension or any other income earns no relief at all.
 export function relievableOn(earned: number, age = 0): number {
   return age >= reliefStopsAt ? 0 : Math.max(leastRelievable / 12, earned);
+}
+
+// The most salary sacrifice a person may exempt from employee and
+// employer National Insurance in the tax year `at` falls in: boundless
+// before April 2029, and £2,000 a year from then, held in nominal
+// pounds.
+export function sacrificeCapIn(at: Month): number {
+  return taxYearOf(at) < sacrificeNiCappedFrom
+    ? Number.POSITIVE_INFINITY
+    : sacrificeNiCap;
 }
 
 // The stamp duty on a home bought for the price, in the pounds it is

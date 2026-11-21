@@ -152,6 +152,16 @@ describe("contributionOf", () => {
     expect(contributionOf({ ...scheme, sacrifice: 0.02 })).toBeCloseTo(8160, 8);
     expect(contributionOf({ ...scheme, sacrifice: 0 })).toBeCloseTo(5400, 8);
   });
+
+  // With only £2,000 of the £14,400 sacrifice exempt from NI, employer
+  // NI adds £300 (£14,700); with nothing exempt, £14,400; with more
+  // exempt than sacrificed, it is capped to the sacrifice itself.
+  it("credits employer NI only on the NI-exempt portion of the sacrifice", () => {
+    expect(contributionOf(salary, 2000)).toBeCloseTo(14700, 8);
+    expect(contributionOf(salary, 0)).toBeCloseTo(14400, 8);
+    expect(contributionOf(salary, -500)).toBeCloseTo(14400, 8);
+    expect(contributionOf(salary, 50000)).toBeCloseTo(16560, 8);
+  });
 });
 
 // The salary as its dialog holds it, feeding the pension it opened on

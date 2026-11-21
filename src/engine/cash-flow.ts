@@ -17,6 +17,7 @@ import {
   contributionOf,
   incomeKinds,
   isEarned,
+  matchOf,
   sacrificeOf,
   totalOf,
 } from "@/data/income";
@@ -38,11 +39,14 @@ import { keptIn } from "@/lib/maps";
 import { monthsBetween } from "@/lib/months";
 import {
   april,
+  employerNi,
   incomeTaxOn,
   insuranceOn,
   pensionAllowanceOf,
   reliefOf,
   relievableOn,
+  sacrificeCapIn,
+  taxYearOf,
   upratingIn,
 } from "@/lib/tax";
 
@@ -83,7 +87,8 @@ export interface Earned {
 }
 
 // A pension a salary feeds: what lands in it a month, the sacrifice
-// with the employer's NI saved on it and the employer's match, the line
+// with the employer's NI saved on its NI-exempt portion and the
+// employer's match, the line
 // it is fed from, and what that line gives up a month, which comes off
 // the month before the month is taxed, where the match comes off
 // nothing. Both are the whole of the line's feed whatever room the
@@ -146,6 +151,12 @@ export interface Totals {
   readonly saved: number;
 }
 
+// A feed entry inside a month's calculation, carrying the NI-exempt
+// slice of its sacrifice alongside the public Fed fields.
+interface Allocated extends Fed {
+  readonly exempt: number;
+}
+
 // A month fed one way, with or without the sacrifices into the pensions
 // marked droppable: what the salaries feed, the tax on what is left of
 // them, what the month then has, the purse the payments out of it are
@@ -157,7 +168,7 @@ export interface Totals {
 // in full after them, and a month with nothing in any would otherwise
 // keep them by paying the pension less.
 interface Feeding {
-  readonly fed: readonly Fed[];
+  readonly fed: readonly Allocated[];
   readonly funded: readonly Paid[];
   readonly month: number;
   readonly purse: Purse;
@@ -215,12 +226,17 @@ interface Purse {
 // having used a twelfth each and the months after it keeping theirs,
 // where the projection knows the pace behind it. Opened at what is left
 // of the year instead, a month read on its own in April would open the
-// whole year's room in one month.
+// whole year's room in one month. Beside `used` is `sacrificed`, what
+// each owner has given up by salary sacrifice since April, for the
+// April 2029 £2,000 National Insurance cap, opened the same way: what
+// the tax year has left for a month the projection carries, and a
+// twelfth of the cap for a month read on its own.
 interface Reading {
   readonly at: Month;
   readonly drawn?: ReadonlySet<number>;
   readonly plan: Plan;
   readonly reserve?: number;
+  readonly sacrificed?: ReadonlyMap<number, number>;
   readonly settlement?: number;
   readonly used?: Used;
 }
@@ -315,7 +331,9 @@ const standings = new WeakMap<
 // asset or a debt taking the spare money and a debt whose payments never
 // end. Then, in order: the income lines running in the month, a salary
 // or a profit only until its owner retires; what the salaries sacrifice
-// into the pensions they feed, with the employer's match and floor; the
+// into the pensions they feed, with employer NI on the NI-exempt
+// portion (capped at £2,000 a tax year per owner from April 2029) and
+// the employer's match and floor; the
 // income tax and the National Insurance on the rest, owner by owner; the
 // expense lines and each debt's own fixed sum; the fixed sums of the
 // pensions kept paid; the other fixed sums, down the accounts in the
@@ -353,42 +371,35 @@ export function cashFlow(
   const income = payOf(running, [], reading);
   // What each line feeding a listed pension lands in it, in the order
   // the lines are listed: the whole of its feed where the month gives up
-  // the sacrifices into that account, and otherwise the employer's floor
-  // under its match alone, the line giving up nothing; a line landing
-  // nothing lands no entry. Each line's entry is worked out once each
-  // way, so two feedings giving up the same sacrifices hold the same
-  // entries.
-  const giving = new Map<IncomeLine, Fed | null>();
-  const flooring = new Map<IncomeLine, Fed | null>();
-  const entryOf = (
-    line: IncomeLine,
-    account: Account,
-    isGiven: boolean,
-  ): Fed | null =>
-    keptIn(isGiven ? giving : flooring, line, () => {
-      const given = isGiven ? line : { ...line, sacrifice: 0 };
-      const wanted = monthlyOf(line, contributionOf(given), reading);
-      return wanted === 0
-        ? null
-        : {
-            account,
-            amount: wanted,
-            line,
-            sacrificed: monthlyOf(line, sacrificeOf(given), reading),
-          };
-    });
+  // the sacrifices into that account, with employer NI saved only on the
+  // slice within the owner's remaining NI-exempt cap for the tax year,
+  // and otherwise the employer's floor under its match alone, the line
+  // giving up nothing; a line landing nothing lands no entry.
   const feedingInto = (
     isGiving: (account: Account) => boolean,
-  ): readonly Fed[] => {
-    const fed: Fed[] = [];
+  ): readonly Allocated[] => {
+    const fed: Allocated[] = [];
+    const rooms = new Map<number, number>();
     for (const line of running) {
       const account = standing.feeds.get(line);
-      const entry =
-        account === undefined
-          ? null
-          : entryOf(line, account, isGiving(account));
-      if (entry !== null) {
-        fed.push(entry);
+      if (account === undefined) {
+        continue;
+      }
+      const isGiven = isGiving(account);
+      const given = isGiven ? line : { ...line, sacrifice: 0 };
+      const sacrificed = monthlyOf(line, sacrificeOf(given), reading);
+      const room =
+        rooms.get(line.owner) ?? sacrificeRoomIn(line.owner, reading);
+      const exempt = Math.min(sacrificed, room);
+      rooms.set(line.owner, room - exempt);
+      const amount =
+        exempt === sacrificed
+          ? monthlyOf(line, contributionOf(given), reading)
+          : sacrificed +
+            exempt * employerNi +
+            monthlyOf(line, matchOf(given), reading);
+      if (amount > 0) {
+        fed.push({ account, amount, exempt, line, sacrificed });
       }
     }
     return fed;
@@ -397,12 +408,19 @@ export function cashFlow(
   // the month reads, entry for entry: whether it can keep the pensions
   // paid and what it then pays are read over the same feeding as often
   // as not.
-  const taxes: { readonly fed: readonly Fed[]; readonly taxed: Taxed }[] = [];
-  const taxedWith = (fed: readonly Fed[]): Taxed => {
+  const taxes: { readonly fed: readonly Allocated[]; readonly taxed: Taxed }[] =
+    [];
+  const taxedWith = (fed: readonly Allocated[]): Taxed => {
     const known = taxes.find(
       (each) =>
         each.fed.length === fed.length &&
-        each.fed.every((entry, index) => entry === fed[index]),
+        each.fed.every(
+          (entry, index) =>
+            entry.line === fed[index]?.line &&
+            entry.amount === fed[index].amount &&
+            entry.sacrificed === fed[index].sacrificed &&
+            entry.exempt === fed[index].exempt,
+        ),
     );
     if (known !== undefined) {
       return known.taxed;
@@ -419,7 +437,7 @@ export function cashFlow(
   }
   const outgoings = expenses + total(owed);
   const leftWith = (
-    feeds: readonly Fed[],
+    feeds: readonly Allocated[],
     taxed: Taxed = taxedWith(feeds),
   ): number =>
     income -
@@ -431,13 +449,13 @@ export function cashFlow(
     Math.max(0, -leftWith([])),
     reading.reserve ?? Number.POSITIVE_INFINITY,
   );
-  const kept = feedingInto(() => true).filter(({ account }) =>
+  const kept = feedingInto(isKeptPaid).filter(({ account }) =>
     isKeptPaid(account),
   );
   const isKeeping = kept.length > 0 && leftWith(kept) >= floor - nanopound;
   const feeding = feedingInto((account) => isKeeping || !isKeptPaid(account));
   const others = feeding.filter(({ account }) => !isKeptPaid(account));
-  const paidWith = (fed: readonly Fed[], least: number): Feeding => {
+  const paidWith = (fed: readonly Allocated[], least: number): Feeding => {
     const taxed = taxedWith(fed);
     const month = leftWith(fed, taxed);
     const purse: Purse = {
@@ -493,7 +511,12 @@ export function cashFlow(
   return {
     earned: taxed.earned,
     expenses,
-    fed,
+    fed: fed.map(({ account, amount, line, sacrificed }) => ({
+      account,
+      amount,
+      line,
+      sacrificed,
+    })),
     fixed: [...owed, ...funded, ...saved],
     income,
     incomeTax: taxed.incomeTax,
@@ -654,14 +677,24 @@ function accountAt(
 function allowanceIn(
   owner: number,
   theirs: readonly IncomeLine[],
-  { fed, reading }: { readonly fed: readonly Fed[]; readonly reading: Reading },
+  {
+    fed,
+    reading,
+  }: { readonly fed: readonly Allocated[]; readonly reading: Reading },
 ): number {
   const { drawn = nobody } = reading;
   const own = fed.filter((entry) => entry.line.owner === owner);
   const pay = evenPayOf(theirs, fed, reading);
   const sacrificed = own.reduce((sum, entry) => sum + entry.sacrificed, 0);
+  const match = own.reduce(
+    (sum, entry) =>
+      sum + entry.amount - entry.sacrificed - entry.exempt * employerNi,
+    0,
+  );
+  const annualEmployerNi =
+    Math.min(12 * sacrificed, sacrificeCapIn(reading.at)) * employerNi;
   return pensionAllowanceOf({
-    adjusted: 12 * (pay + total(own)),
+    adjusted: 12 * (pay + sacrificed + match) + annualEmployerNi,
     hasDrawn: drawn.has(owner),
     threshold: 12 * (pay + sacrificed),
   });
@@ -928,23 +961,10 @@ function monthlyOf(
 // to have used a twelfth each, and never below nothing, since an owner
 // whose allowance falls to the money purchase one part way through a
 // year may have used more than it already.
-function openedAt(
-  held: string,
-  allowance: number,
-  { at, plan, used }: Reading,
-): number {
-  if (used === undefined) {
-    return allowance / 12;
-  }
-  const opens = {
-    month: april,
-    year: at.month < april ? at.year - 1 : at.year,
-  };
-  const before = Math.max(
-    0,
-    monthsBetween(opens, { month: plan.month, year: plan.from }),
-  );
-  return Math.max(0, allowance * (1 - before / 12) - (used.get(held) ?? 0));
+function openedAt(held: string, allowance: number, reading: Reading): number {
+  return reading.used === undefined
+    ? allowance / 12
+    : remainingIn(allowance, reading.used.get(held) ?? 0, reading);
 }
 
 // The month a line paying a loan makes its first payment in, which the
@@ -1022,6 +1042,25 @@ function reliefIn(purse: Purse, account: Account): number {
         relievableOn(0));
 }
 
+// What is left of a yearly limit in a month the projection carries: the
+// year's limit with any months of the plan's first tax year before it
+// opened taken to have used a twelfth each, less what the tax year has
+// used since April, and never below nothing.
+function remainingIn(
+  limit: number,
+  alreadyUsed: number,
+  { at, plan }: Pick<Reading, "at" | "plan">,
+): number {
+  const before = Math.max(
+    0,
+    monthsBetween(
+      { month: april, year: taxYearOf(at) },
+      { month: plan.month, year: plan.from },
+    ),
+  );
+  return Math.max(0, limit * (1 - before / 12) - alreadyUsed);
+}
+
 // What is left of an account's allowance in the month, in what lands:
 // its owner's for its kind, what the month opened it at until something
 // has been paid under it into any of the owner's accounts of the kind,
@@ -1046,6 +1085,22 @@ function roomOf({ kind, owner }: Pick<Account, "kind" | "owner">): string {
     kind,
     () => `${String(owner)} ${kind}`,
   );
+}
+
+// What is left of an owner's salary-sacrifice NI exemption in the
+// month: boundless before April 2029, a twelfth of £2,000 for a month
+// read on its own from then, and what the tax year has left of it once
+// what the owner has sacrificed since April is off for a month the
+// projection carries, with any months of the plan's first tax year
+// before it opened taken to have used a twelfth each.
+function sacrificeRoomIn(owner: number, reading: Reading): number {
+  const cap = sacrificeCapIn(reading.at);
+  if (!Number.isFinite(cap)) {
+    return cap;
+  }
+  return reading.sacrificed === undefined
+    ? cap / 12
+    : remainingIn(cap, reading.sacrificed.get(owner) ?? 0, reading);
 }
 
 // The spare money handed down the accounts that take it, each taking
@@ -1198,7 +1253,7 @@ function standingOf(
 // they earned together, with that excess among it.
 function taxOn(
   lines: readonly IncomeLine[],
-  fed: readonly Fed[],
+  fed: readonly Allocated[],
   reading: Reading,
 ): Taxed {
   const stretch = { months: 1, uprating: upratingIn(reading.plan, reading.at) };
@@ -1215,7 +1270,8 @@ function taxOn(
   let taxables = 0;
   for (const [owner, theirs] of Map.groupBy(lines, ({ owner }) => owner)) {
     const profit = ofKind(theirs, "self-employment");
-    const landed = total(fed.filter((entry) => entry.line.owner === owner));
+    const own = fed.filter((entry) => entry.line.owner === owner);
+    const landed = total(own);
     const excess = Math.max(
       0,
       landed -
@@ -1225,11 +1281,20 @@ function taxOn(
           reading,
         ),
     );
+    const niLiable = own
+      .filter(({ line }) => line.kind === "employment")
+      .reduce((sum, entry) => sum + (entry.sacrificed - entry.exempt), 0);
     const taxable = payOf(theirs, fed, reading) + excess;
     earned.push({ isWorking: theirs.some(isEarned), owner, profit, taxable });
     incomeTax += incomeTaxOn(taxable, stretch);
     insurance += incomeKinds.reduce(
-      (sum, kind) => sum + insuranceOn(kind, ofKind(theirs, kind), stretch),
+      (sum, kind) =>
+        sum +
+        insuranceOn(
+          kind,
+          ofKind(theirs, kind) + (kind === "employment" ? niLiable : 0),
+          stretch,
+        ),
       0,
     );
     profits += profit;
