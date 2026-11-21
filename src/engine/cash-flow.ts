@@ -449,10 +449,10 @@ export function cashFlow(
     Math.max(0, -leftWith([])),
     reading.reserve ?? Number.POSITIVE_INFINITY,
   );
-  const kept = feedingInto(isKeptPaid).filter(({ account }) =>
-    isKeptPaid(account),
-  );
-  const isKeeping = kept.length > 0 && leftWith(kept) >= floor - nanopound;
+  const kept = feedingInto(isKeptPaid);
+  const isKeeping =
+    kept.some(({ account }) => isKeptPaid(account)) &&
+    leftWith(kept) >= floor - nanopound;
   const feeding = feedingInto((account) => isKeeping || !isKeptPaid(account));
   const others = feeding.filter(({ account }) => !isKeptPaid(account));
   const paidWith = (fed: readonly Allocated[], least: number): Feeding => {

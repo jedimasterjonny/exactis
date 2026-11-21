@@ -966,6 +966,63 @@ describe("project", () => {
     ).toStrictEqual({ 3: 0, 6: 19700, 7: 50560 });
   });
 
+  // In December 2026, a £360,000 salary's 15% mandatory floor (£4,500)
+  // into a droppable pension incurs £525 of annual allowance tax on top
+  // of a £400 spending gap (£925 total). With £1,000 in cash, the £75
+  // left cannot cover a £100 kept-paid sacrifice (£104.75 net cost), so
+  // the kept-paid sacrifice is dropped rather than overshooting the
+  // cash reserve into an uncovered shortfall.
+  it("drops a kept-paid sacrifice instead of causing an uncovered shortfall when a droppable floor's annual allowance charge eats the reserve", () => {
+    const droppable: Account = {
+      balance: 0,
+      growth: { kind: "fixed", rate: 0 },
+      id: 10,
+      isDroppable: true,
+      kind: "tax-deferred",
+      name: "Droppable",
+      owner: 1,
+    };
+    const kept: Account = {
+      balance: 0,
+      growth: { kind: "fixed", rate: 0 },
+      id: 11,
+      kind: "tax-deferred",
+      name: "Kept",
+      owner: 1,
+    };
+    const mainJob = {
+      ...salary,
+      amount: 360000,
+      bonus: 0,
+      feeds: droppable.id,
+      floor: 0.15,
+      id: 1,
+      match: 0.15,
+      rsu: 0,
+      sacrifice: 0.15,
+    };
+    const sideJob = {
+      ...salary,
+      amount: 12000,
+      bonus: 0,
+      feeds: kept.id,
+      id: 2,
+      rsu: 0,
+      sacrifice: 0.1,
+    };
+    const [openingPoint, closingPoint] = project(
+      [droppable, kept, { ...pocket, balance: 1000 }],
+      {
+        expenses: [{ ...household, amount: 17812.2 }],
+        income: [mainJob, sideJob],
+      },
+      { ...plan, month: 11, years: 1 },
+    );
+
+    expect(openingPoint?.uncovered).toBe(0);
+    expect(closingPoint?.balances).toStrictEqual({ 3: 75, 10: 4500, 11: 0 });
+  });
+
   // The same month drawing the pension first: the SIPP gives up the £800
   // of spending, taxed nothing, a quarter of it free and the £600 left
   // under a twelfth of the personal allowance, and the £500 keeping it

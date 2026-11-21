@@ -2013,6 +2013,70 @@ describe("cashFlow", () => {
     expect(flow.left).toBeCloseTo(-220.22, 2);
   });
 
+  // In December 2026 (four months of the tapered £10,000 allowance
+  // left, £3,333.33), a £360,000 salary feeding a droppable pension
+  // with a 15% employer floor (£4,500/mo) triggers £525 of annual
+  // allowance tax even when its sacrifice is dropped. Against
+  // £17,812.20 of spending (£400 over the £17,412.20 net pay of both
+  // jobs), the unavoidable shortfall is £925, leaving £75 of the £1,000
+  // reserve — less than the £104.75 net cost of a £100 kept-paid
+  // sacrifice. Counting the droppable floor in the kept-paid check
+  // drops the kept-paid sacrifice so the shortfall stays within the
+  // £1,000 reserve.
+  it("counts a droppable pension's mandatory floor when checking whether the reserve covers a kept-paid sacrifice", () => {
+    const droppable: Account = {
+      balance: 0,
+      growth: { kind: "fixed", rate: 0 },
+      id: 10,
+      isDroppable: true,
+      kind: "tax-deferred",
+      name: "Droppable",
+      owner: 1,
+    };
+    const kept: Account = {
+      balance: 0,
+      growth: { kind: "fixed", rate: 0 },
+      id: 11,
+      kind: "tax-deferred",
+      name: "Kept",
+      owner: 1,
+    };
+    const mainJob: IncomeLine = {
+      ...plain,
+      amount: 360000,
+      feeds: droppable.id,
+      floor: 0.15,
+      id: 1,
+      match: 0.15,
+      sacrifice: 0.15,
+    };
+    const sideJob: IncomeLine = {
+      ...plain,
+      amount: 12000,
+      feeds: kept.id,
+      id: 2,
+      sacrifice: 0.1,
+    };
+    const flow = cashFlow(
+      [droppable, kept],
+      {
+        expenses: [{ ...household, amount: 17812.2 }],
+        income: [mainJob, sideJob],
+      },
+      {
+        at: { month: 11, year: 2026 },
+        plan: { ...plan, month: 11 },
+        reserve: 1000,
+        used: new Map(),
+      },
+    );
+
+    expect(pennies(flow.fed)).toStrictEqual([
+      { account: droppable, amount: 4500, line: mainJob, sacrificed: 0 },
+    ]);
+    expect(flow.left).toBeCloseTo(-925, 2);
+  });
+
   // Against £4,200 of household the two salaries leave £159.78 earned
   // whole. The £600 the £60,000 salary would give up into the pension
   // kept paid costs the month £348, and with nothing in the cash and the
