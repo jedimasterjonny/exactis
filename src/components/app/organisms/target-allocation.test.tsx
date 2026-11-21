@@ -122,6 +122,13 @@ describe("TargetAllocation", () => {
         name: "Reload from Portfolio Performance",
       }),
     ).toBeEnabled();
+    // Marked with the import's glyph, as the Cogitator's import is.
+    expect(
+      within(card)
+        .getByRole("button", { name: "Reload from Portfolio Performance" })
+        // eslint-disable-next-line testing-library/no-node-access -- the glyph is an icon hidden from the tree, with no role or text of its own
+        .querySelector("svg"),
+    ).toHaveClass("lucide-upload");
   });
 
   it("lays out the categories imported, each with its CMA class", () => {

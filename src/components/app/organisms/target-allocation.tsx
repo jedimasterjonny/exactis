@@ -8,7 +8,7 @@ import {
   ChevronDown,
   Crosshair,
   Download,
-  RefreshCw,
+  Upload,
   WandSparkles,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -297,7 +297,7 @@ export function TargetAllocation({
             size="sm"
             variant="outline"
           >
-            <RefreshCw aria-hidden />
+            <Upload aria-hidden />
             {targets === null
               ? "Import from Portfolio Performance"
               : "Reload from Portfolio Performance"}
