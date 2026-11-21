@@ -994,19 +994,34 @@ describe("cashFlow", () => {
     expect(takenIn(1, 25000)).toStrictEqual([0, 7342.2]);
   });
 
-  // An ISA whose owner the plan does not list has no allowance the
-  // month opens for them, and is held to a twelfth of the kind's, as a
-  // month read on its own is, however the year was carried.
+  // An ISA or a pension whose owner the plan does not list has no
+  // allowance the month opens for them, and is held to a twelfth of
+  // the kind's, as a month read on its own is, however the year was
+  // carried, with the £3,600 floor for relief.
   it("holds a wrapper whose owner the plan does not list to a twelfth of its kind's allowance", () => {
     const strangers: Account = { ...spareIsa, owner: 99 };
+    const strangerPension: Account = {
+      ...pension,
+      contribution: { amount: 500, cadence: "month", kind: "fixed" },
+      id: 98,
+      owner: 99,
+    };
     const flow = cashFlow(
       [strangers, spareCash],
+      { expenses: [], income: [salary] },
+      { at: { month: 3, year: 2027 }, plan, used: new Map() },
+    );
+    const pensionFlow = cashFlow(
+      [strangerPension],
       { expenses: [], income: [salary] },
       { at: { month: 3, year: 2027 }, plan, used: new Map() },
     );
 
     expect(pennies(flow.spare).map(({ amount }) => amount)).toStrictEqual([
       1666.67, 5675.53,
+    ]);
+    expect(pennies(pensionFlow.relief)).toStrictEqual([
+      { account: strangerPension, amount: 60 },
     ]);
   });
 
@@ -1548,6 +1563,44 @@ describe("cashFlow", () => {
       { account: sipp, amount: 4940, cap: 60000 },
     ]);
     expect(pennies(flow.relief)).toStrictEqual([{ account: sipp, amount: 60 }]);
+  });
+
+  // Born in 1992, the owner turns 74 in 2066 and still claims relief
+  // on both earned income and the £3,600 floor; in 2067, at 75, relief
+  // stops altogether and every pound paid into the pension lands as a
+  // pound, even with earned income running.
+  it("claims no tax relief on pension payments from age 75", () => {
+    const paying: Account = {
+      ...pension,
+      contribution: { amount: 500, cadence: "month", kind: "fixed" },
+    };
+    const stillWorking = retiringAt(plan, 80);
+    const earning: IncomeLine = { ...plain, amount: 12000, lastYear: null };
+    const state: IncomeLine = { ...statePension, firstYear: 2060 };
+    const reliefAt = (
+      year: number,
+      lines: readonly IncomeLine[],
+    ): CashFlow["relief"] =>
+      pennies(
+        cashFlow(
+          [paying],
+          { expenses: [], income: lines },
+          { at: { month: 0, year }, plan: stillWorking },
+        ).relief,
+      );
+
+    expect(reliefAt(2066, [state])).toStrictEqual([
+      { account: paying, amount: 60 },
+    ]);
+    expect(reliefAt(2066, [earning])).toStrictEqual([
+      { account: paying, amount: 125 },
+    ]);
+    expect(reliefAt(2067, [state])).toStrictEqual([
+      { account: paying, amount: 0 },
+    ]);
+    expect(reliefAt(2067, [earning])).toStrictEqual([
+      { account: paying, amount: 0 },
+    ]);
   });
 
   // £2,453.30 after its tax and £1,000 of household leave £1,453.30

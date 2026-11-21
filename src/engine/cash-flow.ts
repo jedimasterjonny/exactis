@@ -22,6 +22,7 @@ import {
 } from "@/data/income";
 import { retirementYearOf } from "@/data/milestones";
 import {
+  ageIn,
   debtTermOf,
   earnerOf,
   marginOf,
@@ -325,7 +326,8 @@ const standings = new WeakMap<
 // while the month can still pay the spending, the debts and the pensions
 // kept paid. What the month pays an ISA or a pension is held to its
 // owner's allowance, what a salary feeds landing whole and charged past
-// it, and a pension's relief to what its owner earns. It hands back the
+// it, and a pension's relief to what its owner earns while under 75,
+// nothing from age 75. It hands back the
 // month in its own pounds, line by line and summed, with what each
 // pension was fed and claims in relief, what landed under each allowance
 // and what each owner is taxed on and whether they work, for the
@@ -445,16 +447,18 @@ export function cashFlow(
       relievable: new Map(),
       rooms: new Map(),
     };
-    for (const [owner, lines] of Map.groupBy(
-      running.filter(isEarned),
-      byOwner,
-    )) {
-      purse.relievable.set(owner, relievableOn(evenPayOf(lines, fed, reading)));
-    }
-    for (const { id } of reading.plan.owners) {
+    for (const owner of reading.plan.owners) {
+      const { id } = owner;
       const isa = roomOf({ kind: "tax-free", owner: id });
       const pension = roomOf({ kind: "tax-deferred", owner: id });
       const theirs = running.filter((line) => line.owner === id);
+      purse.relievable.set(
+        String(id),
+        relievableOn(
+          evenPayOf(theirs.filter(isEarned), fed, reading),
+          ageIn(at.year, owner),
+        ),
+      );
       purse.rooms.set(isa, openedAt(isa, isaAllowance, reading));
       purse.rooms.set(
         pension,
@@ -680,12 +684,6 @@ function bonusIn(line: IncomeLine, reading: Reading): number {
     return month % 3 === 2 ? 3 * twelfth : 0;
   }
   return month === line.bonusMonth ? 12 * twelfth : 0;
-}
-
-// The owner who earns a line, as the lines are grouped by owner: the
-// id as a string, which is how a room is keyed too.
-function byOwner(line: IncomeLine): string {
-  return String(line.owner);
 }
 
 // What a loan's payments charge the month, given the term the loan maths
@@ -1013,9 +1011,9 @@ function payOf(
 
 // What is left of the relief an account's owner may claim in the month,
 // in what lands with it: what a twelfth of the owner's own earnings in
-// a year relieves until a payment has claimed some of it, the £3,600 floor for
-// an owner earning nothing, and nothing for an account that claims no
-// relief.
+// a year relieves until a payment has claimed some of it, the £3,600
+// floor for an owner under 75 earning nothing, nothing from age 75, and
+// nothing for an account that claims no relief.
 function reliefIn(purse: Purse, account: Account): number {
   return reliefOf(account) === 0
     ? 0

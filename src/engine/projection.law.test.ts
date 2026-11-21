@@ -50,9 +50,10 @@ interface Earning {
   readonly year: TaxYear;
 }
 
-// An earning plan's income, and the fixed sum its pension is paid a
-// month out of what is left of it.
+// An earning plan's owner's birth year, income, and the fixed sum its
+// pension is paid a month out of what is left of it.
 interface EarningCase {
+  readonly born: number;
   readonly fixed: number;
   readonly income: readonly IncomeLine[];
 }
@@ -172,13 +173,14 @@ function drawnIn(
 // allowance taxed as income; the pension paid its fixed sum out of what
 // is left and what its allowance has left, with the basic rate claimed
 // on as much of it as the month's earnings less what they sacrifice
-// relieve, or a twelfth of £3,600 when that is more; and the ISA the
+// relieve, or a twelfth of £3,600 when that is more, and nothing from
+// age 75; and the ISA the
 // rest up to what the tax year has left of its allowance, what is past
 // it going to cash.
 function earnedFrom(
   earning: Earning,
   at: Month,
-  { fixed, income }: EarningCase,
+  { born, fixed, income }: EarningCase,
 ): Earning {
   const refund = at.month === april ? refundOf(earning.year) : 0;
   const year = at.month === april ? opened : earning.year;
@@ -203,10 +205,13 @@ function earnedFrom(
   const sacrifice = givenUpIn(income, at);
   const sacrificed = netOf(sacrifice) >= -1e-9 ? sacrifice : 0;
   const net = netOf(sacrificed);
-  const relievable = Math.max(
-    3600 / 12,
-    earnedIn(income, at, ["employment", "self-employment"]) - sacrificed,
-  );
+  const relievable =
+    at.year - born >= 75
+      ? 0
+      : Math.max(
+          3600 / 12,
+          earnedIn(income, at, ["employment", "self-employment"]) - sacrificed,
+        );
   const room = Math.max(0, pensionLeft - sacrificed * 1.15);
   const paid = Math.max(
     0,
@@ -531,7 +536,52 @@ describe("project against the law", () => {
       };
       const expected = [earning];
       for (const { at, isLast } of monthsOf(plan)) {
-        earning = earnedFrom(earning, at, { fixed, income });
+        earning = earnedFrom(earning, at, { born: plan.born, fixed, income });
+        expected.push(...(isLast ? [earning] : []));
+      }
+
+      project([pension, isa, deepCash], { expenses: [], income }, plan).forEach(
+        (point, index) => {
+          expect(isNear(point.free, expected[index]?.kept)).toBe(true);
+          expect(isNear(point.deferred, expected[index]?.fed)).toBe(true);
+        },
+      );
+    }
+  });
+
+  // Owners spanning age 75: born between 1951 and 1956, so plans over
+  // 2026–2030 cross the age-75 cutoff mid-tax-year and spend full years
+  // on both sides of it, holding basic-rate and April higher-rate
+  // relief to zero from age 75.
+  it("stops pension tax relief from the calendar year an owner turns 75", () => {
+    const random = seeded(19520406);
+    for (let run = 0; run < plans; run += 1) {
+      const born = 1951 + Math.floor(random() * 6);
+      const plan = planFrom(random, born);
+      const fixed = pick(random, [300, 1200, 2500]);
+      const pension: Account = {
+        balance: 0,
+        contribution: { amount: fixed, cadence: "month", kind: "fixed" },
+        growth: { kind: "fixed", rate: 0 },
+        id: 50,
+        isDroppable: true,
+        kind: "tax-deferred",
+        name: "Pension",
+        owner: 1,
+      };
+      const income = Array.from(
+        { length: 1 + Math.floor(random() * 3) },
+        (_, index) => lineFrom(random, index + 1, plan.from),
+      );
+      let earning: Earning = {
+        fed: 0,
+        kept: isa.balance,
+        used: usedBefore(plan),
+        year: opened,
+      };
+      const expected = [earning];
+      for (const { at, isLast } of monthsOf(plan)) {
+        earning = earnedFrom(earning, at, { born, fixed, income });
         expected.push(...(isLast ? [earning] : []));
       }
 
