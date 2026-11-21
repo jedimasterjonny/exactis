@@ -41,7 +41,6 @@ describe("MilestoneChips", () => {
       "forced-colors:bg-[Highlight]",
       "forced-colors:text-[HighlightText]",
       "forced-colors:forced-color-adjust-none",
-      "forced-colors:focus-visible:outline-[CanvasText]",
     );
     expect(
       screen.getByRole("button", { name: "Kids leave home 2040" }),

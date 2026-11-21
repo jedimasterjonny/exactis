@@ -139,10 +139,7 @@ describe("PhoneNav", () => {
         "min-h-11",
         "aria-[current=page]:before:bg-brand",
         "forced-colors:aria-[current=page]:before:bg-[CanvasText]",
-        "forced-colors:focus-visible:outline-solid",
-        "forced-colors:focus-visible:outline-2",
         "forced-colors:focus-visible:-outline-offset-2",
-        "forced-colors:focus-visible:outline-[CanvasText]",
       );
     }
   });
@@ -218,21 +215,17 @@ describe("PhoneNav", () => {
     );
   });
 
-  // Forced colours take the ring away, so an outline stands in for it,
-  // inside the cell as the ring is.
-  it("outlines the focused tab or More in the text colour under forced colours", () => {
+  // Forced colours take the ring away, so the focus rule's outline in
+  // the text colour stands in for it, drawn inside the cell as the ring
+  // is.
+  it("outlines the focused tab or More inside the cell under forced colours", () => {
     const bar = barOn("/", closed);
 
     for (const cell of [
       ...within(bar).getAllByRole("link"),
       within(bar).getByRole("button", { name: "More" }),
     ]) {
-      expect(cell).toHaveClass(
-        "forced-colors:focus-visible:outline-solid",
-        "forced-colors:focus-visible:outline-2",
-        "forced-colors:focus-visible:-outline-offset-2",
-        "forced-colors:focus-visible:outline-[CanvasText]",
-      );
+      expect(cell).toHaveClass("forced-colors:focus-visible:-outline-offset-2");
     }
   });
 

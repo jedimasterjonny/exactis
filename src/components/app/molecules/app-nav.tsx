@@ -56,7 +56,7 @@ export function AppNav({ isDue }: AppNavProps): JSX.Element {
             >
               <SidebarMenuButton
                 aria-current={isCurrent ? "page" : undefined}
-                className="before:absolute before:inset-y-1.5 before:-left-2 before:w-0.5 before:rounded-full max-md:h-11 forced-colors:outline-[Canvas] forced-colors:focus-visible:outline-[CanvasText] pointer-coarse:h-11 data-active:before:bg-sidebar-primary forced-colors:data-active:before:bg-[CanvasText]"
+                className="before:absolute before:inset-y-1.5 before:-left-2 before:w-0.5 before:rounded-full max-md:h-11 forced-colors:outline-[Canvas] pointer-coarse:h-11 data-active:before:bg-sidebar-primary forced-colors:data-active:before:bg-[CanvasText]"
                 isActive={isCurrent}
                 onClick={() => {
                   setOpenMobile(false);

@@ -99,7 +99,7 @@ const Cell = memo(function Cell({
       aria-label={`Future ${formatCount(place + 1)}, ${outcomeNames[outcome].toLowerCase()}`}
       aria-pressed={isChosen}
       className={cn(
-        "aspect-[3/2] rounded-xs outline-offset-1 forced-color-adjust-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-foreground focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-ring aria-pressed:bg-foreground/10 aria-pressed:outline-2 aria-pressed:outline-foreground forced-colors:focus-visible:outline-[CanvasText] forced-colors:aria-pressed:bg-[Highlight] forced-colors:aria-pressed:text-[HighlightText]",
+        "aspect-[3/2] rounded-xs outline-offset-1 forced-color-adjust-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-foreground focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-ring aria-pressed:bg-foreground/10 aria-pressed:outline-2 aria-pressed:outline-foreground forced-colors:aria-pressed:bg-[Highlight] forced-colors:aria-pressed:text-[HighlightText]",
         outcomeInks[outcome],
       )}
       onClick={() => {
