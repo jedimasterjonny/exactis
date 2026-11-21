@@ -272,6 +272,7 @@ export function AccountLedger({
           onDelete={drop}
           onDismiss={close}
           onSaved={close}
+          opens={{ month: plan.month, year: plan.from }}
           owners={owners}
         />
       )}

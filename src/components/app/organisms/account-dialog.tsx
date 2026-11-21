@@ -11,6 +11,7 @@ import type {
 } from "@/data/accounts";
 import type { IncomeLine } from "@/data/income";
 import type { Owner } from "@/data/owners";
+import type { Month } from "@/data/schedule";
 import type { Entry } from "@/hooks/use-editor";
 
 import { saveAccount } from "@/actions/accounts";
@@ -30,6 +31,7 @@ interface AccountDialogProps {
   readonly onDelete?: ((account: Account) => void) | undefined;
   readonly onDismiss: () => void;
   readonly onSaved: (account: Account) => void;
+  readonly opens: Month;
   readonly owners: readonly Owner[];
 }
 
@@ -98,6 +100,7 @@ export function AccountDialog({
   onDelete,
   onDismiss,
   onSaved,
+  opens,
   owners,
 }: AccountDialogProps): JSX.Element | null {
   const feeders = account === null ? [] : feeding(account.id, lines);
@@ -198,9 +201,11 @@ export function AccountDialog({
             draft={entry.draft.shares}
             feeders={feeders}
             initial={entry.initial.shares}
+            lines={lines}
             onAmend={(shares) => {
               amend(entry, { shares });
             }}
+            opens={opens}
           />
         )}
       </AccountFields>

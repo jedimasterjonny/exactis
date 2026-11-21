@@ -52,6 +52,7 @@ function renderDialog(
       lines={[]}
       onDismiss={vi.fn<() => void>()}
       onSaved={vi.fn<(account: Account) => void>()}
+      opens={{ month: 8, year: 2026 }}
       owners={owners}
       {...props}
     />,
@@ -455,6 +456,37 @@ describe("AccountDialog", () => {
     expect(
       choice(openDialog(), "Contribution"),
     ).not.toHaveAccessibleDescription();
+  });
+
+  // Opening from April 2029 passes `opens` and the full `lines` list
+  // through to the sacrifice fields so the hint caps employer NI at
+  // £300 (£14,400 -> £14,700), and drops it to £0 (£14,400) when an
+  // earlier salary of the same owner already exhausts the £2,000 cap
+  // into another pension.
+  it("passes the plan opening month and schedule lines to the sacrifice hint from April 2029", () => {
+    const view = renderDialog({
+      account: pension,
+      lines: [salary],
+      opens: { month: 3, year: 2029 },
+    });
+    const dialog = openDialog();
+
+    expect(field("Sacrificed from Salary", dialog)).toHaveAccessibleDescription(
+      "Of its £120,000 base, landing as £14,700 a year",
+    );
+
+    view.unmount();
+    renderDialog({
+      account: pension,
+      lines: [{ ...salary, feeds: 99, id: 98, name: "First job" }, salary],
+      opens: { month: 3, year: 2029 },
+    });
+
+    expect(
+      field("Sacrificed from Salary", openDialog()),
+    ).toHaveAccessibleDescription(
+      "Of its £120,000 base, landing as £14,400 a year",
+    );
   });
 
   it("keeps a refused save open and says why", async () => {
