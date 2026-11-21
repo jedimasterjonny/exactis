@@ -38,7 +38,9 @@ interface ProgressYearProps {
 // where the bar's fills are named. A debt paid down adds and one run
 // up takes away, as it moves net worth. The sentence saying how far net
 // worth moved takes the id it is handed, so a chart can be described by
-// it.
+// it. The figure is a step smaller on a phone, so a move of seven or
+// eight figures fits a phone's width under spaced text rather than
+// widening the card's column, and everything laid in it, past its edge.
 export function ProgressYear({
   headlineId,
   year,
@@ -62,7 +64,7 @@ export function ProgressYear({
     <Card aria-label="What the year came to" role="region">
       <CardContent className="grid gap-6 lg:grid-cols-[auto_minmax(0,1fr)] lg:gap-x-10 xl:grid-cols-[auto_minmax(0,1fr)_20rem]">
         <div className="grid content-start gap-3">
-          <p className="display-figure text-5xl font-medium tracking-tighter">
+          <p className="display-figure text-4xl font-medium tracking-tighter sm:text-5xl">
             {formatSignedGbp(moved)}
           </p>
           <p className="text-xs text-muted-foreground">
