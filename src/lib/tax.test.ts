@@ -6,6 +6,7 @@ import {
   drawFor,
   drawOf,
   grossFilling,
+  grossRelievedOf,
   incomeTaxOn,
   insuranceOn,
   isWithinAllowance,
@@ -259,6 +260,50 @@ describe("incomeTaxOn", () => {
     );
     expect(incomeTaxOn(6000, { months: 1, uprating: 2 })).toBeCloseTo(781, 10);
   });
+
+  // A gross relief-at-source pension payment extends the basic and
+  // higher rate bands and lowers the adjusted net income the personal
+  // allowance is withdrawn against, without moving the personal
+  // allowance itself:
+  // - £15,000 or £30,000 with £10,000 gross still owes £486 or £3,486.
+  // - £60,000 with £10,000 gross moves all £9,730 of higher-rate pay
+  //   into the basic rate band, saving £1,946 (20% of £9,730).
+  // - £120,000 with £20,000 gross restores the whole personal allowance
+  //   and saves £8,000 (40% on top of the 20% claimed at source).
+  // - £150,000 with £30,000 gross saves 25% on £24,860 and 40% on
+  //   £5,140: £8,271.
+  // - Over six months, £60,000 with £6,000 gross saves £2,400 (40% in
+  //   the withdrawal band), and at uprating 2, £120,000 with £10,000
+  //   gross shifts the £100,540 basic-rate limit to £110,540, saving
+  //   £2,000.
+  it("extends the bands and restores the personal allowance for gross pension relief", () => {
+    expect(incomeTaxOn(15000, wholeYear, 10000)).toBeCloseTo(486, 10);
+    expect(incomeTaxOn(30000, wholeYear, 10000)).toBeCloseTo(3486, 10);
+    expect(
+      incomeTaxOn(60000, wholeYear) - incomeTaxOn(60000, wholeYear, 10000),
+    ).toBeCloseTo(1946, 10);
+    expect(
+      incomeTaxOn(120000, wholeYear) - incomeTaxOn(120000, wholeYear, 20000),
+    ).toBeCloseTo(8000, 10);
+    expect(
+      incomeTaxOn(150000, wholeYear) - incomeTaxOn(150000, wholeYear, 30000),
+    ).toBeCloseTo(8271, 10);
+    expect(
+      incomeTaxOn(60000, { months: 6, uprating: 1 }) -
+        incomeTaxOn(60000, { months: 6, uprating: 1 }, 6000),
+    ).toBeCloseTo(2400, 10);
+    expect(
+      incomeTaxOn(120000, { months: 12, uprating: 2 }) -
+        incomeTaxOn(120000, { months: 12, uprating: 2 }, 10000),
+    ).toBeCloseTo(2000, 10);
+  });
+});
+
+describe("grossRelievedOf", () => {
+  it("reads the gross pension contribution from the basic-rate relief claimed", () => {
+    expect(grossRelievedOf(200)).toBe(1000);
+    expect(grossRelievedOf(0)).toBe(0);
+  });
 });
 
 describe("insuranceOn", () => {
@@ -351,6 +396,9 @@ describe("refusing a charge", () => {
   it("refuses a sum below nothing or not a number, whatever the kind", () => {
     for (const sum of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
       expect(() => incomeTaxOn(sum, wholeYear)).toThrow(
+        "A tax is charged on nothing or more",
+      );
+      expect(() => incomeTaxOn(1000, wholeYear, sum)).toThrow(
         "A tax is charged on nothing or more",
       );
       expect(() => insuranceOn("other", sum, wholeYear)).toThrow(

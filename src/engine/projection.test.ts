@@ -308,10 +308,14 @@ describe("project", () => {
   // the spare money does: the mortgage's £2,180 first and whole, being
   // owed, though it is listed last, and the pension, marked droppable,
   // the £1,176.20 left of its £2,376. The current account, listed
-  // first and uncapped, would take whatever was left, and nothing is, so
-  // the ISA is paid nothing either; the pension is paid what the month
-  // had, which lands with the basic rate claimed back as £1,470.25, and
-  // fed the £1,380 that lands with the NI saved on top: 446,344.
+  // first and uncapped, takes whatever is left, so the ISA is paid
+  // nothing; the pension is paid what the month had, which lands with
+  // the basic rate claimed back as £1,470.25, and fed the £1,380 that
+  // lands with the NI saved on top. In April, settling the three months
+  // of 2025/26 refunds £1,597.05 of higher-rate and allowance-taper
+  // relief on their £4,410.75 gross relieved payments, letting April
+  // pay the pension its full £2,376 (with the £397.25 left going to the
+  // current account) and lifting the pension to 447,900.
   it("reads the cash flow over every account, in the order they are listed", () => {
     const spareCash: Account = {
       ...cash,
@@ -325,7 +329,7 @@ describe("project", () => {
 
     expect(a?.free).toBe(271930);
     expect(b?.free).toBe(271930);
-    expect(a?.deferred).toBe(446344);
+    expect(a?.deferred).toBe(447900);
   });
 
   // £800 a month paid into a pension out of the month lands as £1,000,
@@ -1643,6 +1647,258 @@ describe("project", () => {
     ).toStrictEqual([0, 1066, 13510]);
   });
 
+  // Read in April at no growth. A salary of £120,000 pays £39,432 of
+  // income tax and £4,410.60 of Class 1 over 2026/27, leaving £76,157.40
+  // (£6,346.45 a month). With £16,000 a year (£1,333.33 a month) paid
+  // into a pension out of taxed money, £20,000 lands in the pension
+  // each year with basic-rate relief, and £5,013.12 a month is spent by
+  // an expense line so nothing is saved into cash in any regular month.
+  // When April 2027 settles 2026/27, the £20,000 gross restores the
+  // personal allowance and extends the basic-rate band, refunding
+  // £8,000 into cash (40% on top of the 20% claimed at source).
+  it("refunds higher-rate relief and personal allowance restoration when the tax year settles", () => {
+    const sipp: Account = {
+      balance: 0,
+      contribution: { amount: 16000, cadence: "year", kind: "fixed" },
+      growth: { kind: "fixed", rate: 0 },
+      id: 1,
+      isDroppable: true,
+      kind: "tax-deferred",
+      name: "SIPP",
+      owner: 1,
+    };
+    const spareCash: Account = {
+      ...cash,
+      balance: 0,
+      contribution: { cap: null, kind: "spare" },
+    };
+    const earner = {
+      ...salary,
+      amount: 120000,
+      bonus: 0,
+      feeds: null,
+      lastYear: null,
+      rsu: 0,
+      sacrifice: 0,
+    };
+    const spending = {
+      ...household,
+      amount: 76157.4 / 12 - 16000 / 12,
+      lastYear: null,
+    };
+    const points = project(
+      [sipp, spareCash],
+      { expenses: [spending], income: [earner] },
+      { ...plan, month: 3, years: 2 },
+    );
+
+    expect(points.map(({ deferred }) => deferred)).toStrictEqual([
+      0, 15000, 35000,
+    ]);
+    expect(points.map(({ balances }) => balances[spareCash.id])).toStrictEqual([
+      0, 0, 8000,
+    ]);
+  });
+
+  // Read in April at no growth with two owners: owner 1 earns £60,000
+  // (higher-rate) and pays nothing into a pension; owner 2 earns
+  // £60,000 and pays £8,000 a year (£10,000 gross) into their own
+  // pension. Only owner 2's bands extend, refunding £1,946 (20% of the
+  // £9,730 above £50,270) in April 2027; owner 1's bands stay as they
+  // are.
+  it("extends only the contributing owner's bands when settling a household of two", () => {
+    const sipp: Account = {
+      balance: 0,
+      contribution: { amount: 8000, cadence: "year", kind: "fixed" },
+      growth: { kind: "fixed", rate: 0 },
+      id: 1,
+      isDroppable: true,
+      kind: "tax-deferred",
+      name: "Partner SIPP",
+      owner: 2,
+    };
+    const spareCash: Account = {
+      ...cash,
+      balance: 0,
+      contribution: { cap: null, kind: "spare" },
+    };
+    const base = {
+      ...salary,
+      amount: 60000,
+      bonus: 0,
+      feeds: null,
+      lastYear: null,
+      rsu: 0,
+      sacrifice: 0,
+    };
+    // Each £60,000 salary leaves £45,357.40 after £11,432 IT and
+    // £3,210.60 NI; two salaries less £8,000 paid to SIPP leave
+    // £82,714.80 over 12 months.
+    const spending = {
+      ...household,
+      amount: (2 * 45357.4 - 8000) / 12,
+      lastYear: null,
+    };
+    const points = project(
+      [sipp, spareCash],
+      {
+        expenses: [spending],
+        income: [
+          { ...base, id: 1, owner: 1 },
+          { ...base, id: 2, owner: 2 },
+        ],
+      },
+      {
+        ...plan,
+        month: 3,
+        owners: [
+          ...plan.owners,
+          { born: 1990, id: 2, name: "Partner", retirement: atAge(65) },
+        ],
+        years: 2,
+      },
+    );
+
+    expect(points.map(({ deferred }) => deferred)).toStrictEqual([
+      0, 7500, 17500,
+    ]);
+    expect(points.map(({ balances }) => balances[spareCash.id])).toStrictEqual([
+      0, 0, 1946,
+    ]);
+  });
+
+  // Only the relievable slice of a payment out of taxed money extends
+  // the bands. A non-earner with £60,000 of pension income (no relevant
+  // earnings) can relieve only £3,600 gross a year (£2,880 net); paying
+  // £8,000 net lands £8,720 a year (£3,600 relieved + £5,120
+  // unrelieved), and April refunds 20% on the £3,600 relieved slice
+  // (£720), not on the full £8,720.
+  it("extends bands only by the relievable slice of a pension payment", () => {
+    const sipp: Account = {
+      balance: 0,
+      contribution: { amount: 8000, cadence: "year", kind: "fixed" },
+      growth: { kind: "fixed", rate: 0 },
+      id: 1,
+      isDroppable: true,
+      kind: "tax-deferred",
+      name: "SIPP",
+      owner: 1,
+    };
+    const spareCash: Account = {
+      ...cash,
+      balance: 0,
+      contribution: { cap: null, kind: "spare" },
+    };
+    const annuity = {
+      ...salary,
+      amount: 60000,
+      bonus: 0,
+      feeds: null,
+      kind: "pension" as const,
+      lastYear: null,
+      rsu: 0,
+      sacrifice: 0,
+    };
+    // £60,000 pension income pays £11,432 IT and £0 NI, leaving
+    // £48,568; less £8,000 paid to SIPP = £40,568 spent over 12 months.
+    const spending = {
+      ...household,
+      amount: (48568 - 8000) / 12,
+      lastYear: null,
+    };
+    const points = project(
+      [sipp, spareCash],
+      { expenses: [spending], income: [annuity] },
+      { ...plan, month: 3, years: 2 },
+    );
+
+    expect(points.map(({ deferred }) => deferred)).toStrictEqual([
+      0, 6540, 15260,
+    ]);
+    expect(points.map(({ balances }) => balances[spareCash.id])).toStrictEqual([
+      0, 0, 720,
+    ]);
+  });
+
+  // Under pension-to-basic-rate, gross relief-at-source contributions
+  // made earlier in the tax year extend the basic-rate band (not the
+  // personal allowance). An owner aged 60 in 2026 earns £60,000 a year
+  // (£45,000 over Apr–Dec 2026) and retires at the start of 2027,
+  // paying £1,333.33/mo net (£15,000 gross over those 9 months) into
+  // their pension. Entering January 2027 (month 10 of 2026/27), the
+  // unextended basic-rate share is £50,270 × 10/12 = £41,891.67 <
+  // £45,000, so without counting the £15,000 relieved contributions
+  // January would draw £0 from the pension; with them, the basic-rate
+  // band extends to £56,891.67 (£11,891.67 taxable room), letting the
+  // pension cover the £10,000 January shortfall rather than the ISA.
+  it("fills the basic-rate band extended by relief-at-source contributions when drawing", () => {
+    const older = { born: 1966, id: 1, name: "Owner", retirement: atAge(61) };
+    const sipp: Account = {
+      balance: 200000,
+      contribution: { amount: 16000, cadence: "year", kind: "fixed" },
+      growth: { kind: "fixed", rate: 0 },
+      id: 1,
+      isDroppable: true,
+      kind: "tax-deferred",
+      name: "SIPP",
+      owner: 1,
+    };
+    const bufferIsa: Account = {
+      balance: 50000,
+      growth: { kind: "fixed", rate: 0 },
+      id: 2,
+      kind: "tax-free",
+      name: "ISA",
+      owner: 1,
+    };
+    const earner = {
+      ...salary,
+      amount: 60000,
+      bonus: 0,
+      feeds: null,
+      lastYear: 2026,
+      rsu: 0,
+      sacrifice: 0,
+    };
+    // Spend all post-tax/post-SIPP cash during 2026 so nothing spills
+    // over, then spend £10,000 in January 2027 alone.
+    const workingSpend = {
+      ...household,
+      amount: (45357.4 - 16000) / 12,
+      firstYear: 2026,
+      id: 1,
+      lastYear: 2026,
+    };
+    const retiredSpend = {
+      ...household,
+      amount: 10000,
+      firstYear: 2027,
+      id: 2,
+      lastMonth: 0,
+      lastYear: 2027,
+    };
+    const points = project(
+      [sipp, bufferIsa],
+      { expenses: [workingSpend, retiredSpend], income: [earner] },
+      {
+        ...plan,
+        born: 1966,
+        drawdown: "pension-to-basic-rate",
+        from: 2026,
+        month: 3,
+        owners: [older],
+        retires: 61,
+        years: 2,
+      },
+    );
+
+    // Without band extension, January 2027 would draw £10,000 from the
+    // ISA (leaving £40,000); with the £15,000 extended basic-rate room,
+    // the pension covers January 2027 whole, keeping the ISA at £50,000.
+    expect(points[2]?.free).toBe(50000);
+    expect(points[2]?.deferred).toBeLessThan(215000);
+  });
+
   // £400 of cash covers £400 of January and stops there rather than
   // going below nothing, so the ISA covers the £600 left of it and the
   // eleven whole months after, £11,600 in all: 20,000 − 11,600 = 8,400.
@@ -2207,14 +2463,15 @@ describe("drawing the pensions to the top of the basic rate band", () => {
     ).toStrictEqual({ 3: 9500, 7: 99760 });
   });
 
-  // £50,269.95 a year of other income to Ada, 5p short of the top of the
-  // basic rate band, leaves her under a penny of room in each month, and
-  // from November £5,000 is spent and her SIPP is kept paid £3,000 a
-  // month, which lands as £3,060. The cash gives the £1,439.17 each month
-  // is short and the £3,000, and the SIPP none of it, so she has not
-  // drawn on a pension as income and December's £3,000 lands whole;
-  // drawing the pennies would have held it to the money purchase
-  // allowance.
+  // £53,869.95 a year of other income to Ada — 5p short of the top of
+  // her basic rate band once her £300 a month of gross pension relief
+  // extends it by £3,600 a year — leaves her under a penny of room in
+  // each month, and from November £5,000 is spent and her SIPP is kept
+  // paid £3,000 a month, which lands as £3,060. The cash gives the
+  // £1,259.17 each month is short and the £3,000, and the SIPP none of
+  // it, so she has not drawn on a pension as income and December's
+  // £3,000 lands whole; drawing the pennies would have held it to the
+  // money purchase allowance.
   it("fills no band from room of less than a penny", () => {
     expect(
       project(
@@ -2227,11 +2484,11 @@ describe("drawing the pensions to the top of the basic rate band", () => {
         ],
         {
           expenses: [{ ...household, amount: 5000 }],
-          income: [{ ...other(1, 50269.95), cadence: "year" }],
+          income: [{ ...other(1, 53869.95), cadence: "year" }],
         },
         { ...filling, month: 10, owners: [ada] },
       ).at(-1)?.balances,
-    ).toStrictEqual({ 3: 11122, 7: 106120 });
+    ).toStrictEqual({ 3: 11482, 7: 106120 });
   });
 
   // Drawing the pensions to the personal allowance alone, with £800 a

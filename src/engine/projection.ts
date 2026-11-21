@@ -28,6 +28,7 @@ import {
   drawFor,
   drawOf,
   grossFilling,
+  grossRelievedOf,
   incomeTaxOn,
   insuranceOn,
   keptOf,
@@ -166,6 +167,7 @@ interface Drawing {
   readonly drawn: ReadonlySet<number>;
   readonly earned: readonly Earned[];
   readonly plan: Plan;
+  readonly relief: readonly Paid[];
   readonly taxYears: ReadonlyMap<number, TaxYear>;
   readonly uprating: number;
 }
@@ -196,13 +198,15 @@ interface Moved {
 // One owner's tax year as the projection has carried it so far: how
 // many of its months the plan holds, what they earned and drew that is
 // taxed as the owner's income, the self-employed profit among it that
-// their Class 4 is charged on, and the income tax and Class 4 each
-// month was charged on its own. Each owner has one, since a year is
-// settled a person at a time.
+// their Class 4 is charged on, the gross relief-at-source pension
+// payments made out of taxed money in them, and the income tax and
+// Class 4 each month was charged on its own. Each owner has one, since
+// a year is settled a person at a time.
 interface TaxYear {
   readonly months: number;
   readonly paid: number;
   readonly profit: number;
+  readonly relieved: number;
   readonly taxable: number;
 }
 
@@ -254,7 +258,13 @@ const penny = 0.01;
 
 // A tax year the plan holds no months of yet: an owner's as April opens,
 // and one the plan has not entered.
-const noMonths: TaxYear = { months: 0, paid: 0, profit: 0, taxable: 0 };
+const noMonths: TaxYear = {
+  months: 0,
+  paid: 0,
+  profit: 0,
+  relieved: 0,
+  taxable: 0,
+};
 
 // The age an owner may draw a pension at as income, the UK
 // normal minimum pension age: 55, until it rises to 57 on 6 April 2028,
@@ -670,6 +680,7 @@ export function project(
           drawn,
           earned: flow.earned,
           plan: carried.plan,
+          relief: flow.relief,
           taxYears,
           uprating: stretch.uprating,
         });
@@ -693,6 +704,7 @@ export function project(
                   incomeTaxOn(taxable, stretch) +
                   insuranceOn("self-employment", profit, stretch),
                 profit: taxYear.profit + profit,
+                relieved: taxYear.relieved + relievedOf(flow.relief, id),
                 taxable: taxYear.taxable + taxable,
               },
             ];
@@ -870,7 +882,7 @@ function carried(balance: number, paid: number, growth: number): number {
 function drawnFrom(
   held: readonly Held[],
   { kept, spending }: { readonly kept: number; readonly spending: number },
-  { allowances, at, drawn, earned, plan, taxYears, uprating }: Drawing,
+  { allowances, at, drawn, earned, plan, relief, taxYears, uprating }: Drawing,
 ): {
   readonly allowances: ReadonlyMap<number, number>;
   readonly below: ReadonlyMap<number, number>;
@@ -935,7 +947,7 @@ function drawnFrom(
   const penniesOf = (id: number): number => Math.round(taxedOf(id) * 100);
   const tops =
     bands === 0 ? [] : bandTopsOn({ months: 1, uprating }).slice(0, bands);
-  for (const top of tops) {
+  for (const [band, top] of tops.entries()) {
     for (const { id } of plan.owners
       .filter(
         ({ id }) =>
@@ -947,7 +959,9 @@ function drawnFrom(
       if (left <= 0) {
         break;
       }
-      const months = (taxYears.get(id) ?? noMonths).months + 1;
+      const taxYear = taxYears.get(id) ?? noMonths;
+      const months = taxYear.months + 1;
+      const extended = band > 0 ? taxYear.relieved + relievedOf(relief, id) : 0;
       carried = carried.map((entry) => {
         const { account } = entry;
         if (
@@ -958,7 +972,7 @@ function drawnFrom(
         ) {
           return entry;
         }
-        const room = top * months - taxedOf(id);
+        const room = top * months + extended - taxedOf(id);
         return room < penny
           ? entry
           : drawnOn(
@@ -1422,6 +1436,16 @@ function rateOf(account: Account, plan: Plan, year: number): number {
   return rate;
 }
 
+// The gross relief-at-source pension contributions an owner made in
+// the month, read off the basic-rate relief claimed on their pensions.
+function relievedOf(relief: readonly Paid[], owner: number): number {
+  return grossRelievedOf(
+    relief
+      .filter(({ account }) => account.owner === owner)
+      .reduce((sum, { amount }) => sum + amount, 0),
+  );
+}
+
 // What the cash, the GIAs and the ISAs hold as a month opens, which is as
 // far as the flow keeps a pension not marked droppable paid out of the
 // savings.
@@ -1434,18 +1458,20 @@ function reserveOf(held: readonly Held[]): number {
 // What a tax year is refunded once it closes, or owes as a negative:
 // what its months paid, each a twelfth of a year's income tax and
 // Class 4 on itself, less the income tax on everything they were taxed
-// on together and the Class 4 on all their profit, each against as much
-// of each band as the months the plan held of the year, as the bands
-// had risen by it. An owner's year is entered with its first month, so
-// one of no months is never here: the April a plan opens in has no year
-// behind it and settles nothing without asking.
+// on together, with the year's gross relief-at-source pension payments
+// extending its bands and reducing the income the personal allowance is
+// withdrawn against, and the Class 4 on all their profit, each against
+// as much of each band as the months the plan held of the year, as the
+// bands had risen by it. An owner's year is entered with its first
+// month, so one of no months is never here: the April a plan opens in
+// has no year behind it and settles nothing without asking.
 function settled(
-  { months, paid, profit, taxable }: TaxYear,
+  { months, paid, profit, relieved, taxable }: TaxYear,
   uprating: number,
 ): number {
   return (
     paid -
-    incomeTaxOn(taxable, { months, uprating }) -
+    incomeTaxOn(taxable, { months, uprating }, relieved) -
     insuranceOn("self-employment", profit, { months, uprating })
   );
 }

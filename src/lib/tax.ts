@@ -225,12 +225,30 @@ export function grossFilling(room: number, allowance: number): number {
   );
 }
 
+// The gross pension contribution that claimed `relief` at the basic
+// rate: five times the relief, since a pension claims 20% of the gross
+// on what is paid out of taxed money.
+export function grossRelievedOf(relief: number): number {
+  return relief / basicRate;
+}
+
 // The income tax on what a stretch of the year earned, which is
 // everything the lines pay less what a salary gives up into a pension,
-// since a sacrifice is never paid to its owner at all.
-export function incomeTaxOn(taxable: number, stretch: Stretch): number {
-  checkCharge(stretch, taxable);
-  return chargedOn(incomeTax, taxable, shareOf(stretch));
+// since a sacrifice is never paid to its owner at all. A gross pension
+// contribution paid out of taxed money and relieved at source extends
+// the basic and higher rate limits and reduces the adjusted net income
+// the personal allowance is withdrawn against, shifting every band
+// past the personal allowance up by that gross sum.
+export function incomeTaxOn(
+  taxable: number,
+  stretch: Stretch,
+  relieved = 0,
+): number {
+  checkCharge(stretch, taxable, relieved);
+  const share = shareOf(stretch);
+  return relieved === 0
+    ? chargedOn(incomeTax, taxable, share)
+    : chargedOn(incomeBands(share, relieved), taxable, 1);
 }
 
 // The National Insurance a kind of income pays on what a stretch of the
@@ -333,8 +351,9 @@ export function pensionAllowanceOf({
 // £1,000 in the pension and the relief is a quarter of what was paid.
 // It is claimed only on as much as relievableOn allows, a pound paid
 // past it landing as a pound. Anything else holds what it is paid. The
-// relief a higher or an additional rate taxpayer claims on top comes
-// back to them rather than to the pension, and is not counted.
+// further relief a higher or an additional rate taxpayer claims on top
+// comes back to them when the tax year settles rather than to the
+// pension.
 export function reliefOf(account: { readonly kind: AccountKind }): number {
   return isPension(account) ? basicRate / (1 - basicRate) : 0;
 }
@@ -473,6 +492,19 @@ function grossFor(net: number, standing: Standing): number {
       below: stretch === toBand ? to : below + stretch * part,
     })
   );
+}
+
+// The income tax bands for a stretch of the year, scaled to its share
+// and with every threshold past the personal allowance shifted up by a
+// gross relief-at-source pension contribution: the basic rate band
+// widens by it, the personal allowance withdrawal starts that much
+// higher, and the additional rate does too, while the personal
+// allowance itself stays where it is.
+function incomeBands(share: number, relieved: number): readonly Band[] {
+  return incomeTax.map(({ from, rate }, index) => ({
+    from: from * share + (index >= 2 ? relieved : 0),
+    rate,
+  }));
 }
 
 // The share of each band's yearly figure a stretch of the year meets: a

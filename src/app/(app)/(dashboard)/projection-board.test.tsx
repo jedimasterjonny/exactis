@@ -310,14 +310,14 @@ describe("ProjectionBoard", () => {
 
   // Over the fixture's accounts as they are, the pension not droppable,
   // retiring at 50 the plan never runs out but draws on the pension at
-  // 55, before its owner's pension age, which is falling short.
+  // 56, before its owner's pension age, which is falling short.
   it("says where the plan falls short by drawing a pension early at the age moved to", () => {
     render(board(retiring, schedule, { owned: fixture }));
 
     typeAge("50");
 
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
-      "Retiring at 50, the plan falls short at 55 at its own rates.",
+      "Retiring at 50, the plan falls short at 56 at its own rates.",
     );
   });
 
@@ -901,7 +901,7 @@ describe("ProjectionBoard", () => {
   // A year of expenses the plan holds from its first year, so it retires
   // then and runs out at 42, as retiring at 34 does; and spending twice
   // as much, it never reaches ten thousand years of them, and runs out
-  // at 86 while still working.
+  // at 87 while still working.
   it("says a retirement on conditions reached in the plan's first year, and one never reached by a plan that also runs out", () => {
     const spending: Schedule = {
       ...schedule,
@@ -919,7 +919,7 @@ describe("ProjectionBoard", () => {
     rerender(board(onConditions(10000), spending));
 
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
-      "The plan never reaches its retirement's conditions at its own rates, and runs out at 86.",
+      "The plan never reaches its retirement's conditions at its own rates, and runs out at 87.",
     );
   });
 
