@@ -251,19 +251,22 @@ salary stops: a month earning more than the rest meets a twelfth of each band
 that the quieter months leave unused, and a month read past the band where the
 personal allowance is withdrawn is charged 45% on pay its year is charged 60%
 on, so the year can owe. So the run carries each owner's tax year, April to
-April, what its months were taxed on and what they were charged. In the April
-after, each owner's year is worked out whole: their income tax on everything
-their months earned and drew from their pensions, and their Class 4 on all their
-profit, each against as much of each band as the months the plan held of the
-year, as the bands stood that year. What that comes to less what the months paid
-is refunded into April's money or owed out of it, every owner's together, since
-the month's money is the household's. It comes in as income does, untaxed, and
-is spent, saved or drawn for with the rest. Class 4 is settled with the income
-tax since it too is due on the year's profit rather than a month's; Class 1 is
-charged a pay period at a time, as the months charge it, and is not settled. The
-plan's first tax year is the months of it the plan holds, against their share of
-each band, and its last is cut off where the plan ends and never settled. A
-month read on its own settles nothing.
+April, what its months were taxed on, what they paid into pensions out of taxed
+money with relief and what they were charged. In the April after, each owner's
+year is worked out whole: their income tax on everything their months earned and
+drew from their pensions, with the gross relieved payments extending their basic
+and higher rate limits and reducing the adjusted net income the personal
+allowance is withdrawn against, and their Class 4 on all their profit, each
+against as much of each band as the months the plan held of the year, as the
+bands stood that year. What that comes to less what the months paid is refunded
+into April's money or owed out of it, every owner's together, since the month's
+money is the household's. It comes in as income does, untaxed, and is spent,
+saved or drawn for with the rest. Class 4 is settled with the income tax since
+it too is due on the year's profit rather than a month's; Class 1 is charged a
+pay period at a time, as the months charge it, and is not settled. The plan's
+first tax year is the months of it the plan holds, against their share of each
+band, and its last is cut off where the plan ends and never settled. A month
+read on its own settles nothing.
 
 The bands are frozen until April 2031 and are held so: flat in pounds through
 the 2030/31 tax year, so an income rising with prices is dragged into a higher
@@ -415,15 +418,17 @@ do that.
 
 A fixed sum or the spare money paid into a pension comes out of taxed money
 instead, so the pension claims the basic rate back on it, and £800 paid lands as
-£1,000, which is what a pension's cap and its allowance are held to. The relief
-a higher rate taxpayer claims on top is theirs rather than the pension's, and is
-not counted. Relief is claimed on no more than the owner earns a year from their
-own salary or self-employment, less what they sacrifice, or £3,600 when that is
-more, a twelfth of it a month shared across the owner's pensions in the order
-the month pays them; a pound paid past it lands as a pound. So a pension paid
-after its owner retires, or one of an owner who earns nothing whatever the rest
-of the household earns, lands a pound for a pound once £300 has landed in the
-month.
+£1,000, which is what a pension's cap and its allowance are held to. The further
+relief a higher or an additional rate taxpayer claims on top, and the personal
+allowance restored where the gross brings adjusted net income back below
+£125,140, come back to the household when April settles the tax year, under The
+tax on the month; a pound paid past what is relievable claims neither. Relief is
+claimed on no more than the owner earns a year from their own salary or
+self-employment, less what they sacrifice, or £3,600 when that is more, a
+twelfth of it a month shared across the owner's pensions in the order the month
+pays them; a pound paid past it lands as a pound. So a pension paid after its
+owner retires, or one of an owner who earns nothing whatever the rest of the
+household earns, lands a pound for a pound once £300 has landed in the month.
 
 ## The run
 
@@ -599,22 +604,23 @@ the pension than pay 20% to draw it sooner.
 
 The room left in a band is measured over the tax year so far, as April settles
 the year, rather than as a fresh twelfth each month: the share of the band for
-the months the plan has held of the year, this one among them, less everything
-the owner has been taxed on in them, this month's income and draws included. So
-a year whose salary stopped part-way, having used the band already, fills
-nothing until the months catch it up, rather than drawing at 20% what April
-charges at 40%; and a month after one that drew less than its share catches up,
-charged as a twelfth of a year as every month is, which is too much, and
-refunded the excess in April, as a bonus month is. Income later in the tax year,
-such as a State Pension starting in January, is not foreseen, so a band filled
-before it starts is overfilled once it does, and April charges what is over. The
-room is what may be taxed, so while the owner's lump sum allowance lasts the
-draw is a third more than the room, a quarter of it being free, and a pound for
-a pound once the allowance is used up, exactly where it runs out part-way
-through a draw. Room of less than a penny is none, since a draw on a pension
-marks its owner as having drawn on one as income, which holds what is paid into
-their pensions to the money purchase allowance from then on, and the residue of
-the arithmetic, or a few pence, is no reason to.
+the months the plan has held of the year, this one among them, plus for the
+basic rate band any gross relief-at-source pension contributions made in those
+months, less everything the owner has been taxed on in them, this month's income
+and draws included. So a year whose salary stopped part-way, having used the
+band already, fills nothing until the months catch it up, rather than drawing at
+20% what April charges at 40%; and a month after one that drew less than its
+share catches up, charged as a twelfth of a year as every month is, which is too
+much, and refunded the excess in April, as a bonus month is. Income later in the
+tax year, such as a State Pension starting in January, is not foreseen, so a
+band filled before it starts is overfilled once it does, and April charges what
+is over. The room is what may be taxed, so while the owner's lump sum allowance
+lasts the draw is a third more than the room, a quarter of it being free, and a
+pound for a pound once the allowance is used up, exactly where it runs out
+part-way through a draw. Room of less than a penny is none, since a draw on a
+pension marks its owner as having drawn on one as income, which holds what is
+paid into their pensions to the money purchase allowance from then on, and the
+residue of the arithmetic, or a few pence, is no reason to.
 
 A pension is drawn as income, where its kind falls in the order, from its
 owner's pension age: from the year the owner the pension belongs to turns 55

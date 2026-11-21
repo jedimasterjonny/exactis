@@ -58,12 +58,14 @@ interface EarningCase {
 }
 
 // A tax year as the oracle carries it: how many of its months the plan
-// holds, what they paid as twelfths, their self-employed profit, and
-// what they earned and drew that is taxed as income.
+// holds, what they paid as twelfths, their self-employed profit, the
+// gross relief-at-source pension payments made in them, and what they
+// earned and drew that is taxed as income.
 interface TaxYear {
   readonly months: number;
   readonly paid: number;
   readonly profit: number;
+  readonly relieved: number;
   readonly taxable: number;
 }
 
@@ -83,7 +85,13 @@ const everyKind: readonly IncomeKind[] = [
 ];
 
 // A tax year before its first month.
-const opened: TaxYear = { months: 0, paid: 0, profit: 0, taxable: 0 };
+const opened: TaxYear = {
+  months: 0,
+  paid: 0,
+  profit: 0,
+  relieved: 0,
+  taxable: 0,
+};
 
 // How many plans each test draws. Enough that every band, a salary
 // stopping part way through a tax year, a first year of every length
@@ -153,7 +161,7 @@ function drawnIn(
   return {
     allowance: drawing.allowance - free,
     balance: drawing.balance - gross,
-    year: yearWith(year, taxable, 0),
+    year: yearWith(year, { profit: 0, taxable }),
   };
 }
 
@@ -220,7 +228,11 @@ function earnedFrom(
       isa: used.isa + saved,
       pension: used.pension + sacrificed * 1.15 + paid + relief,
     },
-    year: yearWith(year, taxableOf(sacrificed), profit),
+    year: yearWith(year, {
+      profit,
+      relieved: relief * 5,
+      taxable: taxableOf(sacrificed),
+    }),
   };
 }
 
@@ -308,18 +320,21 @@ function isRunning(line: LineValues, { month, year }: Month): boolean {
 }
 
 // Income tax as a return reads it, over a share of a year: the
-// allowance less a pound for every two over £100,000, the basic rate on
-// the first £37,700 above it, the additional rate over £125,140 and the
-// higher rate between, each figure taken as that share of the year's.
-function lawIncomeTax(income: number, months: number): number {
+// allowance less a pound for every two of adjusted net income over
+// £100,000, the basic rate on the first £37,700 plus any gross
+// relief-at-source pension contribution above it, the additional rate
+// over £125,140 plus that contribution and the higher rate between,
+// each base figure taken as that share of the year's.
+function lawIncomeTax(income: number, months: number, relieved = 0): number {
   const share = months / 12;
+  const ani = Math.max(0, income - relieved);
   const allowance = Math.max(
     0,
-    12570 * share - Math.max(0, income - 100000 * share) / 2,
+    12570 * share - Math.max(0, ani - 100000 * share) / 2,
   );
   const taxed = Math.max(0, income - allowance);
-  const additional = Math.max(0, income - 125140 * share);
-  const basic = Math.min(taxed, 37700 * share);
+  const additional = Math.max(0, taxed - (125140 * share + relieved));
+  const basic = Math.min(taxed, 37700 * share + relieved);
   return (
     0.2 * basic +
     0.4 * Math.max(0, taxed - basic - additional) +
@@ -433,7 +448,7 @@ function refundOf(year: TaxYear): number {
   return year.months === 0
     ? 0
     : year.paid -
-        lawIncomeTax(year.taxable, year.months) -
+        lawIncomeTax(year.taxable, year.months, year.relieved) -
         lawInsurance(0.06, year.profit, year.months);
 }
 
@@ -461,11 +476,23 @@ function usedBefore(plan: Plan): Used {
 
 // A tax year a month on: the month's income tax and Class 4 paid as
 // twelfths, and what they were charged on.
-function yearWith(year: TaxYear, taxable: number, profit: number): TaxYear {
+function yearWith(
+  year: TaxYear,
+  {
+    profit,
+    relieved = 0,
+    taxable,
+  }: {
+    readonly profit: number;
+    readonly relieved?: number;
+    readonly taxable: number;
+  },
+): TaxYear {
   return {
     months: year.months + 1,
     paid: year.paid + lawIncomeTax(taxable, 1) + lawInsurance(0.06, profit, 1),
     profit: year.profit + profit,
+    relieved: year.relieved + relieved,
     taxable: year.taxable + taxable,
   };
 }

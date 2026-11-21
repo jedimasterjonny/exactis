@@ -118,10 +118,10 @@ describe("movedSince", () => {
   // The month carries the fixture's £901,462 to £909,489: £5,330 paid
   // into the pension and off the mortgage, and £2,697 of growth and
   // interest besides. The owner retires once the plan is worth £1.6m,
-  // in 2041, at 49, which is where the liquid worth is read.
+  // in 2040, at 48, which is where the liquid worth is read.
   it("moves nothing where the month closed as the plan expected", () => {
     expect(movedSince(before, asPlanned)).toStrictEqual({
-      age: 49,
+      age: 48,
       balances: {
         actual: [],
         expected: 909_489,
@@ -133,19 +133,18 @@ describe("movedSince", () => {
         unchecked: 0,
       },
       changes: [],
-      expected: { liquid: 330_154, retired: 2041 },
-      fixed: 49,
+      expected: { liquid: 336_628, retired: 2040 },
+      fixed: 48,
       invested: 0,
       months: 1,
-      now: { liquid: 330_154, retired: 2041 },
+      now: { liquid: 336_628, retired: 2040 },
       rates: [],
       steps: [],
     });
   });
 
-  // An invented £10,000 more in the ISA than the plan expected brings
-  // the £1.6m forward a year, to 48, so the liquid worth at 49 is read a
-  // year into drawing on it.
+  // An invented £10,000 more in the ISA than the plan expected lifts
+  // the liquid worth at 48, keeping retirement in 2040.
   it("takes a balance the plan did not expect as the balances' step alone", () => {
     const moved = movedSince(
       before,
@@ -157,7 +156,7 @@ describe("movedSince", () => {
     );
 
     expect(moved.steps).toStrictEqual([
-      { groups: ["balances"], standing: { liquid: 247_985, retired: 2040 } },
+      { groups: ["balances"], standing: { liquid: 349_607, retired: 2040 } },
     ]);
     expect(moved.balances.now - moved.balances.expected).toBe(10_000);
     expect(moved.now).toStrictEqual(moved.steps[0]?.standing);
@@ -293,7 +292,7 @@ describe("movedSince", () => {
     expect(moved.rates).toStrictEqual(["rates", "deductions"]);
     expect(moved.changes).toStrictEqual([]);
     expect(moved.steps).toStrictEqual([
-      { groups: ["rates"], standing: { liquid: 80_636, retired: 2038 } },
+      { groups: ["rates"], standing: { liquid: 191_089, retired: 2038 } },
     ]);
   });
 
@@ -432,7 +431,7 @@ describe("movedSince", () => {
     expect(moved.changes).toStrictEqual(["children", "schedule", "ages"]);
     expect(moved.rates).toStrictEqual([]);
     expect(moved.steps).toStrictEqual([
-      { groups: ["changes"], standing: { liquid: 269_796, retired: 2042 } },
+      { groups: ["changes"], standing: { liquid: 282_265, retired: 2041 } },
     ]);
   });
 
