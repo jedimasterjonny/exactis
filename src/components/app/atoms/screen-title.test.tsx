@@ -190,7 +190,27 @@ describe("ScreenTitle", () => {
     );
 
     expect(
-      screen.getByRole("heading", { name: "Accounts & assets" }),
+      screen.getByRole("heading", { name: "Accounts &\u00a0assets" }),
     ).toHaveFocus();
+  });
+
+  // A title of two words bound whole may not fit a phone's width. The
+  // name is matched exactly, so it tells a no-break space from a space,
+  // which a match on the text folds into one.
+  it("keeps the last word of a title of three words or more with the one before it, and leaves a title of two to break", () => {
+    const { rerender } = render(<ScreenTitle>Projected to age 91</ScreenTitle>);
+
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Projected to age\u00a091",
+      }),
+    ).toBeInTheDocument();
+
+    rerender(<ScreenTitle>Plan assumptions</ScreenTitle>);
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Plan assumptions" }),
+    ).toBeInTheDocument();
   });
 });
