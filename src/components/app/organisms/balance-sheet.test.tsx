@@ -401,6 +401,13 @@ describe("BalanceSheet", () => {
     renderSheet({ assets: [], debts: [], savings: [] });
 
     expect(screen.getByText("Nothing on the balance sheet yet")).toBeVisible();
+    // Marked with the Accounts screen's own glyph, as the screen it is.
+    expect(
+      screen
+        .getByText(bySlot("empty-icon"), { suggest: false })
+        // eslint-disable-next-line testing-library/no-node-access -- the glyph is an icon hidden from the tree, with no role or text of its own
+        .querySelector("svg"),
+    ).toHaveClass("lucide-wallet");
     expect(screen.queryByRole("group")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Add debt" }),

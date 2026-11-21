@@ -1,7 +1,7 @@
 import type { JSX, ReactNode } from "react";
 
 import { cn } from "cn";
-import { Plus, Scale } from "lucide-react";
+import { Plus, Wallet } from "lucide-react";
 import { useId } from "react";
 
 import type { Account } from "@/data/accounts";
@@ -96,7 +96,7 @@ export function BalanceSheet({
     return (
       <EmptyState
         description="Add an account, a house or a car."
-        icon={Scale}
+        icon={Wallet}
         title="Nothing on the balance sheet yet"
       />
     );
