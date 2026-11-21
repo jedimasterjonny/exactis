@@ -56,15 +56,16 @@ interface CogitatorScreenProps {
 // choice opens on the account held, so each says what the ladder is
 // making when it comes back after the allocation had nothing to buy
 // toward. An amount the month end offered opens the amount at it rather
-// than at nothing, and the field says which month's close it came from
-// for as long as it holds it, so a figure is never there unexplained;
-// it is typed over as any amount is. Without an offer, what the plan
-// pays into the ISAs and GIA in its first month opens the amount
-// where the page hands it on, and the field says so, and for which
-// month, the same way. One offered in an account opens the account
-// choice on it, or on all accounts where the allocation does not list
-// it. The fields line up by their labels, so the amount's hint beneath
-// its box sets the others no lower.
+// than at nothing, and the field says what it was and which month's close
+// it came from, so a figure is never there unexplained; it is typed over
+// as any amount is, and the field still says what was offered, so the
+// line stays true and the header keeps its height. Without an offer, what
+// the plan pays into the ISAs and GIA in its first month opens the amount
+// where the page hands it on, and the field says so, its figure and for
+// which month, the same way. One offered in an account opens the account
+// choice on it, or on all accounts where the allocation does not list it.
+// The fields line up by their labels, so the amount's hint beneath its
+// box sets the others no lower.
 export function CogitatorScreen({
   bonds,
   offered,
@@ -98,7 +99,7 @@ export function CogitatorScreen({
         isReady ? (
           <div className="flex flex-wrap items-start gap-2">
             <MoneyField
-              hint={hintOf(amount, offered, planned)}
+              hint={hintOf(offered, planned)}
               label="Amount to invest"
               min={0}
               onValueCommitted={setAmount}
@@ -155,20 +156,18 @@ export function CogitatorScreen({
   );
 }
 
-// What the amount field says of the figure it holds: the close it came
-// from while it holds the month end's offer, the month the plan pays it
-// into the ISAs and GIA in while it holds the plan's, and nothing once
-// another is typed.
+// What the amount field says of the figure it opened on: the close it
+// came from and its figure while the month end offered it, or the plan's
+// figure and month, whatever is typed over it.
 function hintOf(
-  amount: number,
   offered: CogitatorScreenProps["offered"],
   planned: CogitatorScreenProps["planned"],
 ): string | undefined {
-  if (offered?.amount === amount) {
-    return `From ${monthName(offered.month.month, "long")}'s close`;
+  if (offered !== undefined) {
+    return `${formatGbp(offered.amount)} from ${monthName(offered.month.month, "long")}'s close`;
   }
-  if (planned?.amount === amount) {
-    return `Planned for the ISAs and GIA in ${monthName(planned.month.month, "long")}`;
+  if (planned !== undefined) {
+    return `${formatGbp(planned.amount)} planned for the ISAs and GIA in ${monthName(planned.month.month, "long")}`;
   }
   return undefined;
 }

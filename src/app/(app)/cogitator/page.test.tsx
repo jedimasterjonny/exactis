@@ -97,7 +97,7 @@ describe("Cogitator", () => {
 
     expect(field("Amount to invest")).toHaveValue("£1,250");
     expect(field("Amount to invest")).toHaveAccessibleDescription(
-      "From August's close",
+      "£1,250 from August's close",
     );
 
     rerender(await cogitator());
@@ -120,14 +120,14 @@ describe("Cogitator", () => {
 
     expect(field("Amount to invest")).toHaveValue("£1,667");
     expect(field("Amount to invest")).toHaveAccessibleDescription(
-      "Planned for the ISAs and GIA in September",
+      "£1,667 planned for the ISAs and GIA in September",
     );
 
     rerender(await cogitator({ amount: "1250", from: "2026-08" }));
 
     expect(field("Amount to invest")).toHaveValue("£1,250");
     expect(field("Amount to invest")).toHaveAccessibleDescription(
-      "From August's close",
+      "£1,250 from August's close",
     );
   });
 
