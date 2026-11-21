@@ -6,6 +6,7 @@ import { cn } from "cn";
 import { Ellipsis, LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 
 import { signOut } from "@/actions/auth";
 import { DueBadge } from "@/components/app/atoms/due-badge";
@@ -53,14 +54,20 @@ const reached = screens.filter((screen) => !tabs.includes(screen));
 // closes and which stays shut where popovers are not drawn. Once the
 // page has hydrated More's press is cancelled, so the list never opens
 // over the sheet, and a move to another screen draws the list afresh,
-// which closes one opened before the page hydrated. The tabs sit above
-// the home indicator, the bar running on beneath them to the foot of the
+// which closes one opened before the page hydrated. A move to another
+// screen closes the sheet too, as back and forward make one, so the
+// screen moved to is not left behind a sheet it did not open, its title
+// holding the focus where the sheet hides it. The tabs sit above the
+// home indicator, the bar running on beneath them to the foot of the
 // screen. A client component, since the pathname is read on the client.
 export function PhoneNav({ isDue }: PhoneNavProps): JSX.Element {
   const pathname = usePathname();
   const screen = screenAt(pathname);
   const { openMobile: isOpen, setOpenMobile } = useSidebar();
   const isMore = screen !== undefined && !tabs.includes(screen);
+  useEffect(() => {
+    setOpenMobile(false);
+  }, [pathname, setOpenMobile]);
   return (
     <nav
       aria-label="Tab bar"

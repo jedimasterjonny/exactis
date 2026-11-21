@@ -1,6 +1,12 @@
 import type { JSX } from "react";
 
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { signOut } from "@/actions/auth";
@@ -290,6 +296,30 @@ describe("PhoneNav", () => {
       within(await screen.findByRole("dialog")).getByText("Every screen"),
     ).toBeInTheDocument();
     expect(more).toHaveAttribute("aria-expanded", "true");
+  });
+
+  // Back and forward move the screen under an open sheet, which nothing
+  // in the sheet chose; a draw on the same screen leaves it open.
+  it("closes the sheet when the screen moves under it, and leaves it open while it does not", async () => {
+    stubViewport(390);
+    pathname.current = "/";
+    const { rerender } = render(<Frame isDue={closed} />);
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+
+    expect(
+      within(await screen.findByRole("dialog")).getByText("Every screen"),
+    ).toBeInTheDocument();
+
+    rerender(<Frame isDue={closed} />);
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    pathname.current = "/progress";
+    rerender(<Frame isDue={closed} />);
+
+    await waitFor(() => {
+      expect(screen.queryByText("Every screen")).not.toBeInTheDocument();
+    });
   });
 
   it("sits fixed along the foot of the screen below the md breakpoint alone", () => {
