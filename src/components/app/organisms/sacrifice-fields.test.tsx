@@ -2,20 +2,28 @@ import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Share } from "@/data/accounts";
+import type { Month } from "@/data/schedule";
 
 import { incomeLines } from "@/data/income.fixture";
 import { commit, field } from "@/test/dom";
 
 import { SacrificeFields } from "./sacrifice-fields";
 
-// The fixture's salary and its step-up, both feeding the workplace
-// pension: the salary 12% of its £120,000 a year, the step-up a
-// twentieth of £14,500 a month.
+// The fixture's salary and a concurrent monthly salary, both running
+// from 2026 and feeding the workplace pension: the salary 12% of its
+// £120,000 a year, the second a twentieth of £14,500 a month.
 const [salary, stepUp] = incomeLines;
 
 const feeders = [
   salary,
-  { ...stepUp, amount: 14500, cadence: "month", feeds: 1, sacrifice: 0.05 },
+  {
+    ...stepUp,
+    amount: 14500,
+    cadence: "month",
+    feeds: 1,
+    firstYear: 2026,
+    sacrifice: 0.05,
+  },
 ] as const;
 
 const shares: readonly Share[] = [
@@ -23,12 +31,15 @@ const shares: readonly Share[] = [
   { line: stepUp.id, sacrifice: 0.05 },
 ];
 
+const opening: Month = { month: 8, year: 2026 };
+
 // The fields as the dialog would mount them, opened on the shares and
 // shown the draft that mirrors them, with a spy where the dialog
 // listens.
 function renderFields(
   initial: readonly Share[] = shares,
   draft: readonly Share[] = initial,
+  opens: Month = opening,
 ): {
   readonly onAmend: ReturnType<
     typeof vi.fn<(shares: readonly Share[]) => void>
@@ -41,6 +52,7 @@ function renderFields(
       feeders={feeders}
       initial={initial}
       onAmend={onAmend}
+      opens={opens}
     />,
   );
   return { onAmend };
@@ -106,11 +118,175 @@ describe("SacrificeFields", () => {
         feeders={[{ ...salary, match: 0.06 }]}
         initial={shares}
         onAmend={vi.fn<(shares: readonly Share[]) => void>()}
+        opens={opening}
       />,
     );
 
     expect(field("Sacrificed from Salary")).toHaveAccessibleDescription(
       "Of its £120,000 base, landing as £23,760 a year",
+    );
+  });
+
+  // From April 2029, concurrent feeders share a single £2,000 NI cap in
+  // list order: £14,400 from the first salary takes the full £2,000
+  // (+£300 = £14,700) leaving the concurrent second £0 of employer NI
+  // (£8,700); when the first takes only £1,200 (1%), the remaining £800
+  // (+£120) lifts the second to £8,820.
+  it("caps employer NI and shares one £2,000 cap across concurrent feeders from April 2029", () => {
+    const view = render(
+      <SacrificeFields
+        draft={shares}
+        feeders={feeders}
+        initial={shares}
+        onAmend={vi.fn<(shares: readonly Share[]) => void>()}
+        opens={{ month: 3, year: 2029 }}
+      />,
+    );
+
+    expect(field("Sacrificed from Salary")).toHaveAccessibleDescription(
+      "Of its £120,000 base, landing as £14,700 a year",
+    );
+    expect(field("Sacrificed from Salary step-up")).toHaveAccessibleDescription(
+      "Of its £14,500 base, landing as £8,700 a year",
+    );
+
+    view.rerender(
+      <SacrificeFields
+        draft={[
+          { line: salary.id, sacrifice: 0.01 },
+          { line: stepUp.id, sacrifice: 0.05 },
+        ]}
+        feeders={feeders}
+        initial={shares}
+        onAmend={vi.fn<(shares: readonly Share[]) => void>()}
+        opens={{ month: 3, year: 2029 }}
+      />,
+    );
+
+    expect(field("Sacrificed from Salary")).toHaveAccessibleDescription(
+      "Of its £120,000 base, landing as £1,380 a year",
+    );
+    expect(field("Sacrificed from Salary step-up")).toHaveAccessibleDescription(
+      "Of its £14,500 base, landing as £8,820 a year",
+    );
+  });
+
+  // A feeder starting in a later year (2035) is read at its own start
+  // rather than the pre-2029 plan opening: when the earlier salary has
+  // ended by 2034 the step-up keeps the full £2,000 cap (£9,000 a year),
+  // whereas when the earlier salary still overlaps in 2035 its £14,400
+  // sacrifice exhausts the cap and the step-up lands as £8,700 a year.
+  it("caps a future post-2029 feeder at its own start year and counts only overlapping earlier feeders", () => {
+    const futureStepUp = {
+      ...stepUp,
+      amount: 14500,
+      cadence: "month" as const,
+      feeds: 1,
+      firstYear: 2035,
+      sacrifice: 0.05,
+    };
+    const view = render(
+      <SacrificeFields
+        draft={shares}
+        feeders={[{ ...salary, lastYear: 2034 }, futureStepUp]}
+        initial={shares}
+        onAmend={vi.fn<(shares: readonly Share[]) => void>()}
+        opens={opening}
+      />,
+    );
+
+    expect(field("Sacrificed from Salary")).toHaveAccessibleDescription(
+      "Of its £120,000 base, landing as £16,560 a year",
+    );
+    expect(field("Sacrificed from Salary step-up")).toHaveAccessibleDescription(
+      "Of its £14,500 base, landing as £9,000 a year",
+    );
+
+    view.rerender(
+      <SacrificeFields
+        draft={shares}
+        feeders={[salary, futureStepUp]}
+        initial={shares}
+        onAmend={vi.fn<(shares: readonly Share[]) => void>()}
+        opens={opening}
+      />,
+    );
+
+    expect(field("Sacrificed from Salary step-up")).toHaveAccessibleDescription(
+      "Of its £14,500 base, landing as £8,700 a year",
+    );
+  });
+
+  // An owner's £2,000 NI cap is shared across all of their pensions in
+  // schedule order: an earlier salary of another owner or an unfed line
+  // consumes none of it, whereas an earlier salary of the same owner
+  // feeding another pension does (whether it takes part of the cap or
+  // all of it).
+  it("counts earlier feeders of the same owner on other pensions against the £2,000 cap", () => {
+    const otherOwner = {
+      ...salary,
+      feeds: 99,
+      id: 20,
+      name: "Partner salary",
+      owner: 2,
+      sacrifice: 0.2,
+    };
+    const unfed = {
+      ...salary,
+      feeds: null,
+      id: 21,
+      name: "Unfed job",
+      sacrifice: 0,
+    };
+    const otherPension = {
+      ...salary,
+      amount: 60000,
+      feeds: 9,
+      id: 22,
+      name: "Other pension job",
+      sacrifice: 0.02, // £1,200/yr leaves £800 (+£120 NI)
+    };
+    const target = {
+      ...salary,
+      amount: 50000,
+      feeds: 7,
+      id: 23,
+      name: "Second job",
+      sacrifice: 0.1, // £5,000/yr
+    };
+    const targetShares: readonly Share[] = [
+      { line: target.id, sacrifice: 0.1 },
+    ];
+    const view = render(
+      <SacrificeFields
+        draft={targetShares}
+        feeders={[target]}
+        initial={targetShares}
+        lines={[otherOwner, unfed, otherPension, target]}
+        onAmend={vi.fn<(shares: readonly Share[]) => void>()}
+        opens={{ month: 3, year: 2029 }}
+      />,
+    );
+
+    expect(field("Sacrificed from Second job")).toHaveAccessibleDescription(
+      "Of its £50,000 base, landing as £5,120 a year",
+    );
+
+    // Once the earlier pension takes £6,000/yr (>= £2,000), nothing is
+    // left of the cap for this pension.
+    view.rerender(
+      <SacrificeFields
+        draft={targetShares}
+        feeders={[target]}
+        initial={targetShares}
+        lines={[otherOwner, unfed, { ...otherPension, sacrifice: 0.1 }, target]}
+        onAmend={vi.fn<(shares: readonly Share[]) => void>()}
+        opens={{ month: 3, year: 2029 }}
+      />,
+    );
+
+    expect(field("Sacrificed from Second job")).toHaveAccessibleDescription(
+      "Of its £50,000 base, landing as £5,000 a year",
     );
   });
 
