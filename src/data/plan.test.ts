@@ -200,7 +200,7 @@ describe("holderOf", () => {
 
     expect(holderOf({ owner: 2 }, plan)).toBe(sam);
     expect(() => holderOf({}, plan)).toThrow(
-      "An ISA or a pension belongs to an owner the household lists",
+      "An ISA, a pension or a GIA belongs to an owner the household lists",
     );
   });
 });

@@ -4,6 +4,7 @@ import type { Account } from "@/data/accounts";
 import type { Deductions, Vintages } from "@/data/cma";
 import type { Kept } from "@/data/household";
 
+import { isGia } from "@/data/accounts";
 import { deductedBy } from "@/data/moves";
 import { recordId } from "@/data/schemas";
 import { upcast } from "@/data/shapes";
@@ -108,14 +109,16 @@ export function pulledOver(
   };
 }
 
-// An account of the scenario's, with the balance the household holds
-// for it and the day that balance was set, where it was dated; one the
-// household holds undated keeps the scenario's day, as a save leaves an
-// undated balance's day as it was.
+// An account of the scenario's, with the balance (and GIA cost basis)
+// the household holds for it and the day that balance was set, where it
+// was dated; one the household holds undated keeps the scenario's day,
+// as a save leaves an undated balance's day as it was.
 function balancedAs(account: Account, kept: Account): Account {
   return {
     ...account,
     balance: kept.balance,
+    ...(isGia(account) &&
+      kept.costBasis !== undefined && { costBasis: kept.costBasis }),
     ...(kept.setOn !== undefined && { setOn: kept.setOn }),
   };
 }

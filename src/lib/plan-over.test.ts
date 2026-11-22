@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
+import type { Account } from "@/data/accounts";
 import type { Cma, Vintages } from "@/data/cma";
 import type { Kept } from "@/data/household";
 import type { Curve } from "@/data/inflation";
@@ -633,5 +634,47 @@ describe("planOver", () => {
       soundKept(adopted(scenario, { ...household, rateSet: "cma" })).household
         .liveRates,
     ).toStrictEqual(soundKept(scenario).household.liveRates);
+  });
+
+  // A GIA's cost basis is bookkeeping alongside its balance, so
+  // adopting a scenario keeps the household's cost basis for a GIA held
+  // by both.
+  it("keeps the household's GIA cost basis alongside its balance on adoption", () => {
+    const gia: Account = {
+      balance: 20000,
+      costBasis: 15000,
+      growth: { kind: "plan" },
+      id: 9,
+      kind: "taxable",
+      name: "GIA",
+      owner: 1,
+    };
+    const withGia: Kept = {
+      ...household,
+      accounts: [...household.accounts, gia],
+    };
+    const updated: Kept = {
+      ...withGia,
+      accounts: withGia.accounts.map((account) =>
+        account.id === gia.id
+          ? { ...account, balance: 24000, costBasis: 17500 }
+          : account,
+      ),
+    };
+    const scenario: Kept = {
+      ...withGia,
+      accounts: withGia.accounts.map((account) =>
+        account.id === gia.id ? { ...account, name: "Renamed GIA" } : account,
+      ),
+    };
+
+    const merged = planOver(updated, scenario, forkOf(withGia));
+
+    expect(merged.accounts.find(({ id }) => id === gia.id)).toStrictEqual({
+      ...gia,
+      balance: 24000,
+      costBasis: 17500,
+      name: "Renamed GIA",
+    });
   });
 });

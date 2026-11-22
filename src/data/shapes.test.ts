@@ -73,11 +73,48 @@ describe("shapes", () => {
 
   // The third shape keeps no reading on a point, so the fourth reads it
   // as it is; the step is there so that a build of the third refuses
-  // the fourth, which is the shape kept now.
-  it("carries a household kept in the third shape to the fourth as it is, the shape kept now", () => {
+  // the fourth.
+  it("carries a household kept in the third shape to the fourth as it is", () => {
     expect(upcast({ ...kept, shape: 3 })).toStrictEqual(kept);
-    expect(currentShape).toBe(4);
-    expect(() => upcast({ ...kept, shape: 5 })).toThrow(
+  });
+
+  // The fourth shape held GIAs with no owner and no cost basis; the
+  // fifth assigns each GIA without an owner to the first listed owner
+  // and sets any missing cost basis to its balance (floored at nothing),
+  // leaving existing owners, cost bases and other accounts as found.
+  it("carries GIAs kept in the fourth shape to the fifth with owner and cost basis, the shape kept now", () => {
+    const legacyGia = {
+      balance: 25000,
+      growth: { kind: "plan" },
+      id: 9,
+      kind: "taxable",
+      name: "GIA",
+    };
+    const alreadySet = {
+      balance: 15000,
+      costBasis: 10000,
+      growth: { kind: "plan" },
+      id: 10,
+      kind: "taxable",
+      name: "Second GIA",
+      owner: 2,
+    };
+    const fourth = {
+      ...kept,
+      accounts: [...kept.accounts, legacyGia, alreadySet],
+      shape: 4,
+    };
+
+    expect(upcast(fourth)).toStrictEqual({
+      ...kept,
+      accounts: [
+        ...kept.accounts,
+        { ...legacyGia, costBasis: 25000, owner: 1 },
+        alreadySet,
+      ],
+    });
+    expect(currentShape).toBe(5);
+    expect(() => upcast({ ...kept, shape: 6 })).toThrow(
       "This household was saved by a newer app than this one",
     );
   });
@@ -90,6 +127,16 @@ describe("shapes", () => {
     expect(upcast({ accounts: "none" })).toStrictEqual({ accounts: "none" });
     expect(upcast({ accounts: [1, null, "none"] })).toStrictEqual({
       accounts: [1, null, "none"],
+    });
+    expect(
+      upcast({
+        accounts: [{ kind: "taxable", name: "GIA" }],
+        owners: [null],
+        shape: 4,
+      }),
+    ).toStrictEqual({
+      accounts: [{ kind: "taxable", name: "GIA" }],
+      owners: [null],
     });
   });
 

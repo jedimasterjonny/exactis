@@ -196,7 +196,7 @@ export function endAge(plan: Plan): number {
   return ageIn(endYear(plan), plan);
 }
 
-// The owner an ISA or a pension belongs to, among those the plan
+// The owner an ISA, a pension or a GIA belongs to, among those the plan
 // carries, by the id the account names. One belonging to nobody the
 // plan lists is refused in the rule's words, as the household refuses
 // the same link, since the engine has no years to draw it at or

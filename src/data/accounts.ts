@@ -17,10 +17,13 @@ import type { Month } from "@/data/schedule";
 // its worth rises no higher than, and a car a floor it falls no lower
 // than, each a limit in whole pounds of today's money; any other
 // account carries none. A house may carry a move, the home sold and the
-// next bought at a milestone; any other account carries none. An ISA
-// or a pension carries
-// the id of the owner it belongs to, whose allowance it is paid under;
-// any other account carries none. What a pension is paid, its own sum
+// next bought at a milestone; any other account carries none. An ISA,
+// a pension or a GIA carries
+// the id of the owner it belongs to, whose allowances and tax bands it
+// is paid and taxed under; any other account carries none. A GIA also
+// carries what it cost, its pooled cost basis in whole pounds, nothing
+// or more, for capital gains tax; any other account carries none. What
+// a pension is paid, its own sum
 // and what the salaries feeding it sacrifice, is kept up out of the
 // savings when the month cannot pay it, unless the pension is marked
 // droppable, when it is dropped instead; any other account, and a
@@ -32,6 +35,7 @@ export interface Account {
   readonly balloon?: number;
   readonly bought?: Purchase;
   readonly contribution?: Contribution;
+  readonly costBasis?: number;
   readonly growth: Growth;
   readonly id: number;
   readonly isDroppable?: true;
@@ -59,19 +63,21 @@ export type AccountKind = (typeof accountKinds)[number];
 // The account as a form or a table row holds it: flat, with every field
 // present. A contribution of nothing is a zero rather than an absence, the
 // cadence is kept beside it whether or not it applies, a cap of nothing
-// is the account's own allowance, the rate sits beside the growth
+// is the account's own allowance, a cost basis of nothing is what a GIA
+// cost or nothing for any other account, the rate sits beside the growth
 // choice whether or not that is fixed, a balloon of nothing is a loan
 // with none, which is every account but a PCP's, an owner of null
-// is an account nobody owns, which is every account but an ISA and a
-// pension, and an account not droppable is marked false. So a value
-// can be edited field by field and stored column by column, and becomes
-// an account by the rules below.
+// is an account nobody owns, which is every account but an ISA, a
+// pension and a GIA, and an account not droppable is marked false. So a
+// value can be edited field by field and stored column by column, and
+// becomes an account by the rules below.
 export interface AccountValues {
   readonly balance: number;
   readonly balloon: number;
   readonly cadence: Cadence;
   readonly cap: number;
   readonly contribution: number;
+  readonly costBasis: number;
   readonly funding: Funding;
   readonly growth: (typeof growthKinds)[number];
   readonly isDroppable: boolean;
@@ -254,14 +260,20 @@ export function isAsset(account: { readonly kind: AccountKind }): boolean {
   );
 }
 
-// An ISA or a pension belongs to one owner, since an allowance is a
-// person's and neither can be held jointly: the kinds with an allowance
-// are the kinds with an owner. A GIA, cash, an asset and a debt belong
-// to nobody here, since nothing the plan works out reads whose they are:
-// a GIA's gains and dividends are taxed as its owner's, but the plan
-// charges a GIA no tax, as it charges cash none on its interest.
+// A General Investment Account: taxed on its dividends and on the gain
+// a draw realises, so it carries its owner and what it cost beside its
+// balance.
+export function isGia(account: { readonly kind: AccountKind }): boolean {
+  return account.kind === "taxable";
+}
+
+// An ISA, a pension or a GIA belongs to one owner: an ISA or a pension
+// for its allowance, which is a person's and cannot be held jointly, and
+// a GIA for the allowances and bands its dividends and gains are charged
+// under. Cash, an asset and a debt belong to nobody here, since nothing
+// the plan works out reads whose they are.
 export function isOwned(account: { readonly kind: AccountKind }): boolean {
-  return allowanceOf(account.kind) !== null;
+  return allowanceOf(account.kind) !== null || isGia(account);
 }
 
 // A pension is the wrapper paid before tax, which is the one a salary
@@ -295,6 +307,7 @@ export function toAccount(
     ...(values.balloon > 0 && { balloon: values.balloon }),
     ...(values.bought !== undefined && { bought: values.bought }),
     ...(contribution !== undefined && { contribution }),
+    ...(isGia(values) && { costBasis: values.costBasis }),
     growth:
       values.growth === "plan"
         ? { kind: "plan" }
@@ -310,7 +323,8 @@ export function toAccount(
 }
 
 // The reverse: an absent contribution is a fixed sum of nothing a year,
-// a spare one carries no sum, a fixed one no cap, a plan rate no rate,
+// a spare one carries no sum, a fixed one no cap, an absent cost basis
+// is nothing, a plan rate no rate,
 // an absent balloon is one of nothing, an absent owner is null, and an
 // absent mark is an account not droppable.
 export function toValues(account: Account): AccountValues {
@@ -321,6 +335,7 @@ export function toValues(account: Account): AccountValues {
     cadence: contribution?.kind === "fixed" ? contribution.cadence : "year",
     cap: contribution?.kind === "spare" ? (contribution.cap ?? 0) : 0,
     contribution: contribution?.kind === "fixed" ? contribution.amount : 0,
+    costBasis: account.costBasis ?? 0,
     funding: contribution?.kind ?? "fixed",
     growth: account.growth.kind,
     isDroppable: account.isDroppable === true,

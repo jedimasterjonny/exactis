@@ -745,10 +745,12 @@ describe("project", () => {
   it("draws a GIA after cash and before the ISA, whatever order they are listed in", () => {
     const gia: Account = {
       balance: 3000,
+      costBasis: 3000,
       growth: { kind: "fixed", rate: 0 },
       id: 10,
       kind: "taxable",
       name: "GIA",
+      owner: 1,
     };
 
     expect(
@@ -758,6 +760,29 @@ describe("project", () => {
       point(2027, { 3: 200, 6: 20000, 10: 3000 }, { free: 20000 }),
       point(2028, { 3: 0, 6: 11200, 10: 0 }, { free: 11200 }),
     ]);
+  });
+
+  it("refuses a GIA without a cost basis, a non-GIA with one, and a cost basis below nothing", () => {
+    const gia: Account = {
+      balance: 3000,
+      growth: { kind: "fixed", rate: 0 },
+      id: 10,
+      kind: "taxable",
+      name: "GIA",
+      owner: 1,
+    };
+
+    expect(() => project([gia], short, { ...plan, years: 1 })).toThrow(
+      "A GIA carries what it cost, and nothing else does",
+    );
+    expect(() =>
+      project([{ ...pocket, costBasis: 100 }], short, { ...plan, years: 1 }),
+    ).toThrow("A GIA carries what it cost, and nothing else does");
+    for (const bad of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() =>
+        project([{ ...gia, costBasis: bad }], short, { ...plan, years: 1 }),
+      ).toThrow("What a GIA cost is nothing or more");
+    }
   });
 
   // Nothing coming in and nothing spent, and a SIPP kept paid at £800

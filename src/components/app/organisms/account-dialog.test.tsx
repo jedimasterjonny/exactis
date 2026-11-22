@@ -121,6 +121,7 @@ describe("AccountDialog", () => {
         cadence: "year",
         cap: 0,
         contribution: 0,
+        costBasis: 0,
         funding: "fixed",
         growth: "plan",
         isDroppable: false,
@@ -180,6 +181,7 @@ describe("AccountDialog", () => {
         cadence: "year",
         cap: 0,
         contribution: 28512,
+        costBasis: 0,
         funding: "fixed",
         growth: "plan",
         isDroppable: false,
@@ -409,6 +411,7 @@ describe("AccountDialog", () => {
         cadence: "year",
         cap: 0,
         contribution: 28512,
+        costBasis: 0,
         funding: "fixed",
         growth: "plan",
         isDroppable: false,
@@ -706,6 +709,55 @@ describe("AccountDialog", () => {
     commit(field("Amount", dialog), "20,000");
 
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeEnabled();
+  });
+
+  // A GIA carries its cost basis, reset when switching away from GIA
+  // and restored on switching back; a negative cost basis holds the save.
+  it("keeps a GIA's cost basis across edits and holds the save on a negative one", async () => {
+    const gia: Account = {
+      balance: 20000,
+      costBasis: 14000,
+      growth: { kind: "plan" },
+      id: 9,
+      kind: "taxable",
+      name: "GIA",
+      owner: 1,
+    };
+    const onSaved = vi.fn<(account: Account) => void>();
+    vi.mocked(saveAccount).mockResolvedValue(
+      saved({ ...gia, costBasis: 15500 }),
+    );
+    renderDialog({ account: gia, onSaved });
+    const dialog = openDialog();
+
+    expect(field("Cost basis", dialog)).toHaveValue("£14,000");
+
+    commit(field("Cost basis", dialog), "-1");
+
+    expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
+
+    fireEvent.change(choice(dialog, "Type"), { target: { value: "cash" } });
+
+    expect(
+      within(dialog).queryByRole("textbox", { name: "Cost basis" }),
+    ).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Save" })).toBeEnabled();
+
+    fireEvent.change(choice(dialog, "Type"), { target: { value: "taxable" } });
+
+    expect(field("Cost basis", dialog)).toHaveValue("£14,000");
+
+    commit(field("Cost basis", dialog), "15,500");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledOnce();
+    });
+    expect(vi.mocked(saveAccount).mock.calls[0]?.[1]).toMatchObject({
+      costBasis: 15500,
+      kind: "taxable",
+      owner: 1,
+    });
   });
   // The ledger hands the dialog its delete, which an account the store
   // holds is offered and reports the account by, saving nothing; a new

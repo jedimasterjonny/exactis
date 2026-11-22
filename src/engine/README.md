@@ -761,17 +761,18 @@ An account is listed once, since the store hands out an id an account, and
 listed twice an account is paid its fixed sum twice over in every month, takes
 the spare money twice on the way down, and has its balance counted twice in
 every year. The run refuses it as well as the month, so a plan of no years,
-which reads no month, is refused all the same. An ISA or a pension belongs to an
-owner, since an allowance with nobody to hold it to is a figure the month cannot
-place, and nothing else does; read as a number rather than as present, so an
-owner of null is refused rather than pooling every such wrapper into one
-allowance; and it belongs to an owner the household lists, since there is
-otherwise no age to draw it at and no allowance to draw it under, read before
-any month as the links are rather than in the first month a draw reaches it. The
-engine refuses as well what the sections above refuse where it is saved: a
-droppable mark on anything but a pension, under Pensions kept paid; conditions
-on anyone but the plan's owner, and a move borrowing on a house no loan is
-secured on, under Moves and Retirement on conditions.
+which reads no month, is refused all the same. An ISA, a pension or a GIA
+belongs to an owner, since an allowance or a tax band with nobody to hold it to
+is a figure the month cannot place, and nothing else does; read as a number
+rather than as present, so an owner of null is refused rather than pooling every
+such account into one allowance; and it belongs to an owner the household lists,
+since there is otherwise no age to draw it at and no allowance to draw it under,
+read before any month as the links are rather than in the first month a draw
+reaches it. A GIA carries what it cost, its pooled cost basis, nothing or more,
+and nothing else does. The engine refuses as well what the sections above refuse
+where it is saved: a droppable mark on anything but a pension, under Pensions
+kept paid; conditions on anyone but the plan's owner, and a move borrowing on a
+house no loan is secured on, under Moves and Retirement on conditions.
 
 A balance below nothing is a debt's: a wrapper, a GIA, a cash account or an
 asset below nothing is a figure nothing can mean, compounded deeper every month

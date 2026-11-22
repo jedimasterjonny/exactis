@@ -93,10 +93,12 @@ describe("BalanceSheet", () => {
   it("groups a GIA on its own between the ISAs and the cash", () => {
     const gia: Account = {
       balance: 9000,
+      costBasis: 6500,
       growth: { kind: "plan" },
       id: 7,
       kind: "taxable",
       name: "Dealing account",
+      owner: 1,
     };
     renderSheet({ savings: [pension, isa, cash, gia] });
 
@@ -111,7 +113,9 @@ describe("BalanceSheet", () => {
       "GIAs · taxable£9,000",
       "Cash£16,900",
     ]);
-    expect(rowsOf("GIAs · taxable")).toStrictEqual(["4Dealing account£9,000"]);
+    expect(rowsOf("GIAs · taxable")).toStrictEqual([
+      "4Dealing account£9,000Me · cost £6,500",
+    ]);
   });
 
   // A saving alone has no order to be placed in, and a group the

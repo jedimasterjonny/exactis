@@ -43,11 +43,11 @@ const values = z
 const opening = values.extend({ id: recordId });
 
 // Deletes the owner with that id, unless an account, an income line or
-// a milestone names it: an ISA or a pension belongs to an owner, an
-// income line is earned by one, and a milestone may be reached at one's
-// age, and the household refuses to leave any of them with none, so the
-// account or the line is given to another owner or deleted first, and
-// the milestone measured on someone else, and the refusal says so in
+// a milestone names it: an ISA, a pension or a GIA belongs to an owner,
+// an income line is earned by one, and a milestone may be reached at
+// one's age, and the household refuses to leave any of them with none,
+// so the account or the line is given to another owner or deleted first,
+// and the milestone measured on someone else, and the refusal says so in
 // words that say what to do.
 // The last owner is refused by the household in its own words, since a
 // plan is somebody's, as is the plan's owner while the owner listed next

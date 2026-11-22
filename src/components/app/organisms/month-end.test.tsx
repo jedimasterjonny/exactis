@@ -529,7 +529,14 @@ describe("MonthEnd", () => {
     [
       "of another kind",
       accounts.map((account) =>
-        account.id === 3 ? { ...account, kind: "taxable" as const } : account,
+        account.id === 3
+          ? {
+              ...account,
+              costBasis: account.balance,
+              kind: "taxable" as const,
+              owner: 1,
+            }
+          : account,
       ),
     ],
   ])(

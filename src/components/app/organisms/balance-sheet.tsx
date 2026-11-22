@@ -14,7 +14,7 @@ import { ShareBar } from "@/components/app/atoms/share-bar";
 import { EmptyState } from "@/components/app/molecules/empty-state";
 import { FoldedLines } from "@/components/app/molecules/folded-lines";
 import { Button } from "@/components/kit/button";
-import { isPension, kindLabels } from "@/data/accounts";
+import { isGia, isPension, kindLabels } from "@/data/accounts";
 import { mortgageOn } from "@/data/houses";
 import { fixedMonthly } from "@/lib/cadence";
 import { counted } from "@/lib/count";
@@ -245,6 +245,9 @@ function aboutOf(
 ): JSX.Element | undefined {
   const said = [
     owners.find(({ id }) => id === account.owner)?.name,
+    isGia(account) && account.costBasis !== undefined
+      ? `cost ${formatGbp(account.costBasis)}`
+      : undefined,
     account.growth.kind === "fixed" ? growthOf(account) : undefined,
     account.isDroppable === true ? "dropped when short" : undefined,
   ].filter((part) => part !== undefined);

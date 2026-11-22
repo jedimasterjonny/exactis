@@ -198,8 +198,8 @@ const thrown: readonly Thrown[] = [
     }),
   ],
   [
-    "An ISA or a pension belongs to an owner, and nothing else",
-    "An ISA or a pension belongs to an owner, and nothing else",
+    "An ISA, a pension or a GIA belongs to an owner, and nothing else",
+    "An ISA, a pension or a GIA belongs to an owner, and nothing else",
     (given): Inputs => changed(given, 3, (cash) => ({ ...cash, owner: 1 })),
   ],
   [
@@ -209,17 +209,34 @@ const thrown: readonly Thrown[] = [
       earning(given, 18, (consulting) => ({ ...consulting, owner: 2 })),
   ],
   [
-    "An ISA or a pension belongs to an owner the household lists",
-    "An ISA or a pension belongs to an owner the household lists",
+    "An ISA, a pension or a GIA belongs to an owner the household lists",
+    "An ISA, a pension or a GIA belongs to an owner the household lists",
     (given): Inputs => changed(given, 2, (isa) => ({ ...isa, owner: 2 })),
   ],
   [
-    "An ISA or a pension belongs to an owner, and nothing else",
-    "An ISA or a pension belongs to an owner, and nothing else",
+    "An ISA, a pension or a GIA belongs to an owner, and nothing else",
+    "An ISA, a pension or a GIA belongs to an owner, and nothing else",
     (given): Inputs =>
       changed(given, 2, (isa) =>
         toAccount({ ...toValues(isa), owner: null }, isa.id),
       ),
+  ],
+  [
+    "A GIA carries what it cost, and nothing else does",
+    "A GIA carries what it cost, and nothing else does",
+    (given): Inputs => changed(given, 3, (cash) => ({ ...cash, costBasis: 0 })),
+  ],
+  [
+    "A GIA carries what it cost, and nothing else does",
+    "A GIA carries what it cost, and nothing else does",
+    (given): Inputs =>
+      changed(given, 2, (isa) => ({ ...isa, kind: "taxable" })),
+  ],
+  [
+    "What a GIA cost is nothing or more",
+    "What a GIA cost is nothing or more",
+    (given): Inputs =>
+      changed(given, 2, (isa) => ({ ...isa, costBasis: -1, kind: "taxable" })),
   ],
   [
     "A salary feeds a pension alone",

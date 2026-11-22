@@ -5,7 +5,7 @@ import type { Drawdown, Plan } from "@/data/plan";
 import type { Month } from "@/data/schedule";
 import type { CashFlow, Earned, Fed, Paid, Schedule } from "@/engine/cash-flow";
 
-import { isAsset, isPension } from "@/data/accounts";
+import { isAsset, isGia, isPension } from "@/data/accounts";
 import { isReached, retiresOn, retiringAt, timed } from "@/data/milestones";
 import {
   ageIn,
@@ -593,6 +593,22 @@ export function project(
   }
   for (const account of accounts.filter(({ owner }) => owner !== undefined)) {
     holderOf(account, plan);
+  }
+  if (
+    accounts.some(
+      (account) => isGia(account) !== (typeof account.costBasis === "number"),
+    )
+  ) {
+    throw new Error(rules.costBasis);
+  }
+  if (
+    accounts.some(
+      (account) =>
+        account.costBasis !== undefined &&
+        (!Number.isFinite(account.costBasis) || account.costBasis < 0),
+    )
+  ) {
+    throw new Error(rules.costBasisBelowNothing);
   }
   let allowances: ReadonlyMap<number, number> = new Map();
   let drawn: ReadonlySet<number> = new Set();

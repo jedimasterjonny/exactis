@@ -633,6 +633,36 @@ describe("movedSince", () => {
 
     expect(movedSince(spare, closed(spare)).invested).toBe(1667);
   });
+
+  // A GIA's cost basis is bookkeeping alongside its balance: changing it
+  // counts under balances rather than plan changes, and changedIn ignores
+  // it as it ignores balance and setOn.
+  it("treats a GIA's cost basis as bookkeeping in changedIn, movedOver and movedSince", () => {
+    const gia: Account = {
+      balance: 20000,
+      costBasis: 15000,
+      growth: { kind: "plan" },
+      id: 20,
+      kind: "taxable",
+      name: "GIA",
+      owner: 1,
+      setOn: "2026-08-25",
+    };
+    const before = closing({ accounts: [...kept.accounts, gia], next: 21 });
+    const after = closed(before, {
+      accounts: changed(closed(before).accounts, gia.id, { costBasis: 16500 }),
+    });
+
+    expect(changedIn(before, after)).toStrictEqual([]);
+    expect(movedSince(before, after).changes).toStrictEqual([]);
+    expect(
+      movedSince(before, after).steps.map(({ groups }) => groups),
+    ).toStrictEqual([["balances"]]);
+    expect(
+      movedOver({ accounts: before.accounts, asOf: before.asOf }, after)
+        .changes,
+    ).toStrictEqual([]);
+  });
 });
 
 describe("investedIn", () => {
@@ -646,7 +676,13 @@ describe("investedIn", () => {
       { account: isa, paid: 1000.4 },
       { account: current, paid: 300 },
       {
-        account: { ...isa, id: 99, kind: "taxable" as const, name: "GIA" },
+        account: {
+          ...isa,
+          costBasis: isa.balance,
+          id: 99,
+          kind: "taxable" as const,
+          name: "GIA",
+        },
         paid: 200.3,
       },
     ].map(({ account, paid }) => ({ account, balance: 0, paid }));

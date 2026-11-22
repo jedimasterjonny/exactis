@@ -5,6 +5,7 @@ import {
   allowanceOf,
   capOf,
   isAsset,
+  isGia,
   isOwned,
   isPension,
   takesSpare,
@@ -32,11 +33,47 @@ describe("accounts", () => {
     ).toStrictEqual(["real-asset", "debt"]);
   });
 
-  it("holds a GIA as it holds cash: paid the spare money, with no allowance and no owner", () => {
+  it("holds a GIA as paid the spare money, with no allowance, an owner and a cost basis", () => {
     expect(takesSpare({ kind: "taxable" })).toBe(true);
     expect(isAsset({ kind: "taxable" })).toBe(false);
+    expect(isGia({ kind: "taxable" })).toBe(true);
+    expect(isGia({ kind: "cash" })).toBe(false);
     expect(allowanceOf("taxable")).toBeNull();
-    expect(isOwned({ kind: "taxable" })).toBe(false);
+    expect(isOwned({ kind: "taxable" })).toBe(true);
+  });
+
+  it("reads a GIA's cost basis off an account and back, and drops it on any other kind", () => {
+    const values = {
+      balance: 50000,
+      balloon: 0,
+      cadence: "year",
+      cap: 0,
+      contribution: 0,
+      costBasis: 35000,
+      funding: "fixed",
+      growth: "plan",
+      isDroppable: false,
+      kind: "taxable",
+      name: "GIA",
+      owner: 1,
+      rate: 0,
+    } as const;
+
+    const gia = toAccount(values, 9);
+
+    expect(gia).toStrictEqual({
+      balance: 50000,
+      costBasis: 35000,
+      growth: { kind: "plan" },
+      id: 9,
+      kind: "taxable",
+      name: "GIA",
+      owner: 1,
+    });
+    expect(toValues(gia)).toStrictEqual(values);
+    expect(
+      toAccount({ ...values, kind: "cash", owner: null }, 10),
+    ).not.toHaveProperty("costBasis");
   });
 
   it("reads a contribution and a fixed rate off an account and back", () => {
@@ -46,6 +83,7 @@ describe("accounts", () => {
       cadence: "month",
       cap: 0,
       contribution: 2180,
+      costBasis: 0,
       funding: "fixed",
       growth: "fixed",
       isDroppable: false,
@@ -69,6 +107,7 @@ describe("accounts", () => {
         cadence: "month",
         cap: 0,
         contribution: 0,
+        costBasis: 0,
         funding: "fixed",
         growth: "plan",
         isDroppable: false,
@@ -94,6 +133,7 @@ describe("accounts", () => {
       cadence: "year",
       cap: 0,
       contribution: 0,
+      costBasis: 0,
       funding: "fixed",
       growth: "plan",
       isDroppable: false,
@@ -145,6 +185,7 @@ describe("accounts", () => {
       cadence: "month",
       cap: 4000,
       contribution: 333,
+      costBasis: 0,
       funding: "spare",
       growth: "plan",
       isDroppable: false,

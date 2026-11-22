@@ -27,6 +27,7 @@ import {
   accountKinds,
   cadences,
   isAsset,
+  isGia,
   isOwned,
   isPension,
   takesSpare,
@@ -208,16 +209,17 @@ const move = z.object({
 // An account as the model lays it, with what the account save holds
 // it to and what the engine refuses of one account alone: a balance
 // below nothing only on a debt and above it never on one, the spare
-// money only into an account that takes it, an owner on an ISA or a
-// pension and on nothing else,
+// money only into an account that takes it, an owner on an ISA, a
+// pension or a GIA and on nothing else, a cost basis of nothing or more
+// on a GIA and on nothing else,
 // a fixed sum within its allowance on its own, a rate no lower than
 // losing everything, a link to an asset only on the loan secured on
 // it, a purchase on a house and on nothing else, a limit of something
 // on a house or a car alone, a move on a house alone, and the mark of
 // an account droppable only on a pension. A contribution, a
-// balloon, a limit, a move, an owner, a link, the mark and the day its
-// balance was set are absent rather than nothing, as the model has
-// them.
+// balloon, a cost basis, a limit, a move, an owner, a link, the mark
+// and the day its balance was set are absent rather than nothing, as
+// the model has them.
 export const account = z
   .object({
     balance: z.number().int(),
@@ -235,6 +237,11 @@ export const account = z
           kind: z.literal("spare"),
         }),
       ])
+      .exactOptional(),
+    costBasis: z
+      .number()
+      .int()
+      .nonnegative(rules.costBasisBelowNothing)
       .exactOptional(),
     growth: z.discriminatedUnion("kind", [
       z.object({
@@ -268,6 +275,10 @@ export const account = z
   .refine(
     (account) => isOwned(account) === (account.owner !== undefined),
     rules.owned,
+  )
+  .refine(
+    (account) => isGia(account) === (account.costBasis !== undefined),
+    rules.costBasis,
   )
   .refine(
     (account) => isWithinAllowance(toValues(account)),
@@ -922,21 +933,26 @@ const sources = z.object({
 }) satisfies z.ZodType<Sources>;
 
 // The balances a kept household holds, each by its account's id with
-// the day it was set where it was, and the month they are as of.
+// its GIA cost basis where it carries one and the day it was set where
+// it was, and the month they are as of.
 export interface KeptBalances {
-  readonly accounts: readonly Pick<Account, "balance" | "id" | "setOn">[];
+  readonly accounts: readonly Pick<
+    Account,
+    "balance" | "costBasis" | "id" | "setOn"
+  >[];
   readonly asOf: Month;
 }
 
 // The balances as a kept household holds them, each field read as an
 // account's own is, off the stored document as it is rather than
 // carried through the chain of shapes, so a step that renames or moves
-// asOf, the accounts, or an account's balance, id or day changes this
-// read too.
+// asOf, the accounts, or an account's balance, costBasis, id or day
+// changes this read too.
 const balances = z.object({
   accounts: z.array(
     z.object({
       balance: account.shape.balance,
+      costBasis: account.shape.costBasis,
       id: account.shape.id,
       setOn: account.shape.setOn,
     }),

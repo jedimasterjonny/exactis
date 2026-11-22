@@ -18,7 +18,13 @@ import { saveAccount } from "@/actions/accounts";
 import { AccountFields } from "@/components/app/organisms/account-fields";
 import { EditDialog } from "@/components/app/organisms/edit-dialog";
 import { SacrificeFields } from "@/components/app/organisms/sacrifice-fields";
-import { isOwned, isPension, takesSpare, toValues } from "@/data/accounts";
+import {
+  isGia,
+  isOwned,
+  isPension,
+  takesSpare,
+  toValues,
+} from "@/data/accounts";
 import { useMountedEditor } from "@/hooks/use-editor";
 import { feeding, listed } from "@/lib/feeders";
 import { ownerFor } from "@/lib/owners";
@@ -49,6 +55,7 @@ const blank: Draft = {
   cadence: "year",
   cap: 0,
   contribution: 0,
+  costBasis: 0,
   funding: "fixed",
   growth: "plan",
   isDroppable: false,
@@ -79,7 +86,7 @@ const blank: Draft = {
 // edit made to the salary on the plan screen meanwhile; the account the
 // dialog opened on goes with the save, so the store refuses a save over
 // an account changed meanwhile rather than writing it back. The owners are
-// handed down for an ISA or a pension to name its own, a new one
+// handed down for an ISA, a pension or a GIA to name its own, a new one
 // opening on the first. The save holds while the account is unnamed,
 // while it is a wrapper with no owner, which is only while the plan has
 // none to give it, while it states a fixed sum past its allowance on its
@@ -141,6 +148,7 @@ export function AccountDialog({
     const willTakeSpare = takesSpare({ kind });
     const treated = {
       ...grownBy(current, kind),
+      costBasis: isGia({ kind }) ? current.initial.costBasis : 0,
       isDroppable: isPension({ kind }) && current.initial.isDroppable,
       kind,
       owner: ownerAfter(current, kind, owners),
@@ -167,6 +175,7 @@ export function AccountDialog({
       canSave={
         entry.draft.name.trim() !== "" &&
         (!isOwned(entry.draft) || entry.draft.owner !== null) &&
+        (!isGia(entry.draft) || entry.draft.costBasis >= 0) &&
         isWithinAllowance(entry.draft)
       }
       isWide
@@ -281,8 +290,8 @@ function kindLockOf(feeders: readonly IncomeLine[]): string | undefined {
 // The entry the dialog mounts open on: the account as it is, under its
 // id so a save writes back to it, with the share each salary feeding
 // it sacrifices, or a blank draft of the kind given under none for a
-// new one, which the store gives an id of its own, a pension or an ISA
-// belonging to the first owner and anything else to nobody.
+// new one, which the store gives an id of its own, a pension, an ISA or
+// a GIA belonging to the first owner and anything else to nobody.
 function openingOf(
   account: Account | AccountKind,
   feeders: readonly IncomeLine[],

@@ -528,6 +528,7 @@ describe("isWithinAllowance", () => {
     cadence: "year",
     cap: 0,
     contribution: 20000,
+    costBasis: 0,
     funding: "fixed",
     growth: "plan",
     isDroppable: false,

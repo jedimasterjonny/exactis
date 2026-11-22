@@ -141,7 +141,7 @@ const house = z
 // anything but a pension, since only a pension is fed. What holds the
 // account as a whole is the household's to hold once it is written in:
 // a balance below nothing only on a debt, the spare money only into an
-// account that takes it, an owner on an ISA or a pension, one the
+// account that takes it, an owner on an ISA, a pension or a GIA, one the
 // household lists, and on nothing else, a fixed sum within its
 // allowance on its own, a debt paying its own fixed sum paying it off,
 // since the engine charges that sum to the month the loan maths says
@@ -155,6 +155,7 @@ const values = z
     cadence: z.enum(cadences),
     cap: pounds,
     contribution: pounds,
+    costBasis: pounds,
     funding: z.enum(fundings),
     growth: z.enum(growthKinds),
     isDroppable: z.boolean(),

@@ -58,6 +58,7 @@ const values = {
   cadence: "month",
   cap: 0,
   contribution: 333,
+  costBasis: 0,
   funding: "fixed",
   growth: "fixed",
   isDroppable: false,
@@ -519,20 +520,25 @@ describe("the account actions", () => {
     // An allowance is a person's, so an ISA or a pension names the owner
     // it is paid under, one the household lists, and an account nobody
     // owns names none.
-    it("holds an ISA or a pension to an owner and every other account to none", async () => {
+    it("holds an ISA, a pension or a GIA to an owner and every other account to none", async () => {
       for (const draft of [
         { ...values, owner: null },
         { ...values, kind: "tax-deferred", owner: null },
+        { ...values, kind: "taxable", owner: null },
         { ...values, kind: "cash", owner: 1 },
       ] as const) {
         await expect(saveAccount(null, draft, null)).resolves.toStrictEqual(
-          refused("An ISA or a pension belongs to an owner, and nothing else"),
+          refused(
+            "An ISA, a pension or a GIA belongs to an owner, and nothing else",
+          ),
         );
       }
       await expect(
         saveAccount(null, { ...values, owner: 99 }, null),
       ).resolves.toStrictEqual(
-        refused("An ISA or a pension belongs to an owner the household lists"),
+        refused(
+          "An ISA, a pension or a GIA belongs to an owner the household lists",
+        ),
       );
       expect(await versions()).toBe(1);
 

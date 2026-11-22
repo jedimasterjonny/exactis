@@ -6,6 +6,7 @@ import type { Month } from "@/data/schedule";
 import type { Future } from "@/engine/futures";
 import type { MonthsOn } from "@/engine/projection";
 
+import { isGia } from "@/data/accounts";
 import { soundKept } from "@/data/household";
 import { blendedBy, deductedBy } from "@/data/moves";
 import { ageIn, endAge } from "@/data/plan";
@@ -145,11 +146,7 @@ const areas: readonly {
   readonly area: Area;
   readonly read: (kept: Kept) => unknown;
 }[] = [
-  {
-    area: "accounts",
-    read: ({ accounts }) =>
-      accounts.map((account) => ({ ...account, balance: 0, setOn: null })),
-  },
+  { area: "accounts", read: ({ accounts }) => accounts.map(accountPlan) },
   { area: "owners", read: ({ owners }) => owners },
   { area: "children", read: ({ children }) => children ?? [] },
   { area: "schedule", read: ({ schedule }) => schedule },
@@ -194,11 +191,7 @@ const records: readonly {
 }[] = [
   { kind: "Owner", read: ({ owners }) => owners },
   { kind: "Child", read: ({ children }) => children ?? [] },
-  {
-    kind: "Account",
-    read: ({ accounts }) =>
-      accounts.map((account) => ({ ...account, balance: 0, setOn: null })),
-  },
+  { kind: "Account", read: ({ accounts }) => accounts.map(accountPlan) },
   { kind: "Income", read: ({ schedule }) => schedule.income },
   { kind: "Expense", read: ({ schedule }) => schedule.expenses },
   { kind: "Milestone", read: ({ milestones }) => milestones },
@@ -316,6 +309,8 @@ export function movedOver(closed: KeptBalances, now: Kept): Moved {
           : {
               ...account,
               balance: was.balance,
+              ...(isGia(account) &&
+                was.costBasis !== undefined && { costBasis: was.costBasis }),
               ...(was.setOn !== undefined && { setOn: was.setOn }),
             };
       }),
@@ -391,10 +386,15 @@ export function movedSince(
   );
   const nowById = new Map(now.accounts.map((account) => [account.id, account]));
   const closed = (accounts: readonly Account[]): readonly Account[] =>
-    accounts.map((account) => ({
-      ...account,
-      balance: nowById.get(account.id)?.balance ?? account.balance,
-    }));
+    accounts.map((account) => {
+      const current = nowById.get(account.id);
+      return {
+        ...account,
+        balance: current?.balance ?? account.balance,
+        ...(isGia(account) &&
+          current?.costBasis !== undefined && { costBasis: current.costBasis }),
+      };
+    });
   const rates = sources
     .filter(({ keys, read }) =>
       read === undefined
@@ -505,6 +505,24 @@ export function standingOf(kept: Kept): NonNullable<KeptPoint["standing"]> {
   const retires = future.retired === null ? null : ageIn(future.retired, plan);
   const age = Math.max(retires ?? endAge(plan), ageIn(plan.from, plan));
   return { age, liquid: Math.round(standingAt(future, age).liquid), retires };
+}
+
+// The bookkeeping keys stripped from an account when comparing plans.
+const bookkeeping = new Set(["balance", "costBasis", "setOn"]);
+
+// An account without its bookkeeping fields (balance, GIA cost basis
+// and date set), so plan diffs and areas compare plan settings alone
+// regardless of which bookkeeping keys are present.
+function accountPlan(
+  account: Account,
+): Record<string, unknown> & { readonly id: number; readonly name: string } {
+  return {
+    ...Object.fromEntries(
+      Object.entries(account).filter(([key]) => !bookkeeping.has(key)),
+    ),
+    id: account.id,
+    name: account.name,
+  };
 }
 
 // The balances the close set against those it closed from, over the
