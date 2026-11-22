@@ -4226,6 +4226,49 @@ describe("monthsOn", () => {
     expect(one?.paid).toBeCloseTo(2970);
     expect(two?.paid).toBeGreaterThan(2 * 2970 + 1200);
   });
+
+  // A GIA carries its cost basis through monthsOn: contributions and
+  // reinvested plan dividends add to it, and keeping a pension paid out
+  // of a GIA reduces its cost basis proportionally.
+  it("carries a GIA's cost basis through contributions, reinvested dividends and kept-paid draws", () => {
+    const planGia: Account = {
+      balance: 20000,
+      contribution: { amount: 1000, cadence: "month", kind: "fixed" },
+      costBasis: 12000,
+      growth: { kind: "plan" },
+      id: 30,
+      kind: "taxable",
+      name: "Plan GIA",
+      owner: 1,
+    };
+    const [reachedGia, reachedIsa] = monthsOn([planGia, flatIsa], funded, {
+      months: 1,
+      plan: { ...year, dividendYield: 0.024, rate: 0 },
+    });
+
+    // £1,000 paid in + (20,000 + 1,000) * 0.024 / 12 = £42 dividend.
+    expect(reachedGia?.costBasis).toBeCloseTo(12000 + 1000 + 42, 10);
+    expect(reachedIsa?.costBasis).toBeUndefined();
+
+    // Drawing £2,376 from a £10,000 GIA (cost basis £6,000) to keep a
+    // pension paid reduces its cost basis proportionally by 2,376/10,000.
+    const drawnGia: Account = {
+      balance: 10000,
+      costBasis: 6000,
+      growth: { kind: "fixed", rate: 0 },
+      id: 31,
+      kind: "taxable",
+      name: "Drawn GIA",
+      owner: 1,
+    };
+    const [, afterDraw] = monthsOn([pension, drawnGia], short, {
+      months: 1,
+      plan: year,
+    });
+
+    expect(afterDraw?.balance).toBeCloseTo(10000 - 2376, 10);
+    expect(afterDraw?.costBasis).toBeCloseTo(6000 * (1 - 2376 / 10000), 10);
+  });
 });
 
 describe("balanceIn", () => {

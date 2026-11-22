@@ -47,10 +47,12 @@ import {
 
 // Where a month or more of the plan leaves an account, as the
 // projection carries it: the account, the balance it is carried to,
-// and what the months pay into it, or off it for a debt.
+// its cost basis for a GIA, and what the months pay into it, or off it
+// for a debt.
 export interface MonthsOn {
   readonly account: Account;
   readonly balance: number;
+  readonly costBasis?: number;
   readonly paid: number;
 }
 
@@ -529,9 +531,10 @@ export function monthsOn(
       },
     );
   }
-  return reached.map(({ account, balance, paid }) => ({
+  return reached.map(({ account, balance, costBasis, paid }) => ({
     account,
     balance,
+    ...(isGia(account) && { costBasis }),
     paid,
   }));
 }
@@ -1295,7 +1298,7 @@ function isRetiring(
 // that is as far as the flow keeps such a pension paid; the spending the
 // month is short of stays where it is, since a month end checks the plan
 // against the balances rather than spending them.
-function keptOutOf<TEntry extends MonthsOn>(
+function keptOutOf<TEntry extends Held & MonthsOn>(
   reached: readonly TEntry[],
   kept: number,
 ): readonly TEntry[] {
@@ -1303,13 +1306,22 @@ function keptOutOf<TEntry extends MonthsOn>(
   let taken = reached;
   for (const kind of drawOrder) {
     taken = taken.map((entry) => {
-      const { account, balance, paid } = entry;
+      const { account, balance, costBasis, paid } = entry;
       const take =
         account.kind === kind && isReserve(account)
           ? Math.min(balance, left)
           : 0;
       left -= take;
-      return { ...entry, balance: balance - take, paid: paid - take };
+      const nextBasis =
+        take > 0 && isGia(account)
+          ? Math.max(0, costBasis - costBasis * (take / balance))
+          : costBasis;
+      return {
+        ...entry,
+        balance: balance - take,
+        costBasis: nextBasis,
+        paid: paid - take,
+      };
     });
   }
   return taken;

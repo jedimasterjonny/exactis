@@ -193,11 +193,13 @@ const openedAsset = z
   .nullable() satisfies z.ZodType<null | Secured>;
 
 // A month end as the worksheet sends it: the month the balances are now
-// as of, and each balance checked against it, by the account's id.
+// as of, and each balance checked against it, by the account's id, with
+// the updated cost basis for a GIA.
 interface Closed {
   readonly asOf: Month;
   readonly balances: readonly {
     readonly balance: number;
+    readonly costBasis?: number;
     readonly id: number;
   }[];
 }
@@ -207,7 +209,13 @@ interface Closed {
 const closed = z.object({
   asOf: month,
   balances: z
-    .array(z.object({ balance: z.number().int(), id: recordId }))
+    .array(
+      z.object({
+        balance: z.number().int(),
+        costBasis: z.number().int().exactOptional(),
+        id: recordId,
+      }),
+    )
     .refine(
       (listed) => new Set(listed.map(({ id }) => id)).size === listed.length,
     ),
@@ -279,10 +287,11 @@ export async function closeBalances(
       );
     }
     const accounts = balances.reduce<readonly Account[]>(
-      (written, { balance, id }) =>
+      (written, { balance, costBasis, id }) =>
         replaced(written, {
           ...found(written, id, "account"),
           balance,
+          ...(costBasis !== undefined && { costBasis }),
           setOn: today(),
         }),
       kept.accounts,

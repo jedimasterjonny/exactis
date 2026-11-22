@@ -696,4 +696,67 @@ describe("MonthEnd", () => {
     expect(field("Stocks & shares ISA")).toHaveValue("£274,711");
     expect(notes()).not.toContain(restored);
   });
+
+  // A GIA renders an editable cost basis input pre-filled with the
+  // plan's expected cost basis (including contributions and reinvested
+  // dividends), persists typed values across reload, and sends the
+  // updated cost basis to closeBalances on Save.
+  it("pre-fills, restores and saves a GIA's cost basis", async () => {
+    vi.mocked(closeBalances).mockResolvedValue(
+      saved({ asOf: { month: 8, year: 2026 }, isRecorded: true }),
+    );
+    const gia = {
+      balance: 24000,
+      contribution: {
+        amount: 500,
+        cadence: "month" as const,
+        kind: "fixed" as const,
+      },
+      costBasis: 18000,
+      growth: { kind: "plan" as const },
+      id: 99,
+      kind: "taxable" as const,
+      name: "General investment",
+      owner: 1,
+    };
+    const props = {
+      accounts: [isa, gia],
+      plan: { ...plan, dividendYield: 0.024 },
+    };
+    const view = drawWorksheet(props);
+
+    // Expected cost basis: £18,000 + £500 paid + (24,000 + 500) * 0.024 / 12 = £18,549.
+    expect(field("General investment cost basis")).toHaveValue("£18,549");
+
+    // Negative cost basis clamps cleanly at £0.
+    commit(field("General investment cost basis"), "-100");
+    expect(field("General investment cost basis")).toHaveValue("£0");
+
+    // Typing cost basis checks the GIA; unchecking still keeps the
+    // typed cost basis in sessionStorage so reload restores it.
+    commit(field("General investment cost basis"), "19,200");
+    expect(
+      screen.getByRole("button", { name: "Check General investment" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Check General investment" }),
+    );
+    expect(sessionStorage.getItem("month-end-draft")).not.toBeNull();
+
+    reload(view, props);
+
+    expect(field("General investment cost basis")).toHaveValue("£19,200");
+    expect(notes()).toContain(restored);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Check General investment" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(closeBalances).toHaveBeenCalledExactlyOnceWith({
+      asOf: { month: 8, year: 2026 },
+      balances: [{ balance: 24600, costBasis: 19200, id: gia.id }],
+    });
+    await screen.findByRole("dialog", { name: "Balances updated" });
+  });
 });

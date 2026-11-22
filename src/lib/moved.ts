@@ -370,10 +370,15 @@ export function movedSince(
   const carried = moving.filter(({ account }) => ids.has(account.id));
   const expected: Kept = {
     ...before,
-    accounts: moving.map(({ account, balance }) => ({
-      ...account,
-      balance: ids.has(account.id) ? Math.round(balance) : account.balance,
-    })),
+    accounts: moving.map(({ account, balance, costBasis }) => {
+      const isSet = ids.has(account.id);
+      return {
+        ...account,
+        balance: isSet ? Math.round(balance) : account.balance,
+        ...(isSet &&
+          costBasis !== undefined && { costBasis: Math.round(costBasis) }),
+      };
+    }),
     asOf: now.asOf,
   };
   const opening = futureIn(expected);

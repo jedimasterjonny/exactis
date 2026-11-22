@@ -19,7 +19,11 @@ import { FieldRow } from "@/components/app/atoms/field-row";
 import { Ledger } from "@/components/app/atoms/ledger";
 import { Note } from "@/components/app/atoms/note";
 import { RowAction } from "@/components/app/atoms/row-action";
-import { MoneyInput, YearField } from "@/components/app/molecules/figure-field";
+import {
+  MoneyField,
+  MoneyInput,
+  YearField,
+} from "@/components/app/molecules/figure-field";
 import { MonthField } from "@/components/app/molecules/month-field";
 import { SectionCard } from "@/components/app/organisms/section-card";
 import { Button } from "@/components/kit/button";
@@ -41,11 +45,13 @@ import { monthEnd, subsectionLabel } from "@/lib/nav";
 
 // The worksheet while it is open: the month the balances are being
 // closed onto, the balances checked, and the figures typed, by the
-// account's id. A balance not typed reads what the plan expected.
+// account's id. A balance or GIA cost basis not typed reads what the
+// plan expected.
 interface Draft {
   readonly asOf: Month;
   readonly checked: ReadonlySet<number>;
   readonly typed: ReadonlyMap<number, number>;
+  readonly typedBasis: ReadonlyMap<number, number>;
 }
 
 // The draft held: what it is, the month cut last it was opened on, each
@@ -68,9 +74,11 @@ interface MonthEndProps {
 }
 
 // What a row says of a balance: what it was, what the months were
-// planned to pay into it, or off it for a debt, and what it reads now.
+// planned to pay into it, or off it for a debt, what it reads now, and
+// for a GIA what its cost basis reads now.
 interface Row {
   readonly account: Account;
+  readonly costBasis?: number;
   readonly isChecked: boolean;
   readonly now: number;
   readonly paid: number;
@@ -91,6 +99,10 @@ const keptDraft = z.object({
     checked: z.array(recordId).transform((ids) => new Set(ids)),
     typed: z
       .array(z.tuple([recordId, z.number()]))
+      .transform((figures) => new Map(figures)),
+    typedBasis: z
+      .array(z.tuple([recordId, z.number()]))
+      .default([])
       .transform((figures) => new Map(figures)),
   }),
   month: aMonth,
@@ -162,6 +174,7 @@ export function MonthEnd({
     asOf: month,
     checked: new Set(),
     typed: new Map(),
+    typedBasis: new Map(),
   });
   const stored = useSyncExternalStore(subscribe, readDraft, noDraft);
   const [held, setHeld] = useState<Held | null>(null);
@@ -235,8 +248,11 @@ export function MonthEnd({
               async () =>
                 closeBalances({
                   asOf: draft.asOf,
-                  balances: checked.map(({ account, now }) => ({
+                  balances: checked.map(({ account, costBasis, now }) => ({
                     balance: Math.round(now),
+                    ...(costBasis !== undefined && {
+                      costBasis: Math.round(costBasis),
+                    }),
                     id: account.id,
                   })),
                 }),
@@ -287,15 +303,17 @@ function attempt<T>(touch: () => T): T | undefined {
 function Balance({
   onCheck,
   onType,
+  onTypeBasis,
   row,
   today,
 }: {
   readonly onCheck: (account: Account, isChecked: boolean) => void;
   readonly onType: (account: Account, value: number) => void;
+  readonly onTypeBasis: (account: Account, value: number) => void;
   readonly row: Row;
   readonly today: string;
 }): JSX.Element {
-  const { account, isChecked, now, paid } = row;
+  const { account, costBasis, isChecked, now, paid } = row;
   const verb = account.kind === "debt" ? "paid off" : "paid in";
   const since =
     account.setOn === undefined
@@ -307,27 +325,40 @@ function Balance({
     isChecked ? `${pounds(now - account.balance - paid)} moved` : since,
   ];
   return (
-    <Field hint={facts.join(" · ")} label={account.name}>
-      <div className="flex gap-2">
-        <div className="min-w-0 flex-1">
-          <MoneyInput
-            onValueCommitted={(value) => {
-              onType(account, value);
+    <div className="grid content-start gap-3">
+      <Field hint={facts.join(" · ")} label={account.name}>
+        <div className="flex gap-2">
+          <div className="min-w-0 flex-1">
+            <MoneyInput
+              onValueCommitted={(value) => {
+                onType(account, value);
+              }}
+              value={now}
+            />
+          </div>
+          <RowAction
+            aria-pressed={isChecked}
+            className={isChecked ? "text-positive" : "text-muted-foreground"}
+            icon={isChecked ? SquareCheck : Square}
+            name={`Check ${account.name}`}
+            onClick={() => {
+              onCheck(account, !isChecked);
             }}
-            value={now}
           />
         </div>
-        <RowAction
-          aria-pressed={isChecked}
-          className={isChecked ? "text-positive" : "text-muted-foreground"}
-          icon={isChecked ? SquareCheck : Square}
-          name={`Check ${account.name}`}
-          onClick={() => {
-            onCheck(account, !isChecked);
+      </Field>
+      {costBasis !== undefined && (
+        <MoneyField
+          hint="Total paid in plus reinvested dividends, less disposals"
+          label={`${account.name} cost basis`}
+          min={0}
+          onValueCommitted={(value) => {
+            onTypeBasis(account, value);
           }}
+          value={costBasis}
         />
-      </div>
-    </Field>
+      )}
+    </div>
   );
 }
 
@@ -343,8 +374,8 @@ function isBound({ touched }: Held, accounts: readonly Account[]): boolean {
 }
 
 // Whether a draft has nothing checked or typed, as one opened afresh.
-function isEmpty({ checked, typed }: Draft): boolean {
-  return checked.size === 0 && typed.size === 0;
+function isEmpty({ checked, typed, typedBasis }: Draft): boolean {
+  return checked.size === 0 && typed.size === 0 && typedBasis.size === 0;
 }
 
 // Keeps a draft in the tab's storage for a reload, or erases the copy
@@ -361,6 +392,7 @@ function keep({ draft, month, touched }: Held): void {
             asOf: draft.asOf,
             checked: [...draft.checked],
             typed: [...draft.typed],
+            typedBasis: [...draft.typedBasis],
           },
           month,
           touched,
@@ -423,8 +455,11 @@ function rowsOf(
 ): readonly Row[] {
   const months = Math.max(0, monthsBetween(from, draft.asOf) + 1);
   return monthsOn(accounts, schedule, { months, plan }).map(
-    ({ account, balance, paid }): Row => ({
+    ({ account, balance, costBasis, paid }): Row => ({
       account,
+      ...(costBasis !== undefined && {
+        costBasis: draft.typedBasis.get(account.id) ?? Math.round(costBasis),
+      }),
       isChecked: draft.checked.has(account.id),
       now: draft.typed.get(account.id) ?? Math.round(balance),
       paid,
@@ -444,11 +479,11 @@ function subscribe(): () => void {
 
 // Each account a draft checked or typed, by id, kind and name.
 function touchedOf(
-  { checked, typed }: Draft,
+  { checked, typed, typedBasis }: Draft,
   accounts: readonly Account[],
 ): readonly Touched[] {
   return accounts
-    .filter(({ id }) => checked.has(id) || typed.has(id))
+    .filter(({ id }) => checked.has(id) || typed.has(id) || typedBasis.has(id))
     .map(({ id, kind, name }): Touched => [id, kind, name]);
 }
 
@@ -507,6 +542,14 @@ function Worksheet({
       ...draft,
       checked: new Set(draft.checked).add(account.id),
       typed: new Map(draft.typed).set(account.id, typedAs(account, value)),
+    });
+  }
+
+  function typeBasis(account: Account, value: number): void {
+    onAmend({
+      ...draft,
+      checked: new Set(draft.checked).add(account.id),
+      typedBasis: new Map(draft.typedBasis).set(account.id, value),
     });
   }
 
@@ -582,6 +625,7 @@ function Worksheet({
                     key={row.account.id}
                     onCheck={check}
                     onType={type}
+                    onTypeBasis={typeBasis}
                     row={row}
                     today={today}
                   />

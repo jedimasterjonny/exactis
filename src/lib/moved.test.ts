@@ -662,6 +662,27 @@ describe("movedSince", () => {
       movedOver({ accounts: before.accounts, asOf: before.asOf }, after)
         .changes,
     ).toStrictEqual([]);
+
+    // When a GIA is closed at the cost basis monthsOn expected (with
+    // reinvested dividends), no balances step is needed; when unchecked
+    // (outside ids), the prior cost basis is left where it stood.
+    const then = soundKept(before).household;
+    const expectedGia = monthsOn(before.accounts, then.schedule, {
+      months: 1,
+      plan: then.plan,
+    }).find(({ account }) => account.id === gia.id);
+    const matched = closed(before, {
+      accounts: changed(closed(before).accounts, gia.id, {
+        costBasis: Math.round(expectedGia?.costBasis ?? 0),
+      }),
+    });
+
+    expect(movedSince(before, matched).steps).toStrictEqual([]);
+    expect(
+      movedSince(before, matched, new Set([2, 3, 4, 5, 6])).steps.map(
+        ({ groups }) => groups,
+      ),
+    ).toStrictEqual([["balances"]]);
   });
 });
 
