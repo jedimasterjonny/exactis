@@ -14,7 +14,7 @@ import { atAge, retiringAt, timed } from "@/data/milestones";
 import { sam, working } from "@/data/owners.fixture";
 import { endYear } from "@/data/plan";
 import { statePensionLines } from "@/data/state-pension";
-import { drawFor, drawOf, lumpSumAllowance } from "@/lib/tax";
+import { cgtAllowance, drawFor, drawOf, lumpSumAllowance } from "@/lib/tax";
 
 import type { Schedule } from "./cash-flow";
 import type { ProjectionPoint, Run } from "./projection";
@@ -75,8 +75,10 @@ function point(
     age: year - plan.born,
     allowances: { [working.id]: lumpSumAllowance },
     balances,
+    bases: {},
     deferred: 0,
     early: 0,
+    exempt: cgtAllowance,
     free: 0,
     uncovered: 0,
     year,
@@ -756,10 +758,268 @@ describe("project", () => {
     expect(
       project([gia, flatIsa, pocket], short, { ...plan, month: 11, years: 2 }),
     ).toStrictEqual([
-      point(2026, { 3: 1200, 6: 20000, 10: 3000 }, { free: 20000 }),
-      point(2027, { 3: 200, 6: 20000, 10: 3000 }, { free: 20000 }),
-      point(2028, { 3: 0, 6: 11200, 10: 0 }, { free: 11200 }),
+      point(
+        2026,
+        { 3: 1200, 6: 20000, 10: 3000 },
+        { bases: { 10: 3000 }, free: 20000 },
+      ),
+      point(
+        2027,
+        { 3: 200, 6: 20000, 10: 3000 },
+        { bases: { 10: 3000 }, free: 20000 },
+      ),
+      point(2028, { 3: 0, 6: 11200, 10: 0 }, { bases: { 10: 0 }, free: 11200 }),
     ]);
+  });
+
+  // A GIA worth £20,000 costing £10,000 (50% gain) in a full tax year
+  // starting April 2026 covers £1,000/mo of spending for 12 months
+  // (£12,000 net). The first £6,000 sold realises £3,000 gain within
+  // the AEA (0% CGT); the remaining £6,000 net requires £6,000 / 0.91 =
+  // £6,593.41 gross (realising £3,296.70 gain @ 18% = £593.41 CGT).
+  // Over the 9 months Apr–Dec (£9,000 net needed on a 50% gain ratio):
+  // £6,000 is sheltered by the £3,000 AEA and the remaining £3,000 net
+  // grosses up at 18% on half the sale (£3,000 / 0.91 = £3,296.70), so
+  // £9,296.70 is sold in all, leaving £10,703 balance and £5,352 basis.
+  it("grosses up GIA draws for CGT above the £3,000 AEA and reduces cost basis proportionally", () => {
+    const gia: Account = {
+      balance: 20000,
+      costBasis: 10000,
+      growth: { kind: "fixed", rate: 0 },
+      id: 10,
+      kind: "taxable",
+      name: "GIA",
+      owner: 1,
+    };
+    const [open, next] = project([gia], short, { ...plan, month: 3, years: 1 });
+
+    expect(open?.balances[10]).toBe(20000);
+    expect(open?.bases[10]).toBe(10000);
+    expect(next?.balances[10]).toBe(Math.round(20000 - (6000 + 3000 / 0.91)));
+    expect(next?.bases[10]).toBe(
+      Math.round(10000 * (1 - (6000 + 3000 / 0.91) / 20000)),
+    );
+  });
+
+  // Contributions into a GIA raise its pooled cost basis pound for
+  // pound; a partial opening tax year (Oct–Mar, 6 months) scales the
+  // £3,000 AEA to £1,500; and when a GIA empties, the shortfall spills
+  // cleanly onto the ISA.
+  it("adds contributions to GIA cost basis, scales opening-year AEA, and spills to the ISA when empty", () => {
+    const savingGia: Account = {
+      balance: 10000,
+      contribution: { amount: 500, cadence: "month", kind: "fixed" },
+      costBasis: 10000,
+      growth: { kind: "fixed", rate: 0 },
+      id: 10,
+      kind: "taxable",
+      name: "GIA",
+      owner: 1,
+    };
+    const [, afterSaving] = project([savingGia], funded, {
+      ...plan,
+      month: 0,
+      years: 1,
+    });
+
+    expect(afterSaving?.balances[10]).toBe(16000);
+    expect(afterSaving?.bases[10]).toBe(16000);
+
+    // Oct–Dec 2026 (3 months of a 6-month opening tax year -> £1,500 AEA):
+    // GIA holds £5,000 costing £0 (100% gain). Selling all £5,000 owes
+    // (£5,000 - £1,500) * 18% = £630 CGT, delivering £4,370 net. Spending
+    // £6,000 (£2,000/mo x 3) leaves £1,630 for the ISA to cover.
+    const smallGia: Account = {
+      balance: 5000,
+      costBasis: 0,
+      growth: { kind: "fixed", rate: 0 },
+      id: 10,
+      kind: "taxable",
+      name: "GIA",
+      owner: 1,
+    };
+    const [baseExpense] = expenseLines;
+    const heavy = { expenses: [{ ...baseExpense, amount: 2000 }], income: [] };
+    const [, afterSpill] = project([smallGia, flatIsa], heavy, {
+      ...plan,
+      month: 9,
+      years: 1,
+    });
+
+    expect(afterSpill?.balances[10]).toBe(0);
+    expect(afterSpill?.bases[10]).toBe(0);
+    expect(afterSpill?.balances[6]).toBe(20000 - (6000 - (5000 - 3500 * 0.18)));
+  });
+
+  // Selling a GIA at a loss in tax year 1 carries the capital loss
+  // forward to tax year 2, where it offsets gains only above the £3,000
+  // AEA (never wasting AEA), and a gain followed by a loss in the same
+  // tax year refunds overpaid monthly CGT in April.
+  it("carries capital losses forward without wasting AEA and settles mid-year losses in April", () => {
+    const losingGia: Account = {
+      balance: 4000,
+      costBasis: 9000,
+      growth: { kind: "fixed", rate: 0 },
+      id: 10,
+      kind: "taxable",
+      name: "Losing GIA",
+      owner: 1,
+    };
+    const gainingGia: Account = {
+      balance: 10000,
+      costBasis: 0,
+      growth: { kind: "fixed", rate: 0 },
+      id: 11,
+      kind: "taxable",
+      name: "Gaining GIA",
+      owner: 1,
+    };
+    // Tax year 2025/26 (Jan–Mar 2026): £4,000 spent in Jan 2026 empties
+    // losingGia, realising a -£5,000 capital loss carried into 2026/27.
+    // Tax year 2026/27: £7,000 spent in Jan 2027 sells £7,000 of
+    // gainingGia (100% gain). With £3,000 AEA + £5,000 carried loss,
+    // £7,000 gain pays £0 CGT and leaves £1,000 carried loss for
+    // 2027/28. Tax year 2027/28: £3,000 spent in Jan 2028 sells the
+    // remaining £3,000 within AEA (£0 CGT).
+    const [baseExpense] = expenseLines;
+    const yearlySpends: Schedule = {
+      expenses: [
+        {
+          ...baseExpense,
+          amount: 4000,
+          firstYear: 2026,
+          id: 20,
+          lastMonth: 0,
+          lastYear: 2026,
+        },
+        {
+          ...baseExpense,
+          amount: 7000,
+          firstYear: 2027,
+          id: 21,
+          lastMonth: 0,
+          lastYear: 2027,
+        },
+        {
+          ...baseExpense,
+          amount: 3000,
+          firstYear: 2028,
+          id: 22,
+          lastMonth: 0,
+          lastYear: 2028,
+        },
+      ],
+      income: [],
+    };
+    const pts = project([losingGia, gainingGia], yearlySpends, {
+      ...plan,
+      month: 0,
+      years: 3,
+    });
+
+    expect(pts[1]?.balances[10]).toBe(0);
+    expect(pts[1]?.balances[11]).toBe(10000);
+    expect(pts[2]?.balances[11]).toBe(3000);
+    expect(pts[3]?.balances[11]).toBe(0);
+    expect(pts.every((p) => p.uncovered === 0)).toBe(true);
+
+    // Mid-year gain followed by mid-year loss in the same 2026/27 tax
+    // year: £5,000 spent in April 2026 sells £3,000 + £2,000 / 0.82 =
+    // £5,439.02 of Gaining GIA (£439.02 CGT), leaving £560.98. Then
+    // £4,000 spent in January 2027 sells the remaining £560.98 (£100.98
+    // CGT, £460 net) and draws £3,540 from Losing GIA (disposing £7,965
+    // of basis for a -£4,425 loss). Net 2026/27 gain is £1,575 <= £3,000
+    // AEA, so April 2027 refunds all £540 of paid CGT into cash.
+    const gainThenLoss: Schedule = {
+      expenses: [
+        {
+          ...baseExpense,
+          amount: 5000,
+          firstYear: 2026,
+          id: 23,
+          lastMonth: 3,
+          lastYear: 2026,
+        },
+        {
+          ...baseExpense,
+          amount: 4000,
+          firstYear: 2027,
+          id: 24,
+          lastMonth: 0,
+          lastYear: 2027,
+        },
+      ],
+      income: [],
+    };
+    const sink: Account = {
+      balance: 0,
+      contribution: { cap: null, kind: "spare" },
+      growth: { kind: "fixed", rate: 0 },
+      id: 3,
+      kind: "cash",
+      name: "Refund sink",
+    };
+    const refunded = project(
+      [
+        { ...gainingGia, balance: 6000 },
+        { ...losingGia, balance: 4000, costBasis: 9000 },
+        sink,
+      ],
+      gainThenLoss,
+      { ...plan, month: 3, years: 2 },
+    );
+
+    expect(refunded.every((p) => p.uncovered === 0)).toBe(true);
+    expect(refunded[1]?.balances[11]).toBe(
+      Math.round(6000 - (3000 + 2000 / 0.82)),
+    );
+    expect(refunded[1]?.balances[10]).toBe(4000);
+    expect(refunded[2]?.balances[11]).toBe(0);
+    expect(refunded[2]?.balances[3]).toBe(540);
+  });
+
+  // Keeping a pension paid out of a GIA uses conservative 24% net
+  // reserve and grosses up the GIA draw for CGT in the kept-paid pass.
+  it("draws a GIA with CGT to keep a pension paid, and respects the after-CGT reserve", () => {
+    const gia: Account = {
+      balance: 10000,
+      costBasis: 0,
+      growth: { kind: "fixed", rate: 0 },
+      id: 10,
+      kind: "taxable",
+      name: "GIA",
+      owner: 1,
+    };
+    const keptPension: Account = {
+      ...sipp,
+      balance: 0,
+      contribution: { amount: 800, cadence: "month", kind: "fixed" },
+      growth: { kind: "fixed", rate: 0 },
+    };
+    // Over 9 months (Apr–Dec 2026), £800/mo kept paid (£7,200 net):
+    // £3,000 inside AEA + £4,200 / 0.82 = £8,121.95 sold, leaving £1,878
+    // in the GIA and 9 * (£800 + £60 relief on £240) = £7,740 in pension.
+    const [, after] = project(
+      [gia, keptPension],
+      { expenses: [], income: [] },
+      { ...plan, drawdown: "pension-first", month: 3, years: 1 },
+    );
+
+    expect(after?.uncovered).toBe(0);
+    expect(after?.balances[10]).toBe(Math.round(10000 - (3000 + 4200 / 0.82)));
+    expect(after?.deferred).toBe(9 * 860);
+
+    // When a GIA holds £1,000 costing £0, the 24% after-CGT reserve is
+    // £760, capping a £800/mo kept-paid pension to £760 in month 1.
+    const [, capped] = project(
+      [{ ...gia, balance: 1000 }, keptPension],
+      { expenses: [], income: [] },
+      { ...plan, drawdown: "pension-first", month: 11, years: 1 },
+    );
+
+    expect(capped?.uncovered).toBe(0);
+    expect(capped?.balances[10]).toBe(240);
+    expect(capped?.deferred).toBe(760 + 60);
   });
 
   it("refuses a GIA without a cost basis, a non-GIA with one, and a cost basis below nothing", () => {
@@ -3817,6 +4077,62 @@ describe("worthsIn", () => {
     ).toStrictEqual({ 6: 80000 });
     expect(worthsIn(point(2026, { 3: 100000 }), [ownerless])).toStrictEqual({
       3: 80000,
+    });
+  });
+
+  // Each owner's GIAs are netted together against one £3,000 exemption
+  // and taxed at 18%, prorated across the GIAs in gain; a GIA at a loss
+  // or break-even pays nothing and offsets the owner's gaining GIA.
+  it("counts GIAs after basic-rate unrealised CGT, netting gains and losses per owner", () => {
+    const gia1: Account = {
+      balance: 20000,
+      costBasis: 10000,
+      growth: { kind: "plan" },
+      id: 10,
+      kind: "taxable",
+      name: "GIA 1",
+      owner: working.id,
+    };
+    const gia2: Account = {
+      balance: 5000,
+      costBasis: 8000,
+      growth: { kind: "plan" },
+      id: 11,
+      kind: "taxable",
+      name: "GIA 2",
+      owner: working.id,
+    };
+    const samsGia: Account = {
+      balance: 15000,
+      costBasis: 7000,
+      growth: { kind: "plan" },
+      id: 12,
+      kind: "taxable",
+      name: "Sam GIA",
+      owner: sam.id,
+    };
+
+    // Owner 1: £10k gain + (-£3k loss) = £7k net gain -> £4k above £3k
+    // exemption @ 18% = £720, all attributed to GIA 1.
+    // Owner 2: £8k gain -> £5k above £3k exemption @ 18% = £900.
+    expect(
+      worthsIn(
+        point(
+          2026,
+          { 10: 20000, 11: 5000, 12: 15000 },
+          { bases: { 10: 10000, 11: 8000, 12: 7000 } },
+        ),
+        [gia1, gia2, samsGia],
+      ),
+    ).toStrictEqual({ 10: 19280, 11: 5000, 12: 14100 });
+
+    // A GIA at a loss alone (or with missing basis) owes nothing when
+    // totalGain is 0, and counts full gain when basis is absent.
+    expect(
+      worthsIn(point(2026, { 11: 5000 }, { bases: { 11: 8000 } }), [gia2]),
+    ).toStrictEqual({ 11: 5000 });
+    expect(worthsIn(point(2026, { 10: 10000 }), [gia1])).toStrictEqual({
+      10: 10000 - Math.round(7000 * 0.18),
     });
   });
 });

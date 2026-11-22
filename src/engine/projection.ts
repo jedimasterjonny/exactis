@@ -25,15 +25,22 @@ import { isOnOrBefore, monthAfter, monthsBetween } from "@/lib/months";
 import {
   april,
   bandTopsOn,
+  capitalGainsTaxOn,
+  cgtAllowance,
   drawFor,
   drawOf,
+  giaDrawFor,
+  giaDrawOf,
+  giaReserveOf,
   grossFilling,
   grossRelievedOf,
   incomeTaxOn,
   insuranceOn,
+  keptGiaOf,
   keptOf,
   lumpSumAllowance,
   stampDutyOn,
+  taxYearOf,
   upratingIn,
 } from "@/lib/tax";
 
@@ -56,7 +63,9 @@ export interface MovedYear {
   readonly allowances: Readonly<Record<number, number>>;
   readonly at: Month;
   readonly balances: Readonly<Record<number, number>>;
+  readonly bases: Readonly<Record<number, number>>;
   readonly due: number;
+  readonly exempt: number;
   readonly run: Run;
   readonly sales: readonly Sale[];
 }
@@ -111,8 +120,10 @@ export interface ProjectionPoint {
   readonly age: number;
   readonly allowances: Readonly<Record<number, number>>;
   readonly balances: Readonly<Record<number, number>>;
+  readonly bases: Readonly<Record<number, number>>;
   readonly deferred: number;
   readonly early: number;
+  readonly exempt: number;
   readonly free: number;
   readonly uncovered: number;
   readonly year: number;
@@ -164,6 +175,7 @@ type Borrowing = NonNullable<Move["mortgage"]> & { readonly loan: Account };
 interface Drawing {
   readonly allowances: ReadonlyMap<number, number>;
   readonly at: Month;
+  readonly capitalLosses: ReadonlyMap<number, number>;
   readonly drawn: ReadonlySet<number>;
   readonly earned: readonly Earned[];
   readonly plan: Plan;
@@ -172,13 +184,15 @@ interface Drawing {
   readonly uprating: number;
 }
 
-// An account and the balance the projection has carried it to, which
-// opens at what the account holds. A held account's is never below
-// nothing, since only a debt may be owed, and no debt is held; a debt
-// is carried apart, owing, and its balance is never above nothing.
+// An account and the balance (and GIA pooled cost basis) the projection
+// has carried it to, which opens at what the account holds. A held
+// account's is never below nothing, since only a debt may be owed, and
+// no debt is held; a debt is carried apart, owing, and its balance is
+// never above nothing.
 interface Held {
   readonly account: Account;
   readonly balance: number;
+  readonly costBasis: number;
 }
 
 // What a year's moves come to as it opens: the run as carried from
@@ -199,16 +213,24 @@ interface Moved {
 // many of its months the plan holds, what they earned and drew that is
 // taxed as the owner's income, the self-employed profit among it that
 // their Class 4 is charged on, the gross relief-at-source pension
-// payments made out of taxed money in them, and the income tax and
-// Class 4 each month was charged on its own. Each owner has one, since
-// a year is settled a person at a time.
+// payments made out of taxed money in them, net realised capital gains
+// (or losses, negative) from GIA draws, and the income tax, Class 4 and
+// capital gains tax each month was charged on its own. Each owner has
+// one, since a year is settled a person at a time.
 interface TaxYear {
+  readonly gains: number;
   readonly months: number;
   readonly paid: number;
   readonly profit: number;
   readonly relieved: number;
   readonly taxable: number;
 }
+
+// The fields of a projection point read to value every account on it.
+type ValuedPoint = Pick<
+  ProjectionPoint,
+  "allowances" | "balances" | "bases" | "exempt"
+>;
 
 // The kinds a month's shortfall is drawn from, in the order a plan
 // drawing its savings first draws them: cash, then the GIA, then the
@@ -259,6 +281,7 @@ const penny = 0.01;
 // A tax year the plan holds no months of yet: an owner's as April opens,
 // and one the plan has not entered.
 const noMonths: TaxYear = {
+  gains: 0,
   months: 0,
   paid: 0,
   profit: 0,
@@ -396,7 +419,8 @@ export function liquidOf(
 // A year of a projection as a milestone measures it, from the month it
 // opens with: the age the plan's owner reaches in it, and every sum whole
 // pounds of today's money: what every account is worth as worthsIn
-// counts it, a pension counted as drawn at the basic rate and anything
+// counts it, pensions counted as drawn at the basic rate, GIAs after
+// basic-rate unrealised CGT above each owner's exemption, and anything
 // else at its balance, which is the plan's net worth; what it owes,
 // every debt's balance turned to a sum owed, nothing where it owes
 // nothing rather than nothing with a sign; what every account counts
@@ -411,7 +435,7 @@ export function liquidOf(
 // measure every year of every future here, so the worths are worked
 // out once and read as they are.
 export function measuredOf(
-  point: Pick<ProjectionPoint, "allowances" | "balances">,
+  point: ValuedPoint,
   at: Month,
   { accounts, plan, schedule }: Run,
 ): Measured {
@@ -466,11 +490,13 @@ export function monthsOn(
   schedule: Schedule,
   { months, plan }: { readonly months: number; readonly plan: Plan },
 ): readonly MonthsOn[] {
-  let reached: readonly MonthsOn[] = accounts.map((account) => ({
-    account,
-    balance: account.balance,
-    paid: 0,
-  }));
+  let reached: readonly (MonthsOn & { readonly costBasis: number })[] =
+    accounts.map((account) => ({
+      account,
+      balance: account.balance,
+      costBasis: account.costBasis ?? 0,
+      paid: 0,
+    }));
   let unmet = 0;
   for (let offset = 0; offset < months; offset += 1) {
     const month = plan.month + offset;
@@ -490,12 +516,21 @@ export function monthsOn(
     unmet += spent;
     reached = keptOutOf(reached, Math.max(0, -flow.left) - spent).map(
       (held) => {
-        const { balance, paid } = monthOf(held, flow, { at, plan });
-        return { account: held.account, balance, paid: held.paid + paid };
+        const { balance, costBasis, paid } = monthOf(held, flow, { at, plan });
+        return {
+          account: held.account,
+          balance,
+          costBasis,
+          paid: held.paid + paid,
+        };
       },
     );
   }
-  return reached;
+  return reached.map(({ account, balance, paid }) => ({
+    account,
+    balance,
+    paid,
+  }));
 }
 
 // The run a year is carried by, off a projection's years as movedYears
@@ -539,7 +574,9 @@ export function movedYears(
       allowances: point.allowances,
       at,
       balances: moving.balances,
+      bases: point.bases,
       due: Math.max(0, -moving.cash),
+      exempt: point.exempt,
       run: moved,
       sales: moving.sales,
     };
@@ -581,13 +618,17 @@ export function project(
   }
   let held: readonly Held[] = accounts
     .filter(({ kind }) => kind !== "debt")
-    .map((account) => ({ account, balance: account.balance }));
+    .map((account) => ({
+      account,
+      balance: account.balance,
+      costBasis: account.costBasis ?? 0,
+    }));
   if (held.some(({ balance }) => balance < 0)) {
     throw new Error(rules.belowNothing);
   }
   let owing: readonly Held[] = accounts
     .filter(({ kind }) => kind === "debt")
-    .map((account) => ({ account, balance: account.balance }));
+    .map((account) => ({ account, balance: account.balance, costBasis: 0 }));
   if (owing.some(({ balance }) => balance > 0)) {
     throw new Error(rules.owes);
   }
@@ -611,6 +652,7 @@ export function project(
     throw new Error(rules.costBasisBelowNothing);
   }
   let allowances: ReadonlyMap<number, number> = new Map();
+  let capitalLosses: ReadonlyMap<number, number> = new Map();
   let drawn: ReadonlySet<number> = new Set();
   let sacrificed: ReadonlyMap<number, number> = new Map();
   let taxYears: ReadonlyMap<number, TaxYear> = new Map();
@@ -630,6 +672,15 @@ export function project(
         Math.round(balance / prices),
       ]),
     );
+    const bases = Object.fromEntries(
+      held
+        .filter(({ account }) => isGia(account))
+        .map(({ account, costBasis }) => [
+          account.id,
+          Math.round(costBasis / prices),
+        ]),
+    );
+    const exempt = Math.round(cgtAllowance / prices);
     const left = Object.fromEntries(
       plan.owners.map(({ id }) => [
         id,
@@ -651,10 +702,11 @@ export function project(
     if (
       conditions !== undefined &&
       retired === null &&
-      isRetiring({ allowances: left, balances: moving.balances }, opens, {
-        conditions,
-        run: moved,
-      })
+      isRetiring(
+        { allowances: left, balances: moving.balances, bases, exempt },
+        opens,
+        { conditions, run: moved },
+      )
     ) {
       retired = year;
       carried = carriedBy(moved, year);
@@ -667,19 +719,15 @@ export function project(
       for (let month = offset === 0 ? plan.month : 0; month < 12; month += 1) {
         const at = { month, year };
         const stretch = { months: 1, uprating: upratingIn(plan, at) };
-        const settlement =
-          month === april
-            ? [...taxYears.values()].reduce(
-                (sum, taxYear) =>
-                  sum +
-                  settled(
-                    taxYear,
-                    upratingIn(plan, { month: april - 1, year }),
-                  ),
-                0,
-              )
-            : 0;
+        let settlement = 0;
         if (month === april) {
+          const closedYear = settledYear(
+            taxYears,
+            capitalLosses,
+            upratingIn(plan, { month: april - 1, year }),
+          );
+          settlement = closedYear.settlement;
+          capitalLosses = closedYear.capitalLosses;
           sacrificed = new Map();
           taxYears = new Map();
           used = new Map();
@@ -699,6 +747,7 @@ export function project(
         const draw = drawnFrom(held, shortOf(carried, flow, reading), {
           allowances,
           at,
+          capitalLosses,
           drawn,
           earned: flow.earned,
           plan: carried.plan,
@@ -720,11 +769,13 @@ export function project(
             return [
               id,
               {
+                gains: taxYear.gains + (draw.gains.get(id) ?? 0),
                 months: taxYear.months + 1,
                 paid:
                   taxYear.paid +
                   incomeTaxOn(taxable, stretch) +
-                  insuranceOn("self-employment", profit, stretch),
+                  insuranceOn("self-employment", profit, stretch) +
+                  (draw.cgt.get(id) ?? 0),
                 profit: taxYear.profit + profit,
                 relieved: taxYear.relieved + relievedOf(flow.relief, id),
                 taxable: taxYear.taxable + taxable,
@@ -733,13 +784,18 @@ export function project(
           }),
         );
         uncovered += draw.uncovered / risen;
-        held = draw.held.map((account) => ({
-          account: account.account,
-          balance: monthOf(account, flow, { at, plan: carried.plan }).balance,
-        }));
-        owing = owing.map((account) => ({
-          account: account.account,
-          balance: monthOf(account, flow, { at, plan: carried.plan }).balance,
+        held = draw.held.map((entry) => {
+          const next = monthOf(entry, flow, { at, plan: carried.plan });
+          return {
+            account: entry.account,
+            balance: next.balance,
+            costBasis: next.costBasis,
+          };
+        });
+        owing = owing.map((entry) => ({
+          account: entry.account,
+          balance: monthOf(entry, flow, { at, plan: carried.plan }).balance,
+          costBasis: 0,
         }));
       }
     }
@@ -747,8 +803,10 @@ export function project(
       age,
       allowances: left,
       balances,
+      bases,
       deferred,
       early: upToPound(early),
+      exempt,
       free,
       uncovered: upToPound(uncovered),
       year,
@@ -795,8 +853,12 @@ export function retirementIn(
     return retirementYear(run.plan);
   }
   return (
-    movedYears(points, run).find(({ allowances, at, balances, run: moved }) =>
-      isRetiring({ allowances, balances }, at, { conditions, run: moved }),
+    movedYears(points, run).find(
+      ({ allowances, at, balances, bases, exempt, run: moved }) =>
+        isRetiring({ allowances, balances, bases, exempt }, at, {
+          conditions,
+          run: moved,
+        }),
     )?.at.year ?? null
   );
 }
@@ -811,11 +873,14 @@ export function retirementIn(
 // every owner of the plan, so an owner it holds none for is outside the
 // plan, with none to draw against, and their pensions are taxed in
 // full. Each pension is rounded to the pound on its own, as a point's
-// balances are, so the net worth summed here and a chart stacking the
-// same figures agree. The futures measure every year of every future
-// through here, so each owner's pensions are summed and counted once.
+// balances are, and each owner's GIAs are netted together against one
+// annual exempt amount and taxed at 18% on net unrealised gain, prorated
+// across the GIAs in gain, so the net worth summed here and a chart
+// stacking the same figures agree. The futures measure every year of
+// every future through here, so each owner's pensions and GIAs are
+// summed and counted once.
 export function worthsIn(
-  point: Pick<ProjectionPoint, "allowances" | "balances">,
+  point: ValuedPoint,
   accounts: readonly Account[],
 ): Readonly<Record<number, number>> {
   const owners = new Map(
@@ -830,18 +895,49 @@ export function worthsIn(
       },
     ),
   );
+  const giaOwners = new Map(
+    [...Map.groupBy(accounts.filter(isGia), ({ owner }) => owner)].map(
+      ([owner, held]) => {
+        const gross = held.reduce(
+          (sum, { id }) => sum + balanceIn(point, id),
+          0,
+        );
+        const basis = held.reduce(
+          (sum, { id }) => sum + (point.bases[id] ?? 0),
+          0,
+        );
+        const tax = gross - keptGiaOf(gross, basis, point.exempt);
+        const totalGain = held.reduce(
+          (sum, { id }) =>
+            sum + Math.max(0, balanceIn(point, id) - (point.bases[id] ?? 0)),
+          0,
+        );
+        return [owner, { tax, totalGain }];
+      },
+    ),
+  );
   return Object.fromEntries(
     accounts.map((account) => {
       const balance = balanceIn(point, account.id);
-      const counted = owners.get(account.owner);
-      if (!isPension(account) || counted === undefined) {
-        return [account.id, balance];
+      const pension = isPension(account)
+        ? owners.get(account.owner)
+        : undefined;
+      if (pension !== undefined) {
+        const { gross, kept } = pension;
+        return [
+          account.id,
+          gross === 0 ? 0 : Math.round((balance * kept) / gross),
+        ];
       }
-      const { gross, kept } = counted;
-      return [
-        account.id,
-        gross === 0 ? 0 : Math.round((balance * kept) / gross),
-      ];
+      const gia = isGia(account) ? giaOwners.get(account.owner) : undefined;
+      if (gia !== undefined && gia.totalGain > 0) {
+        const gain = Math.max(0, balance - (point.bases[account.id] ?? 0));
+        return [
+          account.id,
+          Math.round(balance - (gia.tax * gain) / gia.totalGain),
+        ];
+      }
+      return [account.id, balance];
     }),
   );
 }
@@ -904,12 +1000,24 @@ function carried(balance: number, paid: number, growth: number): number {
 function drawnFrom(
   held: readonly Held[],
   { kept, spending }: { readonly kept: number; readonly spending: number },
-  { allowances, at, drawn, earned, plan, relief, taxYears, uprating }: Drawing,
+  {
+    allowances,
+    at,
+    capitalLosses,
+    drawn,
+    earned,
+    plan,
+    relief,
+    taxYears,
+    uprating,
+  }: Drawing,
 ): {
   readonly allowances: ReadonlyMap<number, number>;
   readonly below: ReadonlyMap<number, number>;
+  readonly cgt: ReadonlyMap<number, number>;
   readonly drawn: ReadonlySet<number>;
   readonly early: number;
+  readonly gains: ReadonlyMap<number, number>;
   readonly held: readonly Held[];
   readonly uncovered: number;
 } {
@@ -919,8 +1027,10 @@ function drawnFrom(
       below: new Map(
         earned.map(({ owner, taxable }) => [owner, taxable] as const),
       ),
+      cgt: new Map(),
       drawn,
       early: 0,
+      gains: new Map(),
       held,
       uncovered: 0,
     };
@@ -933,12 +1043,18 @@ function drawnFrom(
   const below = new Map(
     earned.map(({ owner, taxable }) => [owner, taxable] as const),
   );
+  const monthGains = new Map<number, number>();
+  const monthCgt = new Map<number, number>();
+  const yearExempt = cgtAllowance * (taxYearMonthsIn(plan, at) / 12);
   const isEarly = (account: Account): boolean =>
     isBeforePensionAge(ageIn(at.year, holderOf(account, plan)), at);
   // A pension's draw for what the month is still short, grossed up for
   // its tax or the charge and held to what it holds and to the most
   // given, counted against its owner's lump sum allowance and income.
-  const drawnOn = ({ account, balance }: Held, most: number): Held => {
+  const drawnOn = (
+    { account, balance, costBasis }: Held,
+    most: number,
+  ): Held => {
     const owner = holderOf(account, plan);
     const taxed = {
       allowance: allowanceOf.get(owner.id) ?? lumpSumAllowance,
@@ -957,7 +1073,47 @@ function drawnFrom(
     }
     allowanceOf.set(owner.id, taxed.allowance - draw.taxFree);
     below.set(owner.id, taxed.below + draw.taxable);
-    return { account, balance: balance - draw.gross };
+    return { account, balance: balance - draw.gross, costBasis };
+  };
+  // A GIA's draw for what the month is still short, grossed up for
+  // capital gains tax against the owner's tax-year standing so far,
+  // reducing cost basis proportionally and recording realised gain and
+  // CGT for the month.
+  const drawnGia = (entry: Held): Held => {
+    if (left <= 0 || entry.balance <= 0) {
+      return entry;
+    }
+    const owner = holderOf(entry.account, plan);
+    const taxYear = taxYears.get(owner.id) ?? noMonths;
+    const standing = {
+      carriedLoss: capitalLosses.get(owner.id) ?? 0,
+      exempt: yearExempt,
+      gainsSoFar: taxYear.gains + (monthGains.get(owner.id) ?? 0),
+      income: taxYear.taxable + (below.get(owner.id) ?? 0),
+      relieved: taxYear.relieved + relievedOf(relief, owner.id),
+      stretch: { months: taxYear.months + 1, uprating },
+    };
+    const wanted = giaDrawFor(left, {
+      balance: entry.balance,
+      costBasis: entry.costBasis,
+      standing,
+    });
+    const draw =
+      wanted.gross <= entry.balance
+        ? wanted
+        : giaDrawOf(entry.balance, {
+            balance: entry.balance,
+            costBasis: entry.costBasis,
+            standing,
+          });
+    left = draw === wanted ? 0 : Math.max(0, left - draw.net);
+    monthGains.set(owner.id, (monthGains.get(owner.id) ?? 0) + draw.gain);
+    monthCgt.set(owner.id, (monthCgt.get(owner.id) ?? 0) + draw.tax);
+    return {
+      account: entry.account,
+      balance: entry.balance - draw.gross,
+      costBasis: Math.max(0, entry.costBasis - draw.disposedBasis),
+    };
   };
   const { bands, order } = drawdownSteps[plan.drawdown ?? "savings-first"];
   // What an owner is taxed on over the tax year so far, this month's
@@ -1007,14 +1163,17 @@ function drawnFrom(
   for (const [pass, kind] of [...order, "tax-deferred" as const].entries()) {
     const isEarlyPass = pass === order.length;
     carried = carried.map((entry) => {
-      const { account, balance } = entry;
+      const { account, balance, costBasis } = entry;
       if (account.kind !== kind) {
         return entry;
+      }
+      if (isGia(account)) {
+        return drawnGia(entry);
       }
       if (!isPension(account)) {
         const taken = Math.max(0, Math.min(balance, left));
         left -= taken;
-        return { account, balance: balance - taken };
+        return { account, balance: balance - taken, costBasis };
       }
       return isEarly(account) === isEarlyPass
         ? drawnOn(entry, Number.POSITIVE_INFINITY)
@@ -1024,20 +1183,25 @@ function drawnFrom(
   left += kept;
   for (const kind of kept > 0 ? drawOrder : []) {
     carried = carried.map((entry) => {
-      const { account, balance } = entry;
+      const { account, balance, costBasis } = entry;
       if (account.kind !== kind || !isReserve(account)) {
         return entry;
       }
+      if (isGia(account)) {
+        return drawnGia(entry);
+      }
       const taken = Math.min(balance, left);
       left -= taken;
-      return { account, balance: balance - taken };
+      return { account, balance: balance - taken, costBasis };
     });
   }
   return {
     allowances: allowanceOf,
     below,
+    cgt: monthCgt,
     drawn: accessed,
     early,
+    gains: monthGains,
     held: carried,
     uncovered: left,
   };
@@ -1082,7 +1246,7 @@ function isReserve(account: Account): boolean {
 // age is no condition held with the sums, under Retirement on
 // conditions.
 function isRetiring(
-  point: Pick<ProjectionPoint, "allowances" | "balances">,
+  point: ValuedPoint,
   at: Month,
   {
     conditions,
@@ -1117,20 +1281,21 @@ function isRetiring(
 // that is as far as the flow keeps such a pension paid; the spending the
 // month is short of stays where it is, since a month end checks the plan
 // against the balances rather than spending them.
-function keptOutOf(
-  reached: readonly MonthsOn[],
+function keptOutOf<TEntry extends MonthsOn>(
+  reached: readonly TEntry[],
   kept: number,
-): readonly MonthsOn[] {
+): readonly TEntry[] {
   let left = Math.max(0, kept);
   let taken = reached;
   for (const kind of drawOrder) {
-    taken = taken.map(({ account, balance, paid }) => {
+    taken = taken.map((entry) => {
+      const { account, balance, paid } = entry;
       const take =
         account.kind === kind && isReserve(account)
           ? Math.min(balance, left)
           : 0;
       left -= take;
-      return { account, balance: balance - take, paid: paid - take };
+      return { ...entry, balance: balance - take, paid: paid - take };
     });
   }
   return taken;
@@ -1188,10 +1353,14 @@ function monthIn(account: Account, plan: Plan, at: Month): number | undefined {
 // takes the month's own figure instead where monthIn finds one. A house
 // or a car is held to its limit.
 function monthOf(
-  { account, balance }: Held,
+  { account, balance, costBasis }: Held,
   flow: CashFlow,
   { at, plan }: { readonly at: Month; readonly plan: Plan },
-): { readonly balance: number; readonly paid: number } {
+): {
+  readonly balance: number;
+  readonly costBasis: number;
+  readonly paid: number;
+} {
   const rate = rateOf(account, plan, at.year);
   if (account.kind !== "debt") {
     const paid = paidIn(account, flow);
@@ -1210,12 +1379,14 @@ function monthOf(
               grown,
               account.limit * pricesIn(plan, monthAfter(at)),
             ),
+      costBasis: isGia(account) ? costBasis + paid : 0,
       paid,
     };
   }
   const off = paidOff(account, flow);
   return {
     balance: paidDown(balance, off, rate),
+    costBasis: 0,
     paid: Math.min(off, Math.max(0, -balance * (1 + rate / 12))),
   };
 }
@@ -1283,6 +1454,7 @@ function movesIn(
               limit: move.ceiling ?? Number.POSITIVE_INFINITY,
             },
             balance: price,
+            costBasis: 0,
           },
           ...loans.map((loan) =>
             loan === borrowing?.loan
@@ -1293,8 +1465,9 @@ function movesIn(
                     growth: { kind: "fixed" as const, rate: borrowing.rate },
                   },
                   balance: 0 - borrowed,
+                  costBasis: 0,
                 }
-              : { account: { ...loan, balance: 0 }, balance: 0 },
+              : { account: { ...loan, balance: 0 }, balance: 0, costBasis: 0 },
           ),
         ].map((entry) => [entry.account.id, entry]),
       );
@@ -1470,11 +1643,17 @@ function relievedOf(relief: readonly Paid[], owner: number): number {
 
 // What the cash, the GIAs and the ISAs hold as a month opens, which is as
 // far as the flow keeps a pension not marked droppable paid out of the
-// savings.
+// savings. Each GIA is counted at its conservative net realisable value
+// after 24% CGT so a month never promises a kept-paid pension more than
+// selling the GIA can deliver after tax.
 function reserveOf(held: readonly Held[]): number {
   return held
     .filter(({ account }) => isReserve(account))
-    .reduce((sum, { balance }) => sum + balance, 0);
+    .reduce(
+      (sum, { account, balance, costBasis }) =>
+        sum + (isGia(account) ? giaReserveOf(balance, costBasis) : balance),
+      0,
+    );
 }
 
 // What each owner has sacrificed into a pension since April once a
@@ -1496,25 +1675,50 @@ function sacrificedWith(
   return sum;
 }
 
-// What a tax year is refunded once it closes, or owes as a negative:
-// what its months paid, each a twelfth of a year's income tax and
-// Class 4 on itself, less the income tax on everything they were taxed
-// on together, with the year's gross relief-at-source pension payments
-// extending its bands and reducing the income the personal allowance is
-// withdrawn against, and the Class 4 on all their profit, each against
-// as much of each band as the months the plan held of the year, as the
-// bands had risen by it. An owner's year is entered with its first
-// month, so one of no months is never here: the April a plan opens in
-// has no year behind it and settles nothing without asking.
-function settled(
-  { months, paid, profit, relieved, taxable }: TaxYear,
+// Settles every owner's closed tax year in April: what its months paid
+// (income tax, Class 4 and monthly CGT) less the full-year income tax,
+// Class 4 and capital gains tax, while carrying net capital losses
+// forward and consuming brought-forward losses only against gains above
+// the annual exempt amount.
+function settledYear(
+  taxYears: ReadonlyMap<number, TaxYear>,
+  capitalLosses: ReadonlyMap<number, number>,
   uprating: number,
-): number {
-  return (
-    paid -
-    incomeTaxOn(taxable, { months, uprating }, relieved) -
-    insuranceOn("self-employment", profit, { months, uprating })
-  );
+): {
+  readonly capitalLosses: ReadonlyMap<number, number>;
+  readonly settlement: number;
+} {
+  let settlement = 0;
+  const nextLosses = new Map(capitalLosses);
+  for (const [ownerId, taxYear] of taxYears) {
+    const carriedLoss = capitalLosses.get(ownerId) ?? 0;
+    const stretch = { months: taxYear.months, uprating };
+    const exempt = cgtAllowance * (taxYear.months / 12);
+    const cgt = capitalGainsTaxOn(taxYear.gains, {
+      carriedLoss,
+      exempt,
+      income: taxYear.taxable,
+      relieved: taxYear.relieved,
+      stretch,
+    });
+    settlement +=
+      taxYear.paid -
+      incomeTaxOn(taxYear.taxable, stretch, taxYear.relieved) -
+      insuranceOn("self-employment", taxYear.profit, stretch) -
+      cgt;
+    if (taxYear.gains < 0) {
+      nextLosses.set(ownerId, carriedLoss - taxYear.gains);
+    } else {
+      const used = Math.min(carriedLoss, Math.max(0, taxYear.gains - exempt));
+      const remaining = carriedLoss - used;
+      if (remaining > 0) {
+        nextLosses.set(ownerId, remaining);
+      } else {
+        nextLosses.delete(ownerId);
+      }
+    }
+  }
+  return { capitalLosses: nextLosses, settlement };
 }
 
 // What a month the flow leaves short draws, in two parts: what its
@@ -1542,6 +1746,21 @@ function shortOf(
     -cashFlow(accounts, schedule, { ...reading, reserve: 0 }).left,
   );
   return { kept: short - spending, spending };
+}
+
+// How many months the plan holds of the tax year `at` falls in: the
+// remaining months of the opening tax year for its first, and twelve
+// for every full tax year after it.
+function taxYearMonthsIn(
+  plan: Pick<Plan, "from" | "month">,
+  at: Month,
+): number {
+  const firstTaxYear = taxYearOf({ month: plan.month, year: plan.from });
+  if (taxYearOf(at) > firstTaxYear) {
+    return 12;
+  }
+  const left = (april - plan.month + 12) % 12;
+  return left === 0 ? 12 : left;
 }
 
 // The wrapper's balance this year, whole pounds of today's money, read

@@ -1,11 +1,11 @@
 import type { Account } from "@/data/accounts";
 import type { Secured } from "@/data/secured";
 
-import { isPension } from "@/data/accounts";
+import { isGia, isPension } from "@/data/accounts";
 import { worthsIn } from "@/engine/projection";
 import { cadenceAbbreviations } from "@/lib/cadence";
 import { formatGbp } from "@/lib/money";
-import { lumpSumAllowance } from "@/lib/tax";
+import { cgtAllowance, lumpSumAllowance } from "@/lib/tax";
 
 // What the accounts hold between them, a debt's balance taking away, as
 // every total of balances on the accounts screen adds them.
@@ -33,6 +33,8 @@ export function drawingTaxOf(accounts: readonly Account[]): number {
       balances: Object.fromEntries(
         pensions.map(({ balance, id }) => [id, balance]),
       ),
+      bases: {},
+      exempt: cgtAllowance,
     },
     pensions,
   );
@@ -49,6 +51,29 @@ export function equityOf({ asset, loans }: Secured): number {
 // A month's worth of money as the ledger writes it, "£1,275 / mo".
 export function formatMonthly(amount: number): string {
   return `${formatGbp(amount)} / ${cadenceAbbreviations.month}`;
+}
+
+// The capital gains tax on the GIAs as the plan opens, counted as sold
+// at the basic rate (18%) above each owner's £3,000 annual exempt
+// amount: what they hold less what worthsIn says they are worth on the
+// opening point, so the starting net worth agrees with the plan's first
+// point to the pound.
+export function giaTaxOf(accounts: readonly Account[]): number {
+  const gias = accounts.filter(isGia);
+  const worths = worthsIn(
+    {
+      allowances: {},
+      balances: Object.fromEntries(
+        gias.map(({ balance, id }) => [id, balance]),
+      ),
+      bases: Object.fromEntries(
+        gias.map(({ costBasis, id }) => [id, costBasis ?? 0]),
+      ),
+      exempt: cgtAllowance,
+    },
+    gias,
+  );
+  return balanceOf(gias) - sumOf(Object.values(worths), (worth) => worth);
 }
 
 // A figure summed down a list, for a total beneath the rows or a tile

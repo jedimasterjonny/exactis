@@ -116,6 +116,27 @@ describe("BalanceSheet", () => {
     expect(rowsOf("GIAs · taxable")).toStrictEqual([
       "4Dealing account£9,000Me · cost £6,500",
     ]);
+    expect(screen.getByText("Tax on selling the GIAs")).toBeInTheDocument();
+  });
+
+  // A GIA with an unrealised gain past the £3,000 exemption deducts 18%
+  // of the excess from Starting net worth and shows the tax step.
+  it("deducts unrealised GIA CGT from starting net worth", () => {
+    const gia: Account = {
+      balance: 20000,
+      costBasis: 10000,
+      growth: { kind: "plan" },
+      id: 7,
+      kind: "taxable",
+      name: "Dealing account",
+      owner: 1,
+    };
+    renderSheet({ assets: [], debts: [], savings: [gia] });
+
+    // Gain £10,000 -> £7,000 taxable @ 18% = £1,260 -> £18,740 net worth.
+    expect(screen.getByText("Tax on selling the GIAs")).toBeInTheDocument();
+    expect(screen.getByText("−£1,260")).toBeInTheDocument();
+    expect(screen.getByText("£18,740")).toBeInTheDocument();
   });
 
   // A saving alone has no order to be placed in, and a group the

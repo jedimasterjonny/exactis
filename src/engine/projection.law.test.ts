@@ -719,4 +719,264 @@ describe("project against the law", () => {
       });
     }
   });
+
+  // GIA drawing years: a GIA with random starting cost basis (in gain
+  // or at a loss), random spending shortfalls and optional pension
+  // income, verified against an independent HMRC CGT oracle using
+  // bisection gross-up and April settlement with loss carry-forward.
+  it("matches an independent HMRC return for GIA capital gains and losses", () => {
+    const random = seeded(20260406);
+    for (let run = 0; run < plans; run += 1) {
+      const plan = planFrom(random, 1980);
+      const startBalance = 500000;
+      const startBasis = Math.round(startBalance * (0.2 + random() * 1.1));
+      const gia: Account = {
+        balance: startBalance,
+        costBasis: startBasis,
+        growth: { kind: "fixed", rate: 0 },
+        id: 50,
+        kind: "taxable",
+        name: "GIA",
+        owner: 1,
+      };
+      const expenses = Array.from(
+        { length: 1 + Math.floor(random() * 2) },
+        (_, index) => expenseFrom(random, index + 1, plan.from),
+      );
+      const incomeAmount = random() < 0.6 ? Math.round(random() * 60000) : 0;
+      const income: readonly IncomeLine[] =
+        incomeAmount === 0
+          ? []
+          : [
+              {
+                ...lineFrom(random, 9, plan.from),
+                amount: incomeAmount,
+                cadence: "year",
+                feeds: null,
+                kind: "pension",
+                lastYear: null,
+                sacrifice: 0,
+              },
+            ];
+      const expected = giaOracle(
+        { balance: startBalance, basis: startBasis },
+        { expenses, income },
+        plan,
+      );
+
+      project([gia], { expenses, income }, plan).forEach((point, index) => {
+        expect(isNear(point.balances[50] ?? -1, expected[index]?.balance)).toBe(
+          true,
+        );
+        expect(isNear(point.bases[50] ?? -1, expected[index]?.basis)).toBe(
+          true,
+        );
+      });
+    }
+  });
 });
+
+interface GiaOracleState {
+  readonly balance: number;
+  readonly basis: number;
+  readonly carriedLoss: number;
+  readonly gains: number;
+  readonly months: number;
+  readonly paid: number;
+  readonly taxable: number;
+}
+
+// Independent bisection gross-up for a GIA sale with marginal CGT.
+function bisectGiaGross(
+  need: number,
+  { balance, basis }: { readonly balance: number; readonly basis: number },
+  taxOf: (gain: number) => number,
+): number {
+  const ratio = (balance - basis) / balance;
+  if (ratio <= 0) {
+    return need;
+  }
+  let low = need;
+  let high = need / (1 - 0.24 * ratio);
+  for (let step = 0; step < 80; step += 1) {
+    const mid = (low + high) / 2;
+    if (mid - taxOf(mid * ratio) < need) {
+      low = mid;
+    } else {
+      high = mid;
+    }
+  }
+  return (low + high) / 2;
+}
+
+// One GIA draw in the independent oracle, grossed up by bisection.
+function drawGiaOracle(
+  short: number,
+  state: {
+    readonly balance: number;
+    readonly basis: number;
+    readonly carriedLoss: number;
+    readonly gains: number;
+    readonly months: number;
+    readonly taxable: number;
+  },
+  {
+    earned,
+    yearExempt,
+  }: { readonly earned: number; readonly yearExempt: number },
+): {
+  readonly cgt: number;
+  readonly disposed: number;
+  readonly gain: number;
+  readonly gross: number;
+} {
+  const standing = {
+    carriedLoss: state.carriedLoss,
+    exempt: yearExempt,
+    income: state.taxable + earned,
+    months: state.months + 1,
+  };
+  const prior = lawCgt(state.gains, standing);
+  const marginal = (gain: number): number =>
+    gain <= 0 ? 0 : lawCgt(state.gains + gain, standing) - prior;
+  const gross = Math.min(state.balance, bisectGiaGross(short, state, marginal));
+  const disposed = state.basis * (gross / state.balance);
+  const gain = gross - disposed;
+  return { cgt: marginal(gain), disposed, gain, gross };
+}
+
+// Independent HMRC CGT return oracle over a GIA-drawing plan.
+function giaOracle(
+  start: { readonly balance: number; readonly basis: number },
+  schedule: {
+    readonly expenses: readonly ExpenseLine[];
+    readonly income: readonly IncomeLine[];
+  },
+  plan: Plan,
+): readonly { readonly balance: number; readonly basis: number }[] {
+  let state: GiaOracleState = {
+    balance: start.balance,
+    basis: start.basis,
+    carriedLoss: 0,
+    gains: 0,
+    months: 0,
+    paid: 0,
+    taxable: 0,
+  };
+  const expected = [{ balance: state.balance, basis: state.basis }];
+  for (const { at, isLast } of monthsOf(plan)) {
+    state = stepGiaOracle(state, at, { plan, schedule });
+    if (isLast) {
+      expected.push({ balance: state.balance, basis: state.basis });
+    }
+  }
+  return expected;
+}
+
+// Independent UK CGT calculation from statutory basic-rate band room.
+function lawCgt(
+  gain: number,
+  {
+    carriedLoss,
+    exempt,
+    income,
+    months,
+  }: {
+    readonly carriedLoss: number;
+    readonly exempt: number;
+    readonly income: number;
+    readonly months: number;
+  },
+): number {
+  const taxableGain = Math.max(0, gain - exempt - carriedLoss);
+  if (taxableGain === 0) {
+    return 0;
+  }
+  const share = months / 12;
+  const pa = Math.max(
+    0,
+    12570 * share - Math.max(0, income - 100000 * share) / 2,
+  );
+  const basicRoom = Math.max(0, 37700 * share - Math.max(0, income - pa));
+  const atBasic = Math.min(taxableGain, basicRoom);
+  return atBasic * 0.18 + (taxableGain - atBasic) * 0.24;
+}
+
+// Settles a tax year in the GIA oracle and updates brought-forward losses.
+function settleGiaYear(state: {
+  readonly carriedLoss: number;
+  readonly gains: number;
+  readonly months: number;
+  readonly paid: number;
+  readonly taxable: number;
+}): { readonly carriedLoss: number; readonly settlement: number } {
+  const exempt = 3000 * (state.months / 12);
+  const cgt = lawCgt(state.gains, {
+    carriedLoss: state.carriedLoss,
+    exempt,
+    income: state.taxable,
+    months: state.months,
+  });
+  const settlement =
+    state.paid - lawIncomeTax(state.taxable, state.months) - cgt;
+  const carriedLoss =
+    state.gains < 0
+      ? state.carriedLoss - state.gains
+      : state.carriedLoss -
+        Math.min(state.carriedLoss, Math.max(0, state.gains - exempt));
+  return { carriedLoss, settlement };
+}
+
+// One month of the independent GIA CGT oracle.
+function stepGiaOracle(
+  prior: GiaOracleState,
+  at: Month,
+  {
+    plan,
+    schedule: { expenses, income },
+  }: {
+    readonly plan: Plan;
+    readonly schedule: {
+      readonly expenses: readonly ExpenseLine[];
+      readonly income: readonly IncomeLine[];
+    };
+  },
+): GiaOracleState {
+  const firstTaxYear = plan.month < april ? plan.from - 1 : plan.from;
+  const remainder = (april - plan.month + 12) % 12;
+  const openingMonths = remainder === 0 ? 12 : remainder;
+  const settled =
+    at.month === april && prior.months > 0 ? settleGiaYear(prior) : null;
+  const state: GiaOracleState =
+    settled === null
+      ? prior
+      : {
+          ...prior,
+          carriedLoss: settled.carriedLoss,
+          gains: 0,
+          months: 0,
+          paid: 0,
+          taxable: 0,
+        };
+  const earned = earnedIn(income, at, everyKind);
+  const spent = expenses
+    .filter((line) => isRunning(line, at))
+    .reduce((sum, line) => sum + line.amount, 0);
+  const monthIncomeTax = lawIncomeTax(earned, 1);
+  const short = spent - (earned - monthIncomeTax + (settled?.settlement ?? 0));
+  const ty = at.month < april ? at.year - 1 : at.year;
+  const yearExempt = 3000 * ((ty > firstTaxYear ? 12 : openingMonths) / 12);
+  const draw =
+    short > 1e-9 && state.balance > 0
+      ? drawGiaOracle(short, state, { earned, yearExempt })
+      : { cgt: 0, disposed: 0, gain: 0, gross: 0 };
+  return {
+    ...state,
+    balance: state.balance - draw.gross,
+    basis: Math.max(0, state.basis - draw.disposed),
+    gains: state.gains + draw.gain,
+    months: state.months + 1,
+    paid: state.paid + monthIncomeTax + draw.cgt,
+    taxable: state.taxable + earned,
+  };
+}

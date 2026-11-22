@@ -8,6 +8,7 @@ import {
   drawingTaxOf,
   equityOf,
   formatMonthly,
+  giaTaxOf,
   sumOf,
 } from "./ledger";
 
@@ -41,6 +42,45 @@ describe("drawingTaxOf", () => {
     ).toBe(361345);
     expect(drawingTaxOf([{ ...sipp, balance: 100000 }])).toBe(20000);
     expect(drawingTaxOf([])).toBe(0);
+  });
+});
+
+describe("giaTaxOf", () => {
+  it("taxes each owner's net GIA unrealised gain at 18% above £3,000, and nothing within exemption or for none", () => {
+    const gia1 = {
+      balance: 20000,
+      costBasis: 10000,
+      growth: { kind: "plan" as const },
+      id: 10,
+      kind: "taxable" as const,
+      name: "GIA 1",
+      owner: 1,
+    };
+    const giaLoss = {
+      balance: 5000,
+      costBasis: 8000,
+      growth: { kind: "plan" as const },
+      id: 11,
+      kind: "taxable" as const,
+      name: "GIA 2",
+      owner: 1,
+    };
+    const giaSam = {
+      balance: 15000,
+      costBasis: 7000,
+      growth: { kind: "plan" as const },
+      id: 12,
+      kind: "taxable" as const,
+      name: "Sam GIA",
+      owner: 2,
+    };
+
+    // Owner 1 net gain £7,000 -> £4,000 above £3,000 AEA @ 18% = £720.
+    // Owner 2 net gain £8,000 -> £5,000 above £3,000 AEA @ 18% = £900.
+    expect(giaTaxOf([gia1, giaLoss, giaSam])).toBe(720 + 900);
+    expect(giaTaxOf([giaLoss])).toBe(0);
+    expect(giaTaxOf([{ ...sipp, balance: 10000, kind: "taxable" }])).toBe(1260);
+    expect(giaTaxOf(accounts)).toBe(0);
   });
 });
 

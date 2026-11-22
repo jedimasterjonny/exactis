@@ -492,11 +492,12 @@ month at a time by what the flow pays off it, under Debts, and is never drawn on
 either.
 
 From month to month the run carries what a month cannot read afresh: each
-owner's lump sum allowance left, under The draw; the owners who have drawn on a
-pension as income and what has landed under each allowance since April, under
-The allowances and relief; each owner's salary sacrifice since April, under
-Salaries and what they feed; and each owner's tax year, under The tax on the
-month, which the draw reads as well, under The draw.
+owner's lump sum allowance left, under The draw; each GIA's pooled cost basis
+and each owner's carried-forward capital losses, under The draw; the owners who
+have drawn on a pension as income and what has landed under each allowance since
+April, under The allowances and relief; each owner's salary sacrifice since
+April, under Salaries and what they feed; and each owner's tax year, under The
+tax on the month, which the draw reads as well, under The draw.
 
 What no account covered is the year's uncovered shortfall, summed over its
 months and carried on the point the year's balances are read off, so the
@@ -576,16 +577,15 @@ first:
 | Pension to the personal allowance | the pension to the personal allowance, then savings first |
 
 Savings first takes cash first, since it is spent as it stands and grows least;
-then the GIA, since what it earns is taxed and what an ISA earns is not, though
-the plan charges a GIA nothing; then the ISA, which is reached at any age and
-owes nothing on the way out; then the pension. Pension before the ISA takes the
-pension after the GIA and ahead of the ISA, so what it gives up as income fills
-its owner's personal allowance and lower bands in the years before the ISA would
-have run out, which can pay less tax over a life. Pension first takes it ahead
-of the cash as well. Within a kind the accounts are drawn in the order they are
-listed, each giving up what it holds or what the month is still short, whichever
-is the lesser, so an account is drawn to nothing and no lower and what it could
-not cover passes to the next.
+then the GIA, since what it earns is taxed and what an ISA earns is not; then
+the ISA, which is reached at any age and owes nothing on the way out; then the
+pension. Pension before the ISA takes the pension after the GIA and ahead of the
+ISA, so what it gives up as income fills its owner's personal allowance and
+lower bands in the years before the ISA would have run out, which can pay less
+tax over a life. Pension first takes it ahead of the cash as well. Within a kind
+the accounts are drawn in the order they are listed, each giving up what it
+holds or what the month is still short, whichever is the lesser, so an account
+is drawn to nothing and no lower and what it could not cover passes to the next.
 
 Pension to the basic rate band draws the pensions first, but only into the bands
 charged at no more than the basic rate and only as far as the month is short,
@@ -647,18 +647,35 @@ kept of each pound, since the money can be had that way and at no other. A
 registered scheme will not normally make one, so the run marks such a draw
 rather than counting on it, under The run.
 
-Cash, the GIA and the ISA give up what the month is short, a GIA charged no tax
-on what its draw realises. A pension is taxed on the way out, as its owner's
-income, so its draw is grossed up so that what is left of it once taxed is what
-the month is short. A quarter of each draw is free of tax until its owner's
-£268,275 lump sum allowance is used up over the plan, one allowance each, and
-the rest is taxed as income on top of what its owner earned in the month and
-drew from their other pensions before it. So a second pension of one owner's in
-the same month is taxed from where the first left off, and another owner's is
-drawn under their own allowance and bands, from where their own income stands. A
-pension holding less than that gives up all it holds and covers what that leaves
-once taxed. What a draw is taxed on joins its owner's tax year, under The tax on
-the month.
+Cash and the ISA give up what the month is short. A GIA carries its pooled
+Section 104 cost basis (raised by every contribution paid into it, and reduced
+proportionally as units are sold). A draw on a GIA realises a gain or loss of
+the gross sale less the disposed share of its cost basis, and is grossed up so
+that what is left after marginal capital gains tax covers what the month is
+short: nothing on losses or within the owner's £3,000 annual exempt amount
+(scaled by the plan's share of the opening tax year and held whole thereafter)
+plus any carried-forward capital losses, 18% on taxable gains fitting inside the
+owner's unused basic-rate band above their taxable income (personal allowance
+never shelters capital gains), and 24% above it. Mid-year draws read the
+basic-rate band on the tax year's months elapsed so far alongside the full
+year's annual exempt amount; any difference from the full year's bands settles
+in April. What each draw realises and pays joins its owner's tax year and
+settles in April: a net capital loss for the year is carried forward
+indefinitely, and brought-forward losses are consumed only against gains above
+the annual exempt amount so the exemption is never wasted. When measuring the
+reserve available to keep a pension paid, each GIA is counted conservatively
+after 24% CGT on its full unrealised gain so a month never promises more than
+selling the GIA can deliver after tax. A pension is taxed on the way out, as its
+owner's income, so its draw is grossed up so that what is left of it once taxed
+is what the month is short. A quarter of each draw is free of tax until its
+owner's £268,275 lump sum allowance is used up over the plan, one allowance
+each, and the rest is taxed as income on top of what its owner earned in the
+month and drew from their other pensions before it. So a second pension of one
+owner's in the same month is taxed from where the first left off, and another
+owner's is drawn under their own allowance and bands, from where their own
+income stands. A pension holding less than that gives up all it holds and covers
+what that leaves once taxed. What a draw is taxed on joins its owner's tax year,
+under The tax on the month.
 
 What the last account leaves is uncovered: the plan is short by it, and the run
 says so rather than lending it, under The run.
@@ -678,11 +695,12 @@ Everything an account states is in the pounds of the day, as a statement or an
 agreement gives it: its balance, its fixed sum, its cap and its rate, the plan
 rate among them, which is a nominal return. So are the figures the law sets and
 does not raise: the ISA and pension allowances, the lump sum allowance, the
-£3,600 of relief, the £2,000 salary sacrifice National Insurance cap from April
-2029 and the stamp duty bands. Held so, an allowance shrinks in today's money
-over a plan of decades as prices rise, as it would if no government changed it
-again. The tax bands are held flat in pounds until their freeze ends, under The
-tax on the month.
+capital gains tax annual exempt amount (£3,000), the £3,600 of relief, the
+£2,000 salary sacrifice National Insurance cap from April 2029 and the stamp
+duty bands. Held so, an allowance shrinks in today's money over a plan of
+decades as prices rise, as it would if no government changed it again. The tax
+bands are held flat in pounds until their freeze ends, under The tax on the
+month.
 
 A point divides every balance by how far prices have risen by the start of its
 year, and what the year went short or drew early by, a month at a time, by how
@@ -706,7 +724,11 @@ across all of the owner's pensions, what they leave shared between them by what
 each holds, and the rest taxed at 20%. Each point carries what is left of each
 owner's allowance in today's money, as it carries the balances, though the law
 holds the allowance in nominal pounds, so the quarter is capped against like
-money.
+money. GIAs are counted on the same footing as sold at the basic 18% capital
+gains rate: each point carries each GIA's cost basis and the £3,000 annual
+exempt amount in today's money, each owner's GIAs are netted together against
+one exemption, and any resulting unrealised tax is shared across the owner's
+GIAs in proportion to their unrealised gains.
 
 The liquid net worth is the net worth less every real asset, the property and
 vehicles among them, and less every pension in a year its owner cannot draw it
