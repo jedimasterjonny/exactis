@@ -264,6 +264,9 @@ describe("readPortfolioSnapshot", () => {
           [1, "sec-gbp"],
           [3, "Global Equity Index"],
           [4, "GBP"],
+          [6, "  Core equity tracker  "],
+          [7, "GB00TEST0001"],
+          [8, "GEIDX"],
           [
             13,
             [
@@ -342,13 +345,12 @@ describe("readPortfolioSnapshot", () => {
           ],
         ],
       ],
-      // Unpriced fund with a zero-close latest quote.
+      // Unpriced retired fund with a zero-close latest quote and omitted currency.
       [
         2,
         [
           [1, "sec-zero"],
           [3, "Pending Launch"],
-          [4, "GBP"],
           [
             16,
             [
@@ -356,6 +358,7 @@ describe("readPortfolioSnapshot", () => {
               [2, 0],
             ],
           ],
+          [20, 1],
         ],
       ],
       // Cash accounts: GBP reference, USD with known rate, EUR without rate, empty CHF, retired GBP.
@@ -579,6 +582,88 @@ describe("readPortfolioSnapshot", () => {
           [11, 40_000],
         ],
       ],
+      // Optional Asset Allocation taxonomy with nested leaves and multi-assigned security.
+      [
+        8,
+        [
+          [1, "tax-regions"],
+          [2, "Regions"],
+        ],
+      ],
+      [
+        8,
+        [
+          [1, "tax-aa"],
+          [2, "Asset Allocation"],
+          [
+            5,
+            [
+              [1, "aa-root"],
+              [3, "Asset Allocation"],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "aa-eq"],
+              [2, "aa-root"],
+              [3, "Equities"],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "aa-dev"],
+              [2, "aa-eq"],
+              [3, "  Global equity  "],
+              [
+                9,
+                [
+                  [1, "sec-gbp"],
+                  [2, 5000],
+                ],
+              ],
+              [
+                9,
+                [
+                  [1, "sec-usd"],
+                  [2, 10_000],
+                ],
+              ],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "aa-bonds"],
+              [2, "aa-root"],
+              [3, "UK gilts"],
+              [
+                9,
+                [
+                  [1, "sec-gbp"],
+                  [2, 5000],
+                ],
+              ],
+              [
+                9,
+                [
+                  [1, "sec-gbx"],
+                  [2, 10_000],
+                ],
+              ],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "aa-blank"],
+              [2, "aa-root"],
+              [3, "   "],
+            ],
+          ],
+        ],
+      ],
       [12, "GBP"],
     ]);
 
@@ -632,7 +717,71 @@ describe("readPortfolioSnapshot", () => {
           transactionCount: 1,
         },
       ],
+      categories: ["Global equity", "UK gilts"],
       fileName: "household.portfolio",
+      holdings: [
+        {
+          category: "Global equity, UK gilts",
+          currency: "GBP",
+          gbpRate: 1,
+          id: "sec-gbp",
+          isin: "GB00TEST0001",
+          isRetired: false,
+          latestPrice: 125.5,
+          latestPriceDate: "2026-09-25",
+          name: "Global Equity Index",
+          note: "Core equity tracker",
+          shares: 10,
+          sharesByAccount: [{ portfolioId: "port-isa", shares: 10 }],
+          ticker: "GEIDX",
+        },
+        {
+          category: "UK gilts",
+          currency: "GBX",
+          gbpRate: 0.01,
+          id: "sec-gbx",
+          isRetired: false,
+          latestPrice: 250,
+          latestPriceDate: "2026-09-24",
+          name: "UK Gilts Fund",
+          shares: 40,
+          sharesByAccount: [{ portfolioId: "port-isa", shares: 40 }],
+        },
+        {
+          category: "Global equity",
+          currency: "USD",
+          gbpRate: 0.75,
+          id: "sec-usd",
+          isRetired: false,
+          latestPrice: 100,
+          latestPriceDate: "2026-09-22",
+          name: "North America ETF",
+          shares: 2,
+          sharesByAccount: [{ portfolioId: "port-isa", shares: 2 }],
+        },
+        {
+          currency: "JPY",
+          gbpRate: null,
+          id: "sec-jpy",
+          isRetired: false,
+          latestPrice: 1000,
+          latestPriceDate: "2026-09-22",
+          name: "Tokyo Tracker",
+          shares: 5,
+          sharesByAccount: [{ portfolioId: "port-isa", shares: 5 }],
+        },
+        {
+          currency: "",
+          gbpRate: null,
+          id: "sec-zero",
+          isRetired: true,
+          latestPrice: null,
+          latestPriceDate: null,
+          name: "Pending Launch",
+          shares: 0,
+          sharesByAccount: [],
+        },
+      ],
       latestQuoteDate: "2026-09-25",
       securitiesAccounts: [
         {
@@ -698,7 +847,21 @@ describe("readPortfolioSnapshot", () => {
     expect(readPortfolioSnapshot(file, "plain.portfolio")).toStrictEqual({
       baseCurrency: "GBP",
       cashAccounts: [],
+      categories: [],
       fileName: "plain.portfolio",
+      holdings: [
+        {
+          currency: "GBP",
+          gbpRate: 1,
+          id: "sec-undated",
+          isRetired: false,
+          latestPrice: 60,
+          latestPriceDate: null,
+          name: "Undated Fund",
+          shares: 2,
+          sharesByAccount: [{ portfolioId: "port-1", shares: 2 }],
+        },
+      ],
       latestQuoteDate: null,
       securitiesAccounts: [
         {
@@ -754,7 +917,21 @@ describe("readPortfolioSnapshot", () => {
     expect(readPortfolioSnapshot(file, "dollar.portfolio")).toStrictEqual({
       baseCurrency: "USD",
       cashAccounts: [],
+      categories: [],
       fileName: "dollar.portfolio",
+      holdings: [
+        {
+          currency: "GBP",
+          gbpRate: 1,
+          id: "sec-dated",
+          isRetired: false,
+          latestPrice: 50,
+          latestPriceDate: "2026-09-24",
+          name: "Dated Fund",
+          shares: 1,
+          sharesByAccount: [{ portfolioId: "port-1", shares: 1 }],
+        },
+      ],
       latestQuoteDate: "2026-09-24",
       securitiesAccounts: [
         {
@@ -1107,7 +1284,43 @@ describe("readPortfolioSnapshot", () => {
           transactionCount: 0,
         },
       ],
+      categories: [],
       fileName: "edge.portfolio",
+      holdings: [
+        {
+          currency: "GBP",
+          gbpRate: 1,
+          id: "sec-a",
+          isRetired: false,
+          latestPrice: 10.004,
+          latestPriceDate: null,
+          name: "Fund A",
+          shares: 1,
+          sharesByAccount: [{ portfolioId: "port-lots", shares: 1 }],
+        },
+        {
+          currency: "GBP",
+          gbpRate: 1,
+          id: "sec-b",
+          isRetired: false,
+          latestPrice: 10.004,
+          latestPriceDate: null,
+          name: "Fund B",
+          shares: 1,
+          sharesByAccount: [{ portfolioId: "port-lots", shares: 1 }],
+        },
+        {
+          currency: "",
+          gbpRate: null,
+          id: "security-2",
+          isRetired: false,
+          latestPrice: null,
+          latestPriceDate: null,
+          name: "Blank Id Fund",
+          shares: 0,
+          sharesByAccount: [],
+        },
+      ],
       latestQuoteDate: null,
       securitiesAccounts: [
         {
@@ -1128,6 +1341,204 @@ describe("readPortfolioSnapshot", () => {
       totalCash: 0,
       totalInvested: 20,
     });
+  });
+
+  it("lists securities with no transactions at zero shares", () => {
+    const file = portfolioFile([
+      [
+        2,
+        [
+          [1, "sec-watch"],
+          [3, "Watchlist Tracker"],
+          [4, "GBP"],
+        ],
+      ],
+    ]);
+
+    expect(
+      readPortfolioSnapshot(file, "watch.portfolio").holdings,
+    ).toStrictEqual([
+      {
+        currency: "GBP",
+        gbpRate: 1,
+        id: "sec-watch",
+        isRetired: false,
+        latestPrice: null,
+        latestPriceDate: null,
+        name: "Watchlist Tracker",
+        shares: 0,
+        sharesByAccount: [],
+      },
+    ]);
+  });
+
+  it("sums integer shares across accounts without float drift and reads only root-reachable sorted taxonomy leaves", () => {
+    const file = portfolioFile([
+      [
+        2,
+        [
+          [1, "sec-split"],
+          [3, "Split Fund"],
+          [4, "GBP"],
+          [16, [[2, 10_000_000_000]]],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-1"],
+          [2, "First"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-2"],
+          [2, "Second"],
+        ],
+      ],
+      // 0.1 + 0.2 shares across two accounts must equal exact 0.3, not 0.30000000000000004.
+      [
+        5,
+        [
+          [2, 2],
+          [4, "port-1"],
+          [12, 10_000_000],
+          [14, "sec-split"],
+        ],
+      ],
+      [
+        5,
+        [
+          [2, 2],
+          [4, "port-2"],
+          [12, 20_000_000],
+          [14, "sec-split"],
+        ],
+      ],
+      [
+        8,
+        [
+          [2, "Asset Allocation"],
+          [
+            5,
+            [
+              [1, "root"],
+              [3, "Asset Allocation"],
+            ],
+          ],
+          // Reverse alphabetical assignment order must still join sorted ("Alpha, Zebra").
+          [
+            5,
+            [
+              [1, "z"],
+              [2, "root"],
+              [3, "Zebra"],
+              [
+                9,
+                [
+                  [1, "sec-split"],
+                  [2, 5000],
+                ],
+              ],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "a"],
+              [2, "root"],
+              [3, "Alpha"],
+              [
+                9,
+                [
+                  [1, "sec-split"],
+                  [2, 5000],
+                ],
+              ],
+            ],
+          ],
+          // Orphaned leaf beneath an unlisted parent is ignored.
+          [
+            5,
+            [
+              [1, "orphan"],
+              [2, "missing-parent"],
+              [3, "Orphan"],
+              [
+                9,
+                [
+                  [1, "sec-split"],
+                  [2, 10_000],
+                ],
+              ],
+            ],
+          ],
+          // Cyclic pointer back to root terminates cleanly.
+          [
+            5,
+            [
+              [1, "loop"],
+              [2, "root"],
+              [3, "Loop"],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "root"],
+              [2, "loop"],
+              [3, "Back"],
+            ],
+          ],
+        ],
+      ],
+    ]);
+
+    const snapshot = readPortfolioSnapshot(file, "tax.portfolio");
+    expect(snapshot.categories).toStrictEqual(["Alpha", "Loop", "Zebra"]);
+    expect(String(snapshot.holdings[0]?.shares)).toBe("0.3");
+    expect(snapshot.holdings[0]?.category).toBe("Alpha, Zebra");
+
+    // Rootless and empty-root taxonomies return empty categories safely.
+    const rootless = portfolioFile([
+      [
+        8,
+        [
+          [2, "Asset Allocation"],
+          [
+            5,
+            [
+              [1, "detached"],
+              [2, "missing"],
+              [3, "Detached"],
+            ],
+          ],
+        ],
+      ],
+    ]);
+    const emptyRoot = portfolioFile([
+      [
+        8,
+        [
+          [2, "Asset Allocation"],
+          [
+            5,
+            [
+              [1, "root"],
+              [3, "Asset Allocation"],
+            ],
+          ],
+        ],
+      ],
+    ]);
+
+    expect(
+      readPortfolioSnapshot(rootless, "rootless.portfolio").categories,
+    ).toStrictEqual([]);
+    expect(
+      readPortfolioSnapshot(emptyRoot, "empty-root.portfolio").categories,
+    ).toStrictEqual([]);
   });
 
   it("refuses files that are not unencrypted binary Portfolio Performance files", () => {

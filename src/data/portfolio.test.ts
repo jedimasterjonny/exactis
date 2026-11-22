@@ -1,9 +1,14 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import type { CashAccount, SecuritiesAccount } from "./portfolio";
+import type { CashAccount, Holding, SecuritiesAccount } from "./portfolio";
 
-import { accountsLayoutOf, cashTotalsOf, roundPence } from "./portfolio";
+import {
+  accountsLayoutOf,
+  cashTotalsOf,
+  holdingsViewOf,
+  roundPence,
+} from "./portfolio";
 
 const isaCash: CashAccount = {
   balance: 1250.4,
@@ -237,5 +242,239 @@ describe("accountsLayoutOf", () => {
 
     expect(layout.hasRetired).toBe(true);
     expect(layout.standaloneCash).toStrictEqual([]);
+  });
+});
+
+describe("holdingsViewOf", () => {
+  const worldEquity: Holding = {
+    category: "Global equity",
+    currency: "GBP",
+    gbpRate: 1,
+    id: "sec-world",
+    isRetired: false,
+    latestPrice: 100,
+    latestPriceDate: "2026-09-25",
+    name: "World Equity",
+    shares: 15,
+    sharesByAccount: [
+      { portfolioId: "sec-isa", shares: 10 },
+      { portfolioId: "sec-joint", shares: 5 },
+    ],
+  };
+
+  const ukGilts: Holding = {
+    currency: "GBX",
+    gbpRate: 0.01,
+    id: "sec-gilts",
+    isRetired: false,
+    latestPrice: 25_000,
+    latestPriceDate: "2026-09-25",
+    name: "UK Gilts",
+    shares: 2,
+    sharesByAccount: [{ portfolioId: "sec-isa", shares: 2 }],
+  };
+
+  const alphaBond: Holding = {
+    currency: "GBP",
+    gbpRate: 1,
+    id: "sec-alpha",
+    isRetired: false,
+    latestPrice: 100,
+    latestPriceDate: "2026-09-25",
+    name: "Alpha Bond",
+    shares: 5,
+    sharesByAccount: [{ portfolioId: "sec-joint", shares: 5 }],
+  };
+
+  const unpricedFund: Holding = {
+    currency: "GBP",
+    gbpRate: 1,
+    id: "sec-unpriced",
+    isRetired: false,
+    latestPrice: null,
+    latestPriceDate: null,
+    name: "Zeta Private",
+    shares: 3,
+    sharesByAccount: [{ portfolioId: "sec-isa", shares: 3 }],
+  };
+
+  const noFxFund: Holding = {
+    currency: "JPY",
+    gbpRate: null,
+    id: "sec-jpy",
+    isRetired: false,
+    latestPrice: 2000,
+    latestPriceDate: "2026-09-25",
+    name: "Beta Japan",
+    shares: 4,
+    sharesByAccount: [{ portfolioId: "sec-isa", shares: 4 }],
+  };
+
+  const zeroShareFund: Holding = {
+    currency: "USD",
+    gbpRate: 0.75,
+    id: "sec-zero",
+    isRetired: false,
+    latestPrice: 80,
+    latestPriceDate: "2026-09-25",
+    name: "Dormant US",
+    shares: 0,
+    sharesByAccount: [],
+  };
+
+  it("aggregates across accounts, sorts valued descending then unpriced/no-fx then zero alphabetically, and computes shown shares", () => {
+    const view = holdingsViewOf(
+      [zeroShareFund, ukGilts, unpricedFund, worldEquity, alphaBond, noFxFund],
+      { accountId: "", isShowingZeroShares: true },
+    );
+
+    expect(view.hasZeroShare).toBe(true);
+    expect(view.hasForeignPrices).toBe(true);
+    expect(view.totalGbp).toBe(2500);
+    expect(
+      view.rows.map(
+        ({ accountCount, holding, marketValueGbp, share, shares, status }) => ({
+          accountCount,
+          marketValueGbp,
+          name: holding.name,
+          share,
+          shares,
+          status,
+        }),
+      ),
+    ).toStrictEqual([
+      {
+        accountCount: 2,
+        marketValueGbp: 1500,
+        name: "World Equity",
+        share: 0.6,
+        shares: 15,
+        status: "valued",
+      },
+      {
+        accountCount: 1,
+        marketValueGbp: 500,
+        name: "Alpha Bond",
+        share: 0.2,
+        shares: 5,
+        status: "valued",
+      },
+      {
+        accountCount: 1,
+        marketValueGbp: 500,
+        name: "UK Gilts",
+        share: 0.2,
+        shares: 2,
+        status: "valued",
+      },
+      {
+        accountCount: 1,
+        marketValueGbp: null,
+        name: "Beta Japan",
+        share: 0,
+        shares: 4,
+        status: "no-fx",
+      },
+      {
+        accountCount: 1,
+        marketValueGbp: null,
+        name: "Zeta Private",
+        share: 0,
+        shares: 3,
+        status: "unpriced",
+      },
+      {
+        accountCount: 0,
+        marketValueGbp: 0,
+        name: "Dormant US",
+        share: 0,
+        shares: 0,
+        status: "zero",
+      },
+    ]);
+  });
+
+  it("filters by a single securities account UUID, hides zero-share rows when off, and rescales shares to 100%", () => {
+    const view = holdingsViewOf([worldEquity, ukGilts, alphaBond], {
+      accountId: "sec-isa",
+      isShowingZeroShares: false,
+    });
+
+    expect(view.hasZeroShare).toBe(true);
+    expect(view.hasForeignPrices).toBe(false);
+    expect(view.totalGbp).toBe(1500);
+    expect(
+      view.rows.map(
+        ({ accountCount, holding, marketValueGbp, share, shares }) => ({
+          accountCount,
+          marketValueGbp,
+          name: holding.name,
+          share: roundPence(share * 100),
+          shares,
+        }),
+      ),
+    ).toStrictEqual([
+      {
+        accountCount: 1,
+        marketValueGbp: 1000,
+        name: "World Equity",
+        share: 66.67,
+        shares: 10,
+      },
+      {
+        accountCount: 1,
+        marketValueGbp: 500,
+        name: "UK Gilts",
+        share: 33.33,
+        shares: 2,
+      },
+    ]);
+  });
+
+  it("reports zero share weights when totalGbp is zero", () => {
+    const view = holdingsViewOf([unpricedFund, zeroShareFund], {
+      accountId: "",
+      isShowingZeroShares: true,
+    });
+
+    expect(view.totalGbp).toBe(0);
+    expect(view.rows.map((row) => row.share)).toStrictEqual([0, 0]);
+  });
+
+  it("sums per-account penny-rounded lots so unfiltered Holdings reconciles with Accounts, and ignores unpriced or blank-currency rows for hasForeignPrices", () => {
+    const fractionalAcrossTwo: Holding = {
+      currency: "",
+      gbpRate: 1,
+      id: "sec-frac",
+      isRetired: false,
+      latestPrice: 10.004,
+      latestPriceDate: "2026-09-25",
+      name: "Fractional Blank Currency",
+      shares: 2,
+      sharesByAccount: [
+        { portfolioId: "sec-isa", shares: 1 },
+        { portfolioId: "sec-joint", shares: 1 },
+      ],
+    };
+    const unpricedUsd: Holding = {
+      currency: "USD",
+      gbpRate: 0.75,
+      id: "sec-unpriced-usd",
+      isRetired: false,
+      latestPrice: null,
+      latestPriceDate: null,
+      name: "Unpriced Dollar",
+      shares: 1,
+      sharesByAccount: [{ portfolioId: "sec-isa", shares: 1 }],
+    };
+
+    const view = holdingsViewOf([fractionalAcrossTwo, unpricedUsd], {
+      accountId: "",
+      isShowingZeroShares: false,
+    });
+
+    expect(view.totalGbp).toBe(20);
+    expect(view.rows[0]?.marketValueGbp).toBe(20);
+    expect(view.hasForeignPrices).toBe(false);
   });
 });

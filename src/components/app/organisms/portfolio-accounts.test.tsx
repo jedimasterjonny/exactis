@@ -277,4 +277,23 @@ describe("PortfolioAccounts", () => {
       "Leave the scenario to add preview entries.",
     );
   });
+
+  it("opens an active securities account in Holdings by UUID and keeps retired accounts non-interactive", () => {
+    const onOpenSecurities = vi.fn<(portfolioId: string) => void>();
+    renderAccounts({
+      cashAccounts: [isaCash, retiredCash],
+      onOpenSecurities,
+      securitiesAccounts: [isaSecurities, retiredSecurities],
+    });
+
+    fireEvent.click(
+      screen.getByRole("switch", { name: "Show retired accounts" }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Northstar ISA" }));
+    expect(onOpenSecurities).toHaveBeenCalledExactlyOnceWith("sec-isa");
+    expect(
+      screen.queryByRole("button", { name: "Closed Account" }),
+    ).not.toBeInTheDocument();
+  });
 });

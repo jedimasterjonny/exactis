@@ -29,33 +29,63 @@ export function formatAxisGbp(value: number): string {
     : `${sign}£${scaled.format(size / 1_000_000)}m`;
 }
 
-// A sum of money to two decimal places, for bookkeeping ledgers where
-// holdings and uninvested cash add up to the penny: en-GB grouping, a
-// real minus (U+2212) only on sums below nothing once rounded, pence
-// marked "p" for GBX, and a safe plain-decimal fallback for any code
-// Intl does not accept as an ISO currency.
-const twoPlaces = new Intl.NumberFormat("en-GB", {
-  maximumFractionDigits: 2,
-  minimumFractionDigits: 2,
-  signDisplay: "negative",
-});
+// A sum of money or security quote to two (or up to six) decimal
+// places: en-GB grouping, a real minus (U+2212) only on sums below
+// nothing once rounded, pence marked "p" for GBX, and a safe
+// plain-decimal fallback for any code Intl rejects as an ISO currency.
+const decimals = {
+  2: new Intl.NumberFormat("en-GB", {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+    signDisplay: "negative",
+  }),
+  6: new Intl.NumberFormat("en-GB", {
+    maximumFractionDigits: 6,
+    minimumFractionDigits: 2,
+    signDisplay: "negative",
+  }),
+};
 
 const currencies = new Map<string, Intl.NumberFormat | null>();
 
+// A count of fund shares or units, to up to eight decimal places
+// matching Portfolio Performance's 1e8 precision, with no trailing
+// zeroes and a real minus on negative counts.
+const sharesFormat = new Intl.NumberFormat("en-GB", {
+  maximumFractionDigits: 8,
+  signDisplay: "negative",
+});
+
 export function formatCurrency(value: number, currency: string): string {
-  if (currency === "GBX") {
-    return `${twoPlaces.format(value).replace(/^-/, "−")}p`;
-  }
-  const formatter = currencyFormatter(currency);
-  if (formatter === null) {
-    const figure = twoPlaces.format(value).replace(/^-/, "−");
-    return currency === "" ? figure : `${figure} ${currency}`;
-  }
-  return formatter.format(value).replace(/^-/, "−");
+  return formatDecimalCurrency(value, currency, 2);
 }
 
 export function formatGbp(value: number): string {
   return gbp.format(value).replace(/^-/, "−");
+}
+
+export function formatPrice(value: number, currency: string): string {
+  return formatDecimalCurrency(value, currency, 6);
+}
+
+export function formatShares(value: number): string {
+  return sharesFormat.format(value).replace(/^-/, "−");
+}
+
+// The Intl format options PriceField hands Base UI to format and parse
+// quotes in the currency given: currency style for ISO codes Intl
+// accepts, or plain decimals for GBX pence and any non-ISO code so
+// NumberField never throws RangeError.
+export function priceFormatOf(currency: string): Intl.NumberFormatOptions {
+  if (currency !== "GBX" && isoFormatter(currency, 6) !== null) {
+    return {
+      currency,
+      maximumFractionDigits: 6,
+      minimumFractionDigits: 2,
+      style: "currency",
+    };
+  }
+  return { maximumFractionDigits: 6, minimumFractionDigits: 2 };
 }
 
 // A move in pounds, signed whichever way it went, as a figure standing
@@ -167,25 +197,47 @@ export function formatPoints(
   return `${text.replace(/^-/, "−")}pp`;
 }
 
-// An en-GB two-decimal currency formatter cached by ISO code, or null
+function formatDecimalCurrency(
+  value: number,
+  currency: string,
+  maximumFractionDigits: keyof typeof decimals,
+): string {
+  if (currency === "GBX") {
+    return `${decimals[maximumFractionDigits].format(value).replace(/^-/, "−")}p`;
+  }
+  const formatter = isoFormatter(currency, maximumFractionDigits);
+  if (formatter === null) {
+    const figure = decimals[maximumFractionDigits]
+      .format(value)
+      .replace(/^-/, "−");
+    return currency === "" ? figure : `${figure} ${currency}`;
+  }
+  return formatter.format(value).replace(/^-/, "−");
+}
+
+// An en-GB currency formatter cached by ISO code and precision, or null
 // for a code Intl rejects so bookkeeping displays never throw.
-function currencyFormatter(currency: string): Intl.NumberFormat | null {
-  const cached = currencies.get(currency);
+function isoFormatter(
+  currency: string,
+  maximumFractionDigits: keyof typeof decimals,
+): Intl.NumberFormat | null {
+  const key = `${currency}:${String(maximumFractionDigits)}`;
+  const cached = currencies.get(key);
   if (cached !== undefined) {
     return cached;
   }
   try {
     const formatter = new Intl.NumberFormat("en-GB", {
       currency,
-      maximumFractionDigits: 2,
+      maximumFractionDigits,
       minimumFractionDigits: 2,
       signDisplay: "negative",
       style: "currency",
     });
-    currencies.set(currency, formatter);
+    currencies.set(key, formatter);
     return formatter;
   } catch {
-    currencies.set(currency, null);
+    currencies.set(key, null);
     return null;
   }
 }

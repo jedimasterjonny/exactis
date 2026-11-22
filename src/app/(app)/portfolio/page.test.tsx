@@ -1,3 +1,5 @@
+import type { JSX } from "react";
+
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -9,16 +11,22 @@ import Portfolio, { metadata } from "./page";
 
 vi.mock("@/store/household", () => ({ getOpened: vi.fn() }));
 
+async function portfolioPage(
+  address: Record<string, string | string[]> = {},
+): Promise<JSX.Element> {
+  return Portfolio({ searchParams: Promise.resolve(address) });
+}
+
 describe("Portfolio", () => {
   it("titles the page by its label in the navigation", () => {
     expect(metadata).toStrictEqual({ title: "Portfolio" });
   });
 
-  it("renders the portfolio screen unlocked when the household is open", async () => {
+  it("renders the portfolio screen unlocked on Holdings by default and respects ?tab=accounts", async () => {
     vi.setSystemTime(new Date("2026-09-25T12:00:00Z"));
     vi.mocked(getOpened).mockResolvedValue(null);
 
-    render(await Portfolio(), { wrapper: Toaster });
+    const { unmount } = render(await portfolioPage(), { wrapper: Toaster });
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Portfolio",
@@ -35,14 +43,29 @@ describe("Portfolio", () => {
     expect(
       await screen.findByText("northstar.portfolio · GBP"),
     ).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Holdings" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Add security" })).toBeEnabled();
+
+    unmount();
+
+    render(await portfolioPage({ tab: "accounts" }), { wrapper: Toaster });
+
+    fireEvent.change(screen.getByLabelText("Portfolio Performance file"), {
+      target: {
+        files: [new File([samplePortfolioFile()], "northstar.portfolio")],
+      },
+    });
+
     expect(
-      screen
-        .getAllByRole("definition")
-        .map((definition) => definition.textContent),
-    ).toContain("22 Sep 2026 · 3 days old");
-    expect(
-      screen.getByRole("button", { name: "Add securities account" }),
-    ).toBeEnabled();
+      await screen.findByText("northstar.portfolio · GBP"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Accounts" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 
   it("locks preview additions when a scenario is open", async () => {
@@ -52,7 +75,7 @@ describe("Portfolio", () => {
       name: "Retiring early",
     });
 
-    render(await Portfolio(), { wrapper: Toaster });
+    render(await portfolioPage({ tab: ["accounts"] }), { wrapper: Toaster });
 
     fireEvent.change(screen.getByLabelText("Portfolio Performance file"), {
       target: {
@@ -63,8 +86,10 @@ describe("Portfolio", () => {
     expect(
       await screen.findByText("Portfolio belongs to the household"),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Add securities account" }),
-    ).toBeDisabled();
+    expect(screen.getByRole("tab", { name: "Holdings" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Add security" })).toBeDisabled();
   });
 });

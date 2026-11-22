@@ -4,6 +4,7 @@ import { strToU8, zipSync } from "fflate";
 
 import type {
   CashAccount,
+  Holding,
   PortfolioSnapshot,
   SecuritiesAccount,
 } from "@/data/portfolio";
@@ -55,15 +56,19 @@ interface Opened {
   readonly parts: Unzipped;
 }
 
-// A security as the file prices it: its name, the currency it is
-// priced in, or that it is priced in none, its last price in that
-// currency (or nothing while the file holds no price for it), and the
-// ISO date of that quote, or null when none is dated.
+// A security as the file holds and prices it: its name, quote currency
+// (or "no currency" when omitted), optional ISIN, ticker, note and
+// retired flag, its last positive price in that currency (or 0 when
+// unpriced), and the ISO date of that quote, or null when undated.
 interface Security {
   readonly currency: string;
+  readonly isin: string | undefined;
+  readonly isRetired: boolean;
   readonly name: string;
+  readonly note: string | undefined;
   readonly price: number;
   readonly quoteDate: null | string;
+  readonly ticker: string | undefined;
 }
 
 // A taxonomy's classes as the tree from its root: the root, and the
@@ -199,7 +204,17 @@ const fields = {
   },
   portfolio: { id: 1, isRetired: 4, name: 2, note: 3, reference: 5 },
   price: { close: 2, date: 1 },
-  security: { currency: 4, id: 1, latest: 16, name: 3, prices: 13 },
+  security: {
+    currency: 4,
+    id: 1,
+    isin: 7,
+    isRetired: 20,
+    latest: 16,
+    name: 3,
+    note: 6,
+    prices: 13,
+    ticker: 8,
+  },
   taxonomy: { classes: 5, name: 2 },
   timestamp: { seconds: 1 },
   transaction: {
@@ -368,17 +383,30 @@ export function readPortfolioSnapshot(
   const { totalGbp: totalCash } = cashTotalsOf(
     cashAccounts.filter((account) => !account.isRetired),
   );
+  const activePortfolioIds = new Set(
+    securitiesAccounts
+      .filter((account) => !account.isRetired)
+      .map((account) => account.id),
+  );
   const totalInvested = roundPence(
     sumOf(
       securitiesAccounts.filter((account) => !account.isRetired),
       (account) => account.marketValue,
     ),
   );
+  const { categories, categoryBySecurity } = taxonomyInfoOf(client);
+  const holdings = holdingsOf(securities, held, {
+    activePortfolioIds,
+    categoryBySecurity,
+    pounds,
+  });
 
   return {
     baseCurrency,
     cashAccounts,
+    categories,
     fileName,
+    holdings,
     latestQuoteDate: latestQuoteDateOf(securities),
     securitiesAccounts,
     totalCash,
@@ -593,6 +621,50 @@ function dayOf(transaction: Message): string {
   return new Date(dateOf(transaction) * 1000).toISOString().slice(0, 10);
 }
 
+// Each security in the catalogue paired with its active per-account
+// share breakdown, Asset Allocation category (when present), latest
+// positive quote and GBP conversion rate.
+function holdingsOf(
+  securities: ReadonlyMap<string, Security>,
+  held: ReadonlyMap<string, ReadonlyMap<string, number>>,
+  {
+    activePortfolioIds,
+    categoryBySecurity,
+    pounds,
+  }: {
+    readonly activePortfolioIds: ReadonlySet<string>;
+    readonly categoryBySecurity: ReadonlyMap<string, string>;
+    readonly pounds: ReadonlyMap<string, number>;
+  },
+): readonly Holding[] {
+  return [...securities].map(([id, security]) => {
+    const activeLots = [...(held.get(id) ?? [])].filter(
+      ([portfolioId, written]) =>
+        activePortfolioIds.has(portfolioId) && written > 0,
+    );
+    const sharesByAccount = activeLots.map(([portfolioId, written]) => ({
+      portfolioId,
+      shares: written / scaled,
+    }));
+    const category = categoryBySecurity.get(id);
+    return {
+      ...(category !== undefined && { category }),
+      currency: security.currency === "no currency" ? "" : security.currency,
+      gbpRate: pounds.get(security.currency) ?? null,
+      id,
+      isRetired: security.isRetired,
+      ...(security.isin !== undefined && { isin: security.isin }),
+      latestPrice: security.price > 0 ? security.price : null,
+      latestPriceDate: security.quoteDate,
+      name: security.name,
+      ...(security.note !== undefined && { note: security.note }),
+      shares: sumOf(activeLots, ([, written]) => written) / scaled,
+      sharesByAccount,
+      ...(security.ticker !== undefined && { ticker: security.ticker }),
+    };
+  });
+}
+
 // Fractions of a whole as hundredths of a per cent that add up to the
 // whole of what the fractions add up to: each rounded down, and the
 // hundredths left over given one each to the largest remainders, in
@@ -798,9 +870,13 @@ function securitiesOf(client: Message): ReadonlyMap<string, Security> {
         {
           currency:
             optionalText(security, fields.security.currency) ?? "no currency",
+          isin: optionalText(security, fields.security.isin),
+          isRetired: int32At(security, fields.security.isRetired) !== 0,
           name: textOf(security, fields.security.name),
+          note: optionalText(security, fields.security.note),
           price,
           quoteDate: date,
+          ticker: optionalText(security, fields.security.ticker),
         },
       ];
     }),
@@ -885,6 +961,77 @@ function targetsOf(
   return beneath(root).flatMap((each) =>
     categoriesOf(each, [], 1).toSorted((one, other) => other.share - one.share),
   );
+}
+
+// Optional root-reachable leaf categories and sorted security
+// assignments from the file's Asset Allocation taxonomy, returning
+// empty results rather than refusing when the taxonomy or root is absent.
+function taxonomyInfoOf(client: Message): {
+  readonly categories: readonly string[];
+  readonly categoryBySecurity: ReadonlyMap<string, string>;
+} {
+  const found = messagesAt(client, fields.client.taxonomies).find(
+    (each) => textAt(each, fields.taxonomy.name) === taxonomy,
+  );
+  if (found === undefined) {
+    return { categories: [], categoryBySecurity: new Map() };
+  }
+  const classes = messagesAt(found, fields.taxonomy.classes).map(classOf);
+  const root = classes.find((each) => each.parent === undefined);
+  if (root === undefined) {
+    return { categories: [], categoryBySecurity: new Map() };
+  }
+  const leaves = taxonomyLeavesOf(classes, root);
+  const categories = [
+    ...new Set(leaves.map((each) => each.name.trim())),
+  ].toSorted((one, other) => one.localeCompare(other));
+  const assigned = new Map<string, Set<string>>();
+  for (const leaf of leaves) {
+    const label = leaf.name.trim();
+    for (const { vehicle } of leaf.assignments) {
+      assigned.set(
+        vehicle,
+        (assigned.get(vehicle) ?? new Set<string>()).add(label),
+      );
+    }
+  }
+  return {
+    categories,
+    categoryBySecurity: new Map(
+      [...assigned].map(([vehicle, labels]) => [
+        vehicle,
+        [...labels]
+          .toSorted((one, other) => one.localeCompare(other))
+          .join(", "),
+      ]),
+    ),
+  };
+}
+
+// Named leaf classes reachable from a taxonomy's root, ignoring
+// orphaned subtrees and guarding against cyclic parent pointers.
+function taxonomyLeavesOf(
+  classes: readonly Class[],
+  root: Class,
+): readonly Class[] {
+  const leaves: Class[] = [];
+  const walk = (node: Class, seen: ReadonlySet<string>): void => {
+    const children = classes.filter(
+      (each) => each.parent === node.id && !seen.has(each.id),
+    );
+    if (children.length === 0) {
+      if (node.id !== root.id && node.name.trim() !== "") {
+        leaves.push(node);
+      }
+      return;
+    }
+    const nextSeen = new Set([...seen, node.id]);
+    for (const child of children) {
+      walk(child, nextSeen);
+    }
+  };
+  walk(root, new Set());
+  return leaves;
 }
 
 // The text written under a number, or nothing where none was, as an id

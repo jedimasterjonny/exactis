@@ -7,6 +7,7 @@ import {
   CountField,
   MoneyField,
   MultipleField,
+  PriceField,
   RateField,
   YearField,
   YearsInput,
@@ -159,6 +160,68 @@ describe.each([
 
     expect(onValueCommitted.mock.calls).toStrictEqual([[max], [min]]);
     expect(input).toHaveValue(held);
+  });
+});
+
+describe("PriceField", () => {
+  it("formats ISO currency prices up to six decimals, steps by a penny or a unit, and reports clearing", () => {
+    const onValueCommitted = vi.fn<(value: number) => void>();
+    const onCleared = vi.fn<() => void>();
+    render(
+      <PriceField
+        currency="GBP"
+        defaultValue={125.5}
+        hint="Optional latest quote"
+        label="Latest price"
+        min={0}
+        onCleared={onCleared}
+        onValueCommitted={onValueCommitted}
+      />,
+    );
+
+    const input = screen.getByRole("textbox", { name: "Latest price" });
+
+    expect(input).toHaveValue("£125.50");
+    expect(input).toHaveClass("figure", "text-right");
+
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    expect(input).toHaveValue("£125.51");
+
+    fireEvent.keyDown(input, { key: "ArrowDown", shiftKey: true });
+    expect(input).toHaveValue("£124.51");
+
+    commit(input, "214.0156");
+    expect(onValueCommitted.mock.calls).toStrictEqual([
+      [125.51],
+      [124.51],
+      [214.0156],
+    ]);
+    expect(input).toHaveValue("£214.0156");
+
+    commit(input, "");
+    expect(onCleared).toHaveBeenCalledOnce();
+  });
+
+  it("formats GBX pence and non-ISO currency codes as plain decimals without throwing", () => {
+    const { rerender } = render(
+      <PriceField
+        currency="GBX"
+        label="Latest price (pence)"
+        value={214.015}
+      />,
+    );
+
+    expect(
+      screen.getByRole("textbox", { name: "Latest price (pence)" }),
+    ).toHaveValue("214.015");
+
+    rerender(
+      <PriceField currency="EURO" label="Latest price (pence)" value={18.25} />,
+    );
+
+    expect(
+      screen.getByRole("textbox", { name: "Latest price (pence)" }),
+    ).toHaveValue("18.25");
   });
 });
 

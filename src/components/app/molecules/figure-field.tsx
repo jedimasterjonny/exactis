@@ -4,7 +4,7 @@ import type { Figure } from "@/components/app/atoms/figure-input";
 
 import { Field } from "@/components/app/atoms/field";
 import { FigureInput } from "@/components/app/atoms/figure-input";
-import { percentFormat } from "@/lib/money";
+import { percentFormat, priceFormatOf } from "@/lib/money";
 
 type FigureFieldProps = ComponentProps<typeof FigureInput> & {
   readonly error?: string;
@@ -95,6 +95,28 @@ export function MultipleField(
   props: PresetProps<"max" | "min"> & { readonly hint?: string | undefined },
 ): JSX.Element {
   return <FigureField {...props} {...presets.multiple} />;
+}
+
+// A security's quote price, to between two and six decimal places:
+// formatted in its ISO currency where Intl accepts it, or as plain
+// decimals for GBX pence and any non-ISO code so Base UI never throws.
+// Steps by a penny, or a unit with shift, and reports clearing so an
+// optional quote can return to none.
+export function PriceField({
+  currency,
+  ...props
+}: PresetProps<"max" | "min" | "onCleared"> & {
+  readonly currency: string;
+  readonly hint?: string | undefined;
+}): JSX.Element {
+  return (
+    <FigureField
+      {...props}
+      format={priceFormatOf(currency)}
+      largeStep={1}
+      step={0.01}
+    />
+  );
 }
 
 // A rate input. An error is the caller's, for a rate it could not work

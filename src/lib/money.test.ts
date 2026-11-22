@@ -9,9 +9,12 @@ import {
   formatGbp,
   formatPercent,
   formatPoints,
+  formatPrice,
+  formatShares,
   formatSignedGbp,
   formatWholePercent,
   negated,
+  priceFormatOf,
 } from "./money";
 
 describe("formatAxisGbp", () => {
@@ -140,6 +143,50 @@ describe("negated", () => {
     // toBe compares as Object.is does, which tells minus nothing apart.
     expect(negated(0)).toBe(0);
     expect(formatGbp(negated(0))).toBe("£0");
+  });
+});
+
+describe("formatPrice", () => {
+  it("writes quotes to between two and six decimal places, formatting GBX in pence and falling back safely on non-ISO codes", () => {
+    expect(formatPrice(125.5, "GBP")).toBe("£125.50");
+    expect(formatPrice(214.0156, "GBP")).toBe("£214.0156");
+    expect(formatPrice(214.015, "GBX")).toBe("214.015p");
+    expect(formatPrice(200, "GBX")).toBe("200.00p");
+    expect(formatPrice(-12.3456, "USD")).toBe("−US$12.3456");
+    expect(formatPrice(-0.0000004, "GBP")).toBe("£0.00");
+    expect(formatPrice(18.125, "EURO")).toBe("18.125 EURO");
+    expect(formatPrice(18.125, "")).toBe("18.125");
+  });
+});
+
+describe("formatShares", () => {
+  it("writes share counts up to eight decimal places with no trailing zeroes and a real minus", () => {
+    expect(formatShares(0)).toBe("0");
+    expect(formatShares(-0)).toBe("0");
+    expect(formatShares(-0.000000004)).toBe("0");
+    expect(formatShares(1250)).toBe("1,250");
+    expect(formatShares(12.3456)).toBe("12.3456");
+    expect(formatShares(0.12345678)).toBe("0.12345678");
+    expect(formatShares(-2.5)).toBe("−2.5");
+  });
+});
+
+describe("priceFormatOf", () => {
+  it("returns currency format for ISO codes and plain decimals for GBX or invalid codes", () => {
+    expect(priceFormatOf("GBP")).toStrictEqual({
+      currency: "GBP",
+      maximumFractionDigits: 6,
+      minimumFractionDigits: 2,
+      style: "currency",
+    });
+    expect(priceFormatOf("GBX")).toStrictEqual({
+      maximumFractionDigits: 6,
+      minimumFractionDigits: 2,
+    });
+    expect(priceFormatOf("EURO")).toStrictEqual({
+      maximumFractionDigits: 6,
+      minimumFractionDigits: 2,
+    });
   });
 });
 

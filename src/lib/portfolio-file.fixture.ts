@@ -139,6 +139,8 @@ export function samplePortfolioFile(
         [1, "sec-world"],
         [3, "Global Equity Index"],
         [4, "GBP"],
+        [7, "GB00TEST0001"],
+        [8, "GEIDX"],
         [
           13,
           [
@@ -206,6 +208,37 @@ export function samplePortfolioFile(
         [9, [[1, 1_789_200_000]]],
         [10, "GBP"],
         [11, 50_000],
+      ],
+    ],
+    [
+      8,
+      [
+        [1, "tax-aa"],
+        [2, "Asset Allocation"],
+        [
+          5,
+          [
+            [1, "aa-root"],
+            [3, "Asset Allocation"],
+            [6, 10_000],
+          ],
+        ],
+        [
+          5,
+          [
+            [1, "aa-equity"],
+            [2, "aa-root"],
+            [3, "Global equity"],
+            [6, 10_000],
+            [
+              9,
+              [
+                [1, "sec-world"],
+                [2, 10_000],
+              ],
+            ],
+          ],
+        ],
       ],
     ],
     [12, baseCurrency],
