@@ -9,8 +9,10 @@ import type {
   AccountKind,
   NewPortfolioAccount,
 } from "@/components/app/organisms/portfolio-account-dialog";
+import type { NewPortfolioSecurity } from "@/components/app/organisms/portfolio-security-dialog";
 import type {
   CashAccount,
+  Holding,
   PortfolioSnapshot,
   SecuritiesAccount,
 } from "@/data/portfolio";
@@ -19,8 +21,11 @@ import { PortfolioPicker } from "@/components/app/atoms/portfolio-picker";
 import { PortfolioSummary } from "@/components/app/atoms/portfolio-summary";
 import { Caution } from "@/components/app/molecules/caution";
 import { EmptyState } from "@/components/app/molecules/empty-state";
+import { ScreenTabs } from "@/components/app/molecules/screen-tabs";
 import { PortfolioAccountDialog } from "@/components/app/organisms/portfolio-account-dialog";
 import { PortfolioAccounts } from "@/components/app/organisms/portfolio-accounts";
+import { PortfolioHoldings } from "@/components/app/organisms/portfolio-holdings";
+import { PortfolioSecurityDialog } from "@/components/app/organisms/portfolio-security-dialog";
 import { SectionCard } from "@/components/app/organisms/section-card";
 import { Screen } from "@/components/app/templates/screen";
 import { Badge } from "@/components/kit/badge";
@@ -32,19 +37,26 @@ import { formatGbp } from "@/lib/money";
 import { portfolio, sectionLabel, subsectionLabel } from "@/lib/nav";
 
 interface PortfolioScreenProps {
+  readonly initialTab?: string | undefined;
   readonly isInScenario: boolean;
   readonly today: string;
 }
+
+type PortfolioTab = "Accounts" | "Holdings";
 
 // The Portfolio screen, held in the browser around a binary Portfolio
 // Performance (.portfolio) file opened from this device. Before a file
 // is chosen it offers a single primary picker and states that the file
 // stays on the device. Once opened it leads with the headline answer
 // sentence, the four-column summary strip, any scenario, currency or
-// preview notices, and the paired Accounts sheet. Preview accounts stay
-// in tab state only and never modify the file; opening another file
-// resets them cleanly.
+// preview notices, and controlled Holdings and Accounts tabs. Clicking
+// a securities account in Accounts switches straight to Holdings
+// filtered by that account's UUID and restores focus onto the Holdings
+// panel. Preview additions stay in tab state only and never modify the
+// file or alter the real-file headline and summary strip; opening
+// another file resets them cleanly.
 export function PortfolioScreen({
+  initialTab,
   isInScenario,
   today,
 }: PortfolioScreenProps): JSX.Element {
@@ -54,7 +66,14 @@ export function PortfolioScreen({
     readonly SecuritiesAccount[]
   >([]);
   const [draftCash, setDraftCash] = useState<readonly CashAccount[]>([]);
+  const [draftHoldings, setDraftHoldings] = useState<readonly Holding[]>([]);
+  const [activeTab, setActiveTab] = useState<PortfolioTab>(() =>
+    initialTab?.toLowerCase() === "accounts" ? "Accounts" : "Holdings",
+  );
+  const [holdingsAccountId, setHoldingsAccountId] = useState("");
+  const [isShowingZeroShares, setIsShowingZeroShares] = useState(false);
   const [addingAccount, setAddingAccount] = useState<AccountKind | null>(null);
+  const [isAddingSecurity, setIsAddingSecurity] = useState(false);
   const scenarioNoteId = useId();
 
   function addPreviewAccount(draft: NewPortfolioAccount): void {
@@ -96,9 +115,39 @@ export function PortfolioScreen({
     });
   }
 
+  function addPreviewSecurity(draft: NewPortfolioSecurity): void {
+    const added: Holding = {
+      ...(draft.category !== undefined && { category: draft.category }),
+      currency: draft.currency,
+      gbpRate: draftGbpRateOf(draft.currency),
+      id: crypto.randomUUID(),
+      isDraft: true,
+      isRetired: false,
+      ...(draft.isin !== undefined && { isin: draft.isin }),
+      latestPrice: draft.latestPrice,
+      latestPriceDate: null,
+      name: draft.name,
+      ...(draft.note !== undefined && { note: draft.note }),
+      shares: 0,
+      sharesByAccount: [],
+      ...(draft.ticker !== undefined && { ticker: draft.ticker }),
+    };
+    setDraftHoldings((current) => [...current, added]);
+    setHoldingsAccountId("");
+    setIsShowingZeroShares(true);
+    setIsAddingSecurity(false);
+    toast.add({
+      description:
+        "Shown in this view only. Changes are not saved to the file yet.",
+      title: "Security added to preview",
+      type: "info",
+    });
+  }
+
   function clearPreview(): void {
     setDraftSecurities([]);
     setDraftCash([]);
+    setDraftHoldings([]);
   }
 
   function openFile(opened: PortfolioSnapshot): void {
@@ -106,7 +155,16 @@ export function PortfolioScreen({
     setFileKey((current) => current + 1);
     setDraftSecurities([]);
     setDraftCash([]);
+    setDraftHoldings([]);
+    setHoldingsAccountId("");
+    setIsShowingZeroShares(false);
     setAddingAccount(null);
+    setIsAddingSecurity(false);
+  }
+
+  function openSecuritiesInHoldings(portfolioId: string): void {
+    setHoldingsAccountId(portfolioId);
+    setActiveTab("Holdings");
   }
 
   if (snapshot === null) {
@@ -127,13 +185,20 @@ export function PortfolioScreen({
   const snapshotActiveCash = snapshot.cashAccounts.filter(
     (account) => !account.isRetired,
   );
+  const snapshotActiveHoldingsCount = snapshot.holdings.filter(
+    (holding) => holding.shares > 0,
+  ).length;
   const securitiesAccounts = [
     ...snapshot.securitiesAccounts,
     ...draftSecurities,
   ];
   const cashAccounts = [...snapshot.cashAccounts, ...draftCash];
+  const holdings = [...snapshot.holdings, ...draftHoldings];
   const dialogCashAccounts = [...snapshotActiveCash, ...draftCash];
-  const hasPreview = draftSecurities.length > 0 || draftCash.length > 0;
+  const hasPreview =
+    draftSecurities.length > 0 ||
+    draftCash.length > 0 ||
+    draftHoldings.length > 0;
 
   return (
     <Screen
@@ -167,9 +232,8 @@ export function PortfolioScreen({
         {`The portfolio holds ${formatGbp(snapshot.totalInvested + snapshot.totalCash)} across ${counted(snapshotActiveSecurities.length, "securities account")} and ${counted(snapshotActiveCash.length, "cash account")}, with ${formatGbp(snapshot.totalCash)} uninvested.`}
       </h2>
       <PortfolioSummary
-        cashAccountCount={snapshotActiveCash.length}
+        holdingsCount={snapshotActiveHoldingsCount}
         latestQuoteDate={snapshot.latestQuoteDate}
-        securitiesAccountCount={snapshotActiveSecurities.length}
         today={today}
         totalCash={snapshot.totalCash}
         totalInvested={snapshot.totalInvested}
@@ -186,19 +250,50 @@ export function PortfolioScreen({
           Balances and holdings are not recalculated.
         </Caution>
       )}
-      <PortfolioAccounts
-        cashAccounts={cashAccounts}
-        isReadOnly={isInScenario}
-        key={fileKey}
-        label={subsectionLabel(portfolio, 1)}
-        onAddCash={() => {
-          setAddingAccount("cash");
-        }}
-        onAddSecurities={() => {
-          setAddingAccount("securities");
-        }}
-        readOnlyId={isInScenario ? scenarioNoteId : undefined}
-        securitiesAccounts={securitiesAccounts}
+      <ScreenTabs
+        onValueChange={setActiveTab}
+        tabs={[
+          {
+            children: (
+              <PortfolioHoldings
+                accountId={holdingsAccountId}
+                holdings={holdings}
+                isReadOnly={isInScenario}
+                isShowingZeroShares={isShowingZeroShares}
+                label={subsectionLabel(portfolio, 1)}
+                onAccountChange={setHoldingsAccountId}
+                onAddSecurity={() => {
+                  setIsAddingSecurity(true);
+                }}
+                onShowingZeroSharesChange={setIsShowingZeroShares}
+                readOnlyId={isInScenario ? scenarioNoteId : undefined}
+                securitiesAccounts={securitiesAccounts}
+              />
+            ),
+            label: "Holdings",
+          },
+          {
+            children: (
+              <PortfolioAccounts
+                cashAccounts={cashAccounts}
+                isReadOnly={isInScenario}
+                key={fileKey}
+                label={subsectionLabel(portfolio, 2)}
+                onAddCash={() => {
+                  setAddingAccount("cash");
+                }}
+                onAddSecurities={() => {
+                  setAddingAccount("securities");
+                }}
+                onOpenSecurities={openSecuritiesInHoldings}
+                readOnlyId={isInScenario ? scenarioNoteId : undefined}
+                securitiesAccounts={securitiesAccounts}
+              />
+            ),
+            label: "Accounts",
+          },
+        ]}
+        value={activeTab}
       />
       {addingAccount !== null && (
         <PortfolioAccountDialog
@@ -211,8 +306,26 @@ export function PortfolioScreen({
           }}
         />
       )}
+      {isAddingSecurity && (
+        <PortfolioSecurityDialog
+          categories={snapshot.categories}
+          defaultCurrency={snapshot.baseCurrency}
+          onAdd={addPreviewSecurity}
+          onDismiss={() => {
+            setIsAddingSecurity(false);
+          }}
+        />
+      )}
     </Screen>
   );
+}
+
+// Known sterling factor for a preview security's quote currency.
+function draftGbpRateOf(currency: string): null | number {
+  if (currency === "GBP") {
+    return 1;
+  }
+  return currency === "GBX" ? 0.01 : null;
 }
 
 // The opening card shown before a .portfolio file has been selected.

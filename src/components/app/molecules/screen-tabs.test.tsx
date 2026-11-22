@@ -1,5 +1,8 @@
+import type { JSX } from "react";
+
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { useState } from "react";
+import { describe, expect, it, vi } from "vitest";
 
 import { ScreenTabs } from "./screen-tabs";
 
@@ -127,5 +130,60 @@ describe("ScreenTabs", () => {
       "forced-colors:data-active:forced-color-adjust-none",
       "forced-colors:focus-visible:ring-[CanvasText]",
     );
+  });
+
+  it("supports controlled tabs, restores focus onto the target panel on programmatic switches, and does not steal focus on tab clicks even when the tab itself did not receive focus", () => {
+    const onSwitch = vi.fn<(label: "Accounts" | "Holdings") => void>();
+    function ControlledHost(): JSX.Element {
+      const [active, setActive] = useState<"Accounts" | "Holdings">("Accounts");
+      return (
+        <ScreenTabs
+          onValueChange={(next) => {
+            onSwitch(next);
+            setActive(next);
+          }}
+          tabs={[
+            { children: <p>The holdings</p>, label: "Holdings" },
+            {
+              children: (
+                <button
+                  onClick={() => {
+                    setActive("Holdings");
+                  }}
+                  type="button"
+                >
+                  Inspect holdings
+                </button>
+              ),
+              label: "Accounts",
+            },
+          ]}
+          value={active}
+        />
+      );
+    }
+
+    const { unmount } = render(<ControlledHost />);
+
+    const inspectButton = screen.getByRole("button", {
+      name: "Inspect holdings",
+    });
+    inspectButton.focus();
+    fireEvent.click(inspectButton);
+
+    const holdingsPanel = screen.getByRole("tabpanel");
+    expect(holdingsPanel).toHaveTextContent("The holdings");
+    expect(holdingsPanel).toHaveFocus();
+
+    // Simulate Safari macOS/iOS where clicking a tab leaves document.activeElement on body.
+    holdingsPanel.blur();
+    const accountsTab = screen.getByRole("tab", { name: "Accounts" });
+    fireEvent.click(accountsTab);
+
+    expect(accountsTab).toHaveAttribute("aria-selected", "true");
+    expect(onSwitch).toHaveBeenCalledExactlyOnceWith("Accounts");
+    expect(screen.getByRole("tabpanel")).not.toHaveFocus();
+
+    unmount();
   });
 });

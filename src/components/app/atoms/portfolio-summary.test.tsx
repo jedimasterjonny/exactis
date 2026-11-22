@@ -14,12 +14,11 @@ function readings(): readonly (readonly [null | string, null | string])[] {
 }
 
 describe("PortfolioSummary", () => {
-  it("shows invested value, uninvested cash, active account counts, and quote freshness", () => {
+  it("shows invested value, uninvested cash, held securities count, and quote freshness", () => {
     render(
       <PortfolioSummary
-        cashAccountCount={3}
+        holdingsCount={8}
         latestQuoteDate="2026-09-22"
-        securitiesAccountCount={2}
         today="2026-09-25"
         totalCash={1250.4}
         totalInvested={42_150.25}
@@ -29,7 +28,7 @@ describe("PortfolioSummary", () => {
     expect(readings()).toStrictEqual([
       ["Invested", "£42,150.25"],
       ["Uninvested cash", "£1,250.40"],
-      ["Accounts", "2 securities · 3 cash"],
+      ["Holdings", "8 securities"],
       ["Quotes to", "22 Sep 2026 · 3 days old"],
     ]);
 
@@ -40,27 +39,26 @@ describe("PortfolioSummary", () => {
     expect(definitions[3]).not.toHaveClass("figure");
   });
 
-  it("says when the file holds no dated quotes yet", () => {
+  it("uses singular security for one holding and says when the file holds no dated quotes yet", () => {
     render(
       <PortfolioSummary
-        cashAccountCount={0}
+        holdingsCount={1}
         latestQuoteDate={null}
-        securitiesAccountCount={1}
         today="2026-09-25"
         totalCash={0}
         totalInvested={0}
       />,
     );
 
+    expect(readings()).toContainEqual(["Holdings", "1 security"]);
     expect(readings()).toContainEqual(["Quotes to", "No quotes yet"]);
   });
 
   it("formats a quote date ahead of today as a plain date without negative age", () => {
     render(
       <PortfolioSummary
-        cashAccountCount={1}
+        holdingsCount={2}
         latestQuoteDate="2026-09-26"
-        securitiesAccountCount={1}
         today="2026-09-25"
         totalCash={100}
         totalInvested={1000}

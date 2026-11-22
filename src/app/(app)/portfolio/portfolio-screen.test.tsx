@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { Toaster } from "@/components/kit/toast";
@@ -6,6 +12,7 @@ import {
   portfolioFile,
   samplePortfolioFile,
 } from "@/lib/portfolio-file.fixture";
+import { commit } from "@/test/dom";
 
 import { PortfolioScreen } from "./portfolio-screen";
 
@@ -19,7 +26,7 @@ function openPortfolio(bytes: Uint8Array<ArrayBuffer>, name: string): void {
 }
 
 describe("PortfolioScreen", () => {
-  it("opens on the empty state, reads a chosen file, and renders the headline, summary strip, and paired accounts", async () => {
+  it("opens on the empty state, reads a chosen file, and renders Holdings and Accounts tabs with summary readings", async () => {
     render(<PortfolioScreen isInScenario={false} today="2026-09-25" />, {
       wrapper: Toaster,
     });
@@ -51,34 +58,144 @@ describe("PortfolioScreen", () => {
       screen
         .getAllByRole("definition")
         .map((definition) => definition.textContent),
-    ).toContain("22 Sep 2026 · 3 days old");
-    expect(screen.getByText("Northstar ISA")).toBeInTheDocument();
-    expect(screen.getByText("Reserve Cash")).toBeInTheDocument();
+    ).toStrictEqual([
+      "£1,250.00",
+      "£1,250.00",
+      "1 security",
+      "22 Sep 2026 · 3 days old",
+    ]);
+    expect(screen.getByRole("tab", { name: "Holdings" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getAllByText("Global Equity Index")).toHaveLength(2);
     expect(
       screen.queryByText("Portfolio belongs to the household"),
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/^Base currency is/)).not.toBeInTheDocument();
   });
 
-  it("supports adding preview securities and cash accounts, dismissing the dialog, clearing preview, and switching files", async () => {
+  it("cross-filters Holdings when clicking a securities account in Accounts and restores focus to the Holdings panel", async () => {
+    render(
+      <PortfolioScreen
+        initialTab="Accounts"
+        isInScenario={false}
+        today="2026-09-25"
+      />,
+      { wrapper: Toaster },
+    );
+
+    openPortfolio(gbpFile, "northstar.portfolio");
+    await screen.findByText("northstar.portfolio · GBP");
+
+    expect(screen.getByRole("tab", { name: "Accounts" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+
+    const northstarButton = screen.getByRole("button", {
+      name: "Northstar ISA",
+    });
+    northstarButton.focus();
+    fireEvent.click(northstarButton);
+
+    const holdingsPanel = screen.getByRole("tabpanel");
+    expect(screen.getByRole("tab", { name: "Holdings" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(holdingsPanel).toHaveFocus();
+    expect(
+      within(holdingsPanel).getByRole("combobox", { name: "Account" }),
+    ).toHaveValue("port-isa");
+    expect(
+      within(holdingsPanel).getByText("Northstar ISA subtotal"),
+    ).toBeInTheDocument();
+  });
+
+  it("adds preview securities with auto-reveal of zero-share rows, adds preview accounts, clears preview, and resets on file switch", async () => {
     render(<PortfolioScreen isInScenario={false} today="2026-09-25" />, {
       wrapper: Toaster,
     });
 
     openPortfolio(gbpFile, "northstar.portfolio");
-    await screen.findByText("Northstar ISA");
+    await screen.findByText("northstar.portfolio · GBP");
 
-    // Open and dismiss first.
-    fireEvent.click(
-      screen.getByRole("button", { name: "Add securities account" }),
-    );
+    // Open and cancel Add security first.
+    fireEvent.click(screen.getByRole("button", { name: "Add security" }));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
 
-    // Add a preview securities account linked to Reserve Cash with a note.
+    // Add a full GBX preview security while an account filter is active;
+    // it auto-clears the filter and turns on Show zero-share securities so the row is visible immediately.
+    fireEvent.change(screen.getByRole("combobox", { name: "Account" }), {
+      target: { value: "port-isa" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add security" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Security name" }), {
+      target: { value: "UK Gilts Preview" },
+    });
+    fireEvent.change(screen.getByRole("combobox", { name: "Currency" }), {
+      target: { value: "GBX" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "ISIN" }), {
+      target: { value: "GB00TEST0002" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "Ticker" }), {
+      target: { value: "UKGP" },
+    });
+    fireEvent.change(screen.getByRole("combobox", { name: "Asset class" }), {
+      target: { value: "Global equity" },
+    });
+    commit(
+      screen.getByRole("textbox", { name: "Latest price (pence)" }),
+      "214.015",
+    );
+    fireEvent.change(screen.getByRole("textbox", { name: "Note" }), {
+      target: { value: "Draft gilt" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add preview" }));
+
+    expect(await screen.findAllByText("UK Gilts Preview")).toHaveLength(2);
+    expect(
+      screen.getByRole("dialog", { name: "Security added to preview" }),
+    ).toHaveAccessibleDescription(
+      "Shown in this view only. Changes are not saved to the file yet.",
+    );
+    expect(screen.getByRole("combobox", { name: "Account" })).toHaveValue("");
+    expect(
+      screen.getByRole("switch", { name: "Show zero-share securities" }),
+    ).toBeChecked();
+
+    // Add minimal USD and GBP preview securities to cover all draft currency branches.
+    fireEvent.click(screen.getByRole("button", { name: "Add security" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Security name" }), {
+      target: { value: "US Preview ETF" },
+    });
+    fireEvent.change(screen.getByRole("combobox", { name: "Currency" }), {
+      target: { value: "USD" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add preview" }));
+    expect(await screen.findAllByText("US Preview ETF")).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add security" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Security name" }), {
+      target: { value: "Sterling Preview Bond" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add preview" }));
+    expect(await screen.findAllByText("Sterling Preview Bond")).toHaveLength(2);
+
+    // Switch to Accounts tab to add preview securities and cash accounts.
+    fireEvent.click(screen.getByRole("tab", { name: "Accounts" }));
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Add securities account" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
     fireEvent.click(
       screen.getByRole("button", { name: "Add securities account" }),
     );
@@ -94,17 +211,11 @@ describe("PortfolioScreen", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Add preview" }));
 
-    expect(await screen.findByText("Harbour GIA")).toBeInTheDocument();
+    const accountsPanel = screen.getByRole("tabpanel");
     expect(
-      screen.getByRole("dialog", { name: "Account added to preview" }),
-    ).toHaveAccessibleDescription(
-      "Shown in this view only. Changes are not saved to the file yet.",
-    );
-    expect(
-      screen.getByText("Preview entries are kept in this browser tab only"),
+      await within(accountsPanel).findByRole("button", { name: "Harbour GIA" }),
     ).toBeInTheDocument();
 
-    // Add an unlinked preview securities account without optional fields.
     fireEvent.click(
       screen.getByRole("button", { name: "Add securities account" }),
     );
@@ -112,9 +223,12 @@ describe("PortfolioScreen", () => {
       target: { value: "Direct Certs" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Add preview" }));
-    expect(await screen.findByText("Direct Certs")).toBeInTheDocument();
+    expect(
+      await within(accountsPanel).findByRole("button", {
+        name: "Direct Certs",
+      }),
+    ).toBeInTheDocument();
 
-    // Add a preview cash account with a note, then another without a note.
     fireEvent.click(screen.getByRole("button", { name: "Add cash account" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Name" }), {
       target: { value: "Dollar Reserve" },
@@ -126,7 +240,6 @@ describe("PortfolioScreen", () => {
       target: { value: "FX pot" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Add preview" }));
-
     expect(await screen.findByText("Dollar Reserve")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Add cash account" }));
@@ -136,7 +249,7 @@ describe("PortfolioScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add preview" }));
     expect(await screen.findByText("Euro Float")).toBeInTheDocument();
 
-    // Preview accounts do not alter the real-file headline or summary KPIs,
+    // Real-file headline and summary KPIs stay unchanged despite preview entries,
     // while newly previewed cash accounts are selectable as reference accounts.
     expect(
       screen.getByRole("heading", { level: 2, name: /^The portfolio holds/ }),
@@ -147,7 +260,7 @@ describe("PortfolioScreen", () => {
       screen
         .getAllByRole("definition")
         .map((definition) => definition.textContent),
-    ).toContain("1 securities · 2 cash");
+    ).toContain("1 security");
 
     fireEvent.click(
       screen.getByRole("button", { name: "Add securities account" }),
@@ -157,7 +270,7 @@ describe("PortfolioScreen", () => {
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
-    // Clear preview drops every draft account and removes the caution banner.
+    // Clear preview removes draft accounts and draft securities alike.
     fireEvent.click(screen.getByRole("button", { name: "Clear preview" }));
     expect(screen.queryByText("Harbour GIA")).not.toBeInTheDocument();
     expect(screen.queryByText("Dollar Reserve")).not.toBeInTheDocument();
@@ -165,13 +278,16 @@ describe("PortfolioScreen", () => {
       screen.queryByText("Preview entries are kept in this browser tab only"),
     ).not.toBeInTheDocument();
 
-    // Add one draft again, then switch to a USD-base file to verify both draft reset and non-GBP caution.
-    fireEvent.click(screen.getByRole("button", { name: "Add cash account" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "Name" }), {
-      target: { value: "Temporary Cash" },
+    fireEvent.click(screen.getByRole("tab", { name: "Holdings" }));
+    expect(screen.queryByText("UK Gilts Preview")).not.toBeInTheDocument();
+
+    // Add one preview security again and switch to a USD-base file to verify reset and non-GBP caution.
+    fireEvent.click(screen.getByRole("button", { name: "Add security" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Security name" }), {
+      target: { value: "Temporary Fund" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Add preview" }));
-    expect(await screen.findByText("Temporary Cash")).toBeInTheDocument();
+    expect(await screen.findAllByText("Temporary Fund")).toHaveLength(2);
 
     openPortfolio(usdFile, "dollar.portfolio");
 
@@ -179,15 +295,10 @@ describe("PortfolioScreen", () => {
       await screen.findByText("dollar.portfolio · USD"),
     ).toBeInTheDocument();
     expect(screen.getByText("Base currency is USD")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "Totals below are shown in GBP where an exchange rate is known.",
-      ),
-    ).toBeInTheDocument();
-    expect(screen.queryByText("Temporary Cash")).not.toBeInTheDocument();
+    expect(screen.queryByText("Temporary Fund")).not.toBeInTheDocument();
   });
 
-  it("shows the scenario caution and describes disabled add buttons with it when a scenario is open", async () => {
+  it("shows the scenario caution and describes disabled add buttons on both tabs when a scenario is open", async () => {
     render(<PortfolioScreen isInScenario today="2026-09-25" />, {
       wrapper: Toaster,
     });
@@ -197,6 +308,14 @@ describe("PortfolioScreen", () => {
     expect(
       await screen.findByText("Portfolio belongs to the household"),
     ).toBeInTheDocument();
+
+    const addSecurity = screen.getByRole("button", { name: "Add security" });
+    expect(addSecurity).toBeDisabled();
+    expect(addSecurity).toHaveAccessibleDescription(
+      "Portfolio belongs to the household Leave the scenario to add preview entries.",
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Accounts" }));
 
     const addSecurities = screen.getByRole("button", {
       name: "Add securities account",
@@ -227,9 +346,14 @@ describe("PortfolioScreen", () => {
       [12, "GBP"],
     ]);
 
-    render(<PortfolioScreen isInScenario={false} today="2026-09-25" />, {
-      wrapper: Toaster,
-    });
+    render(
+      <PortfolioScreen
+        initialTab="Accounts"
+        isInScenario={false}
+        today="2026-09-25"
+      />,
+      { wrapper: Toaster },
+    );
 
     openPortfolio(fileWithRetired, "first.portfolio");
     const toggle = await screen.findByRole("switch", {
@@ -245,5 +369,73 @@ describe("PortfolioScreen", () => {
     expect(
       screen.getByRole("switch", { name: "Show retired accounts" }),
     ).not.toBeChecked();
+  });
+
+  it("counts retired securities with positive shares in PortfolioSummary so the summary matches HoldingsTable", async () => {
+    const fileWithRetiredHeld = portfolioFile([
+      [
+        2,
+        [
+          [1, "sec-active"],
+          [3, "Global Equity Index"],
+          [4, "GBP"],
+          [16, [[2, 10_000_000_000]]],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-retired"],
+          [3, "Legacy Income Trust"],
+          [4, "GBP"],
+          [16, [[2, 5_000_000_000]]],
+          [20, 1],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-isa"],
+          [2, "Northstar ISA"],
+        ],
+      ],
+      [
+        5,
+        [
+          [2, 2],
+          [4, "port-isa"],
+          [12, 200_000_000],
+          [14, "sec-active"],
+        ],
+      ],
+      [
+        5,
+        [
+          [2, 2],
+          [4, "port-isa"],
+          [12, 100_000_000],
+          [14, "sec-retired"],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+
+    render(<PortfolioScreen isInScenario={false} today="2026-09-25" />, {
+      wrapper: Toaster,
+    });
+
+    openPortfolio(fileWithRetiredHeld, "legacy.portfolio");
+    await screen.findByText("legacy.portfolio · GBP");
+
+    expect(
+      screen
+        .getAllByRole("definition")
+        .map((definition) => definition.textContent),
+    ).toStrictEqual(["£250.00", "£0.00", "2 securities", "No quotes yet"]);
+    expect(screen.getAllByRole("row")).toHaveLength(3);
+    expect(screen.getAllByText("Retired")[1]).toHaveAttribute(
+      "data-variant",
+      "outline",
+    );
   });
 });

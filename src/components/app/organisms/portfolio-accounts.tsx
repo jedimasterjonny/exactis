@@ -30,6 +30,7 @@ interface PortfolioAccountsProps {
   readonly label: string;
   readonly onAddCash: () => void;
   readonly onAddSecurities: () => void;
+  readonly onOpenSecurities?: (portfolioId: string) => void;
   readonly readOnlyId?: string | undefined;
   readonly securitiesAccounts: readonly SecuritiesAccount[];
 }
@@ -47,6 +48,7 @@ export function PortfolioAccounts({
   label,
   onAddCash,
   onAddSecurities,
+  onOpenSecurities,
   readOnlyId,
   securitiesAccounts,
 }: PortfolioAccountsProps): JSX.Element {
@@ -160,6 +162,14 @@ export function PortfolioAccounts({
                         <FoldedLines
                           figure={formatCurrency(securities.marketValue, "GBP")}
                           name={securities.name}
+                          onOpen={
+                            !securities.isRetired &&
+                            onOpenSecurities !== undefined
+                              ? (): void => {
+                                  onOpenSecurities(securities.id);
+                                }
+                              : undefined
+                          }
                         >
                           <span>{securitiesDetail(securities)}</span>
                           <AccountFlags

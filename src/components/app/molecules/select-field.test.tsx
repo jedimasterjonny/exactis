@@ -73,4 +73,32 @@ describe("SelectField", () => {
       "How often the amount is paid in",
     );
   });
+
+  it("supports a controlled value steered by the caller", () => {
+    const onValueChange = vi.fn<(value: Cadence) => void>();
+    const { rerender } = render(
+      <SelectField
+        label="Cadence"
+        onValueChange={onValueChange}
+        options={options}
+        value="year"
+      />,
+    );
+
+    const control = screen.getByRole("combobox", { name: "Cadence" });
+    expect(control).toHaveValue("year");
+
+    fireEvent.change(control, { target: { value: "month" } });
+    expect(onValueChange).toHaveBeenCalledExactlyOnceWith("month");
+
+    rerender(
+      <SelectField
+        label="Cadence"
+        onValueChange={onValueChange}
+        options={options}
+        value="month"
+      />,
+    );
+    expect(control).toHaveValue("month");
+  });
 });

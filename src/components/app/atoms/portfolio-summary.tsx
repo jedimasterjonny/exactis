@@ -4,9 +4,8 @@ import { formatCurrency } from "@/lib/money";
 import { formatDated, formatDay } from "@/lib/months";
 
 interface PortfolioSummaryProps {
-  readonly cashAccountCount: number;
+  readonly holdingsCount: number;
   readonly latestQuoteDate: null | string;
-  readonly securitiesAccountCount: number;
   readonly today: string;
   readonly totalCash: number;
   readonly totalInvested: number;
@@ -14,12 +13,11 @@ interface PortfolioSummaryProps {
 
 // The four bookkeeping readings across the top of the Portfolio screen,
 // laid out in one strip as SourceDates and BalanceDates are: invested
-// value, uninvested cash, active account counts, and the date of the
+// value, uninvested cash, held security count, and the date of the
 // newest quote with its age against the day given.
 export function PortfolioSummary({
-  cashAccountCount,
+  holdingsCount,
   latestQuoteDate,
-  securitiesAccountCount,
   today,
   totalCash,
   totalInvested,
@@ -37,8 +35,8 @@ export function PortfolioSummary({
     },
     {
       isFigure: false,
-      name: "Accounts",
-      value: `${String(securitiesAccountCount)} securities · ${String(cashAccountCount)} cash`,
+      name: "Holdings",
+      value: `${String(holdingsCount)} ${holdingsCount === 1 ? "security" : "securities"}`,
     },
     {
       isFigure: false,
