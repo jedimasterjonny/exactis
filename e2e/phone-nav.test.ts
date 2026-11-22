@@ -48,6 +48,7 @@ describe("the production build", () => {
       "/accounts",
       "/plan",
       "/assumptions",
+      "/portfolio",
     ]);
     // React writes the field naming a server action into a form posting
     // it, so the form posts with JavaScript off as the sign-in form does.

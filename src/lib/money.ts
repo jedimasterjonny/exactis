@@ -29,6 +29,31 @@ export function formatAxisGbp(value: number): string {
     : `${sign}£${scaled.format(size / 1_000_000)}m`;
 }
 
+// A sum of money to two decimal places, for bookkeeping ledgers where
+// holdings and uninvested cash add up to the penny: en-GB grouping, a
+// real minus (U+2212) only on sums below nothing once rounded, pence
+// marked "p" for GBX, and a safe plain-decimal fallback for any code
+// Intl does not accept as an ISO currency.
+const twoPlaces = new Intl.NumberFormat("en-GB", {
+  maximumFractionDigits: 2,
+  minimumFractionDigits: 2,
+  signDisplay: "negative",
+});
+
+const currencies = new Map<string, Intl.NumberFormat | null>();
+
+export function formatCurrency(value: number, currency: string): string {
+  if (currency === "GBX") {
+    return `${twoPlaces.format(value).replace(/^-/, "−")}p`;
+  }
+  const formatter = currencyFormatter(currency);
+  if (formatter === null) {
+    const figure = twoPlaces.format(value).replace(/^-/, "−");
+    return currency === "" ? figure : `${figure} ${currency}`;
+  }
+  return formatter.format(value).replace(/^-/, "−");
+}
+
 export function formatGbp(value: number): string {
   return gbp.format(value).replace(/^-/, "−");
 }
@@ -140,4 +165,27 @@ export function formatPoints(
 ): string {
   const text = points[places].format(value * 100);
   return `${text.replace(/^-/, "−")}pp`;
+}
+
+// An en-GB two-decimal currency formatter cached by ISO code, or null
+// for a code Intl rejects so bookkeeping displays never throw.
+function currencyFormatter(currency: string): Intl.NumberFormat | null {
+  const cached = currencies.get(currency);
+  if (cached !== undefined) {
+    return cached;
+  }
+  try {
+    const formatter = new Intl.NumberFormat("en-GB", {
+      currency,
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 2,
+      signDisplay: "negative",
+      style: "currency",
+    });
+    currencies.set(currency, formatter);
+    return formatter;
+  } catch {
+    currencies.set(currency, null);
+    return null;
+  }
 }

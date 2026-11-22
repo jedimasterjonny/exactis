@@ -125,6 +125,93 @@ export function portfolioFile(
   return new Uint8Array(zipSync({ "data.portfolio": signed }));
 }
 
+// A small fictional binary Portfolio Performance file with paired
+// securities and cash accounts, a standalone cash account and dated
+// quotes. For tests.
+export function samplePortfolioFile(
+  baseCurrency = "GBP",
+): Uint8Array<ArrayBuffer> {
+  return portfolioFile([
+    [1, 66],
+    [
+      2,
+      [
+        [1, "sec-world"],
+        [3, "Global Equity Index"],
+        [4, "GBP"],
+        [
+          13,
+          [
+            [1, 20_718],
+            [2, 12_500_000_000],
+          ],
+        ],
+      ],
+    ],
+    [
+      3,
+      [
+        [1, "cash-isa"],
+        [2, "Northstar ISA Cash"],
+        [3, "GBP"],
+      ],
+    ],
+    [
+      3,
+      [
+        [1, "cash-reserve"],
+        [2, "Reserve Cash"],
+        [3, "GBP"],
+      ],
+    ],
+    [
+      4,
+      [
+        [1, "port-isa"],
+        [2, "Northstar ISA"],
+        [5, "cash-isa"],
+      ],
+    ],
+    [
+      5,
+      [
+        [1, "tx-1"],
+        [2, 6],
+        [3, "cash-isa"],
+        [9, [[1, 1_789_000_000]]],
+        [10, "GBP"],
+        [11, 200_000],
+      ],
+    ],
+    [
+      5,
+      [
+        [1, "tx-2"],
+        [2, 0],
+        [3, "cash-isa"],
+        [4, "port-isa"],
+        [9, [[1, 1_789_100_000]]],
+        [10, "GBP"],
+        [11, 125_000],
+        [12, 1_000_000_000],
+        [14, "sec-world"],
+      ],
+    ],
+    [
+      5,
+      [
+        [1, "tx-3"],
+        [2, 6],
+        [3, "cash-reserve"],
+        [9, [[1, 1_789_200_000]]],
+        [10, "GBP"],
+        [11, 50_000],
+      ],
+    ],
+    [12, baseCurrency],
+  ]);
+}
+
 // A taxonomy as Portfolio Performance writes one: its id and name, and
 // its classes listed flat, each naming the one it sits beneath, from a
 // root holding the whole of it. Each class is listed after those

@@ -2,9 +2,15 @@ import type { Unzipped } from "fflate";
 
 import { strToU8, zipSync } from "fflate";
 
+import type {
+  CashAccount,
+  PortfolioSnapshot,
+  SecuritiesAccount,
+} from "@/data/portfolio";
 import type { Portfolio, Target } from "@/data/targets";
 import type { Message } from "@/lib/protobuf";
 
+import { cashTotalsOf, roundPence } from "@/data/portfolio";
 import { Refusal } from "@/lib/answer";
 import { sumOf } from "@/lib/ledger";
 import { formatPercent } from "@/lib/money";
@@ -50,12 +56,14 @@ interface Opened {
 }
 
 // A security as the file prices it: its name, the currency it is
-// priced in, or that it is priced in none, and its last price in that
-// currency, or nothing while the file holds no price for it.
+// priced in, or that it is priced in none, its last price in that
+// currency (or nothing while the file holds no price for it), and the
+// ISO date of that quote, or null when none is dated.
 interface Security {
   readonly currency: string;
   readonly name: string;
   readonly price: number;
+  readonly quoteDate: null | string;
 }
 
 // A taxonomy's classes as the tree from its root: the root, and the
@@ -135,6 +143,15 @@ const removal = 7;
 // What an amount of money is written in: hundredths of the currency.
 const hundredths = 100;
 
+// Unit type tag for PTransactionUnit.Type.GROSS_VALUE and the highest
+// known PTransaction.Type enum value (0..14).
+const grossValueUnit = 0;
+const maxTransactionType = 14;
+
+// Safe epoch-day range producing valid four-digit ISO years (1000..9999).
+const minEpochDay = -354_285;
+const maxEpochDay = 2_932_896;
+
 // What a transaction of each type does to the cash account it names: a
 // sale, a deposit, a dividend, interest and a refund put its amount in,
 // and a purchase, a removal, interest charged, a tax and a fee take it
@@ -169,19 +186,20 @@ const cashSigns: ReadonlyMap<number, -1 | 1> = new Map([
 // from, a taxonomy's name and classes, what a class holds, and a
 // holding's vehicle and weight.
 const fields = {
-  account: { currency: 3, id: 1 },
+  account: { currency: 3, id: 1, isRetired: 5, name: 2, note: 4 },
   assignment: { vehicle: 1, weight: 2 },
   class: { assignments: 9, id: 1, name: 3, parent: 2, rank: 7, weight: 6 },
   client: {
     accounts: 3,
+    baseCurrency: 12,
     portfolios: 4,
     securities: 2,
     taxonomies: 8,
     transactions: 5,
   },
-  portfolio: { id: 1, name: 2, reference: 5 },
-  price: { close: 2 },
-  security: { currency: 4, id: 1, name: 3, prices: 13 },
+  portfolio: { id: 1, isRetired: 4, name: 2, note: 3, reference: 5 },
+  price: { close: 2, date: 1 },
+  security: { currency: 4, id: 1, latest: 16, name: 3, prices: 13 },
   taxonomy: { classes: 5, name: 2 },
   timestamp: { seconds: 1 },
   transaction: {
@@ -197,7 +215,7 @@ const fields = {
     type: 2,
     units: 15,
   },
-  unit: { amount: 2, fxAmount: 4, fxCurrency: 5 },
+  unit: { amount: 2, fxAmount: 4, fxCurrency: 5, type: 1 },
 } as const;
 
 // What each securities account a Portfolio Performance file lists held
@@ -274,6 +292,98 @@ export function readPortfolios(file: Uint8Array): readonly Portfolio[] {
           .toSorted((one, other) => one.on.localeCompare(other.on)),
       };
     });
+}
+
+// What a binary Portfolio Performance file holds for the Portfolio
+// screen: its base currency, the latest quote date across priced
+// securities, each securities account with its holdings count and
+// sterling market value, each cash account with its balance, sterling
+// equivalent where a GBP rate is known, and transaction count, plus the
+// active (non-retired) sterling totals so the headline, summary strip
+// and default Accounts ledger agree to the penny. Unlike readTargets, a
+// held security priced in a currency with no GBP rate is still counted
+// in holdingsCount and valued at nothing rather than refusing the file,
+// so every valid binary file opens cleanly.
+export function readPortfolioSnapshot(
+  file: Uint8Array,
+  fileName: string,
+): PortfolioSnapshot {
+  const client = messageOf(opened(file).client);
+  const baseCurrency =
+    optionalText(client, fields.client.baseCurrency) ?? "GBP";
+  const securities = securitiesOf(client);
+  const held = sharesHeld(client);
+  const pounds = poundsPer(client);
+  const transactions = messagesAt(client, fields.client.transactions);
+  const { counts: holdingsCounts, values: portfolioValues } =
+    portfolioHoldingsOf(held, securities, pounds);
+  const { balances: cashBalances, counts: cashCounts } =
+    cashLedgerOf(transactions);
+
+  const securitiesAccounts: readonly SecuritiesAccount[] = messagesAt(
+    client,
+    fields.client.portfolios,
+  ).map((portfolio, index) => {
+    const id =
+      optionalText(portfolio, fields.portfolio.id) ??
+      `portfolio-${String(index)}`;
+    const note = optionalText(portfolio, fields.portfolio.note);
+    const referenceAccountId = optionalText(
+      portfolio,
+      fields.portfolio.reference,
+    );
+    return {
+      holdingsCount: holdingsCounts.get(id) ?? 0,
+      id,
+      isRetired: int32At(portfolio, fields.portfolio.isRetired) !== 0,
+      marketValue: roundPence(portfolioValues.get(id) ?? 0),
+      name: textOf(portfolio, fields.portfolio.name),
+      ...(note !== undefined && { note }),
+      ...(referenceAccountId !== undefined && { referenceAccountId }),
+    };
+  });
+
+  const cashAccounts: readonly CashAccount[] = messagesAt(
+    client,
+    fields.client.accounts,
+  ).map((account, index) => {
+    const id =
+      optionalText(account, fields.account.id) ?? `account-${String(index)}`;
+    const currency =
+      optionalText(account, fields.account.currency) ?? baseCurrency;
+    const balance = roundPence(cashBalances.get(id) ?? 0);
+    const note = optionalText(account, fields.account.note);
+    return {
+      balance,
+      balanceGbp: balanceInGbp(balance, pounds.get(currency)),
+      currency,
+      id,
+      isRetired: int32At(account, fields.account.isRetired) !== 0,
+      name: textOf(account, fields.account.name),
+      ...(note !== undefined && { note }),
+      transactionCount: cashCounts.get(id) ?? 0,
+    };
+  });
+
+  const { totalGbp: totalCash } = cashTotalsOf(
+    cashAccounts.filter((account) => !account.isRetired),
+  );
+  const totalInvested = roundPence(
+    sumOf(
+      securitiesAccounts.filter((account) => !account.isRetired),
+      (account) => account.marketValue,
+    ),
+  );
+
+  return {
+    baseCurrency,
+    cashAccounts,
+    fileName,
+    latestQuoteDate: latestQuoteDateOf(securities),
+    securitiesAccounts,
+    totalCash,
+    totalInvested,
+  };
 }
 
 // The target allocation a Portfolio Performance file holds, from its
@@ -366,6 +476,81 @@ export function reweighted(
   );
 }
 
+// Record positive GBP FX rates from a transaction's units, filtered to
+// gross-value or non-gross units so gross rates take precedence over
+// rounded fee or tax units on the same transaction.
+function applyFxUnits(
+  rates: Map<string, number>,
+  units: readonly Message[],
+  isGrossOnly: boolean,
+): void {
+  for (const unit of units) {
+    const isGross = int32At(unit, fields.unit.type) === grossValueUnit;
+    if (isGross !== isGrossOnly) {
+      continue;
+    }
+    const currency = textAt(unit, fields.unit.fxCurrency);
+    const amount = int64At(unit, fields.unit.amount);
+    const foreign = int64At(unit, fields.unit.fxAmount);
+    if (currency !== undefined && amount > 0 && foreign > 0) {
+      rates.set(currency, amount / foreign);
+    }
+  }
+}
+
+// A cash account's sterling balance when a GBP rate is known or the
+// balance is zero, or null when a non-zero foreign balance cannot be
+// converted.
+function balanceInGbp(
+  balance: number,
+  rate: number | undefined,
+): null | number {
+  if (balance === 0) {
+    return 0;
+  }
+  return rate === undefined ? null : roundPence(balance * rate);
+}
+
+// Each cash account's unrounded native balance and touching transaction
+// count, summed from every known transaction naming it as account or as
+// the receiving otherAccount of a cash transfer (crediting the foreign
+// gross-value amount for cross-currency transfers, and counting a
+// self-transfer once).
+function cashLedgerOf(transactions: readonly Message[]): {
+  readonly balances: ReadonlyMap<string, number>;
+  readonly counts: ReadonlyMap<string, number>;
+} {
+  const balances = new Map<string, number>();
+  const counts = new Map<string, number>();
+  for (const transaction of transactions) {
+    const type = int32At(transaction, fields.transaction.type);
+    if (type < 0 || type > maxTransactionType) {
+      continue;
+    }
+    const amount = int64At(transaction, fields.transaction.amount) / hundredths;
+    const account = textOf(transaction, fields.transaction.account);
+    const otherAccount = textOf(transaction, fields.transaction.otherAccount);
+    if (account !== "") {
+      counts.set(account, (counts.get(account) ?? 0) + 1);
+      const sign = cashSigns.get(type);
+      if (sign !== undefined) {
+        balances.set(account, (balances.get(account) ?? 0) + sign * amount);
+      }
+    }
+    if (type === cashTransfer && otherAccount !== "") {
+      if (otherAccount !== account) {
+        counts.set(otherAccount, (counts.get(otherAccount) ?? 0) + 1);
+      }
+      balances.set(
+        otherAccount,
+        (balances.get(otherAccount) ?? 0) +
+          transferCreditOf(transaction, amount),
+      );
+    }
+  }
+  return { balances, counts };
+}
+
 // The classes of the client's Asset Allocation taxonomy, as written,
 // or a refusal naming the taxonomies it has instead.
 function classesIn(client: Message): readonly Class[] {
@@ -436,6 +621,39 @@ function hundredthsOf(
   );
 }
 
+// The most recent quote ISO date across every priced security, or null
+// when none has a dated quote.
+function latestQuoteDateOf(
+  securities: ReadonlyMap<string, Security>,
+): null | string {
+  let latest: null | string = null;
+  for (const { quoteDate } of securities.values()) {
+    if (quoteDate !== null && (latest === null || quoteDate > latest)) {
+      latest = quoteDate;
+    }
+  }
+  return latest;
+}
+
+// The latest positive quote a security carries, comparing every
+// positive historical price and optional latest quote by date so
+// unsorted historical series still yield the newest quote.
+function latestQuoteOf(security: Message): {
+  readonly date: null | string;
+  readonly price: number;
+} {
+  const quotes = [
+    ...messagesAt(security, fields.security.prices),
+    ...messagesAt(security, fields.security.latest),
+  ]
+    .map(quoteOf)
+    .filter((quote) => quote !== null);
+  return quotes.reduce(
+    (best, quote) => ((quote.date ?? "") >= (best.date ?? "") ? quote : best),
+    { date: null, price: 0 },
+  );
+}
+
 // The names of the taxonomies with one, as a sentence lists them, or
 // none.
 function listed(taxonomies: readonly Message[]): string {
@@ -483,6 +701,47 @@ function opensWith(bytes: Uint8Array, text: string): boolean {
   return strToU8(text).every((byte, at) => bytes[at] === byte);
 }
 
+// Trimmed text written under a number, or undefined when missing or blank.
+function optionalText(message: Message, number: number): string | undefined {
+  const value = textAt(message, number)?.trim();
+  return value === undefined || value === "" ? undefined : value;
+}
+
+// Each securities account's count of held catalogued securities and
+// sterling market value summed from penny-rounded per-security lots,
+// skipping unlisted security IDs and unconvertible valuations without
+// dropping catalogued holding counts.
+function portfolioHoldingsOf(
+  held: ReadonlyMap<string, ReadonlyMap<string, number>>,
+  securities: ReadonlyMap<string, Security>,
+  pounds: ReadonlyMap<string, number>,
+): {
+  readonly counts: ReadonlyMap<string, number>;
+  readonly values: ReadonlyMap<string, number>;
+} {
+  const counts = new Map<string, number>();
+  const values = new Map<string, number>();
+  for (const [securityId, inAccounts] of held) {
+    const security = securities.get(securityId);
+    if (security === undefined) {
+      continue;
+    }
+    const factor = pounds.get(security.currency);
+    for (const [portfolioId, written] of inAccounts) {
+      if (written > 0) {
+        counts.set(portfolioId, (counts.get(portfolioId) ?? 0) + 1);
+        if (factor !== undefined) {
+          const lotValue = roundPence(
+            (written / scaled) * security.price * factor,
+          );
+          values.set(portfolioId, (values.get(portfolioId) ?? 0) + lotValue);
+        }
+      }
+    }
+  }
+  return { counts, values };
+}
+
 // What a pound is in each currency the file gives a rate for, beside
 // sterling and pence. Portfolio Performance writes a transaction made
 // in pounds on a security priced in another currency with its gross
@@ -492,7 +751,8 @@ function opensWith(bytes: Uint8Array, text: string): boolean {
 // than by the order written, since the file writes them in neither. A
 // transaction made in some other currency is not read, since its rate
 // is to that currency rather than the pound, and a unit worth nothing
-// in the other currency gives no rate.
+// in either currency gives no rate; on any transaction, gross-value
+// units take precedence over rounded fee or tax units.
 function poundsPer(client: Message): ReadonlyMap<string, number> {
   const rates = new Map<string, number>();
   const dated = messagesAt(client, fields.client.transactions)
@@ -500,29 +760,47 @@ function poundsPer(client: Message): ReadonlyMap<string, number> {
     .map((each) => [dateOf(each), each] as const)
     .toSorted(([one], [other]) => one - other);
   for (const [, transaction] of dated) {
-    for (const unit of messagesAt(transaction, fields.transaction.units)) {
-      const currency = textAt(unit, fields.unit.fxCurrency);
-      const foreign = int64At(unit, fields.unit.fxAmount);
-      if (currency !== undefined && foreign > 0) {
-        rates.set(currency, int64At(unit, fields.unit.amount) / foreign);
-      }
-    }
+    const units = messagesAt(transaction, fields.transaction.units);
+    applyFxUnits(rates, units, false);
+    applyFxUnits(rates, units, true);
   }
   return new Map([...rates, ...factors]);
+}
+
+// A single historical or latest price entry decoded into its price and
+// optional ISO quote date (when within valid four-digit ISO years), or
+// null when the close is not positive.
+function quoteOf(
+  entry: Message,
+): null | { readonly date: null | string; readonly price: number } {
+  const close = int64At(entry, fields.price.close);
+  if (close <= 0) {
+    return null;
+  }
+  const epochDay = entry.has(fields.price.date)
+    ? int64At(entry, fields.price.date)
+    : null;
+  const date =
+    epochDay !== null && epochDay >= minEpochDay && epochDay <= maxEpochDay
+      ? new Date(epochDay * 86_400_000).toISOString().slice(0, 10)
+      : null;
+  return { date, price: close / scaled };
 }
 
 // The securities the file holds, by id, each as it is priced.
 function securitiesOf(client: Message): ReadonlyMap<string, Security> {
   return new Map(
-    messagesAt(client, fields.client.securities).map((security) => {
-      const last = messagesAt(security, fields.security.prices).at(-1);
+    messagesAt(client, fields.client.securities).map((security, index) => {
+      const { date, price } = latestQuoteOf(security);
       return [
-        textOf(security, fields.security.id),
+        optionalText(security, fields.security.id) ??
+          `security-${String(index)}`,
         {
-          currency: textAt(security, fields.security.currency) ?? "no currency",
+          currency:
+            optionalText(security, fields.security.currency) ?? "no currency",
           name: textOf(security, fields.security.name),
-          price:
-            last === undefined ? 0 : int64At(last, fields.price.close) / scaled,
+          price,
+          quoteDate: date,
         },
       ];
     }),
@@ -613,6 +891,21 @@ function targetsOf(
 // or a name the file leaves out reads.
 function textOf(message: Message, number: number): string {
   return textAt(message, number) ?? "";
+}
+
+// What a cash transfer credits to its receiving account: the foreign
+// gross-value amount for a cross-currency transfer, or the transaction
+// amount itself when both accounts share a currency.
+function transferCreditOf(transaction: Message, fallback: number): number {
+  for (const unit of messagesAt(transaction, fields.transaction.units)) {
+    if (int32At(unit, fields.unit.type) === grossValueUnit) {
+      const foreign = int64At(unit, fields.unit.fxAmount);
+      if (foreign > 0) {
+        return foreign / hundredths;
+      }
+    }
+  }
+  return fallback;
 }
 
 // A taxonomy's classes as the tree from its root. A class with no id

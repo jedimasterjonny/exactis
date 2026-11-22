@@ -29,4 +29,23 @@ describe("Caution", () => {
       /^The plan runs out at 70 even at its own rates$/,
     );
   });
+
+  it("carries an id for aria-describedby and renders an optional action beneath the text", () => {
+    render(
+      <Caution
+        action={<button type="button">Clear preview</button>}
+        id="preview-note"
+        title="Preview entries are kept in this browser tab only"
+      >
+        Balances and holdings are not recalculated.
+      </Caution>,
+    );
+
+    const note = screen.getByRole("note");
+
+    expect(note).toHaveAttribute("id", "preview-note");
+    expect(
+      screen.getByRole("button", { name: "Clear preview" }),
+    ).toBeInTheDocument();
+  });
 });
