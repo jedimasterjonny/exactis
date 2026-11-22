@@ -198,8 +198,8 @@ const thrown: readonly Thrown[] = [
     }),
   ],
   [
-    "An ISA or a pension belongs to an owner, and nothing else",
-    "An ISA or a pension belongs to an owner, and nothing else",
+    "An ISA, a pension or a GIA belongs to an owner, and nothing else",
+    "An ISA, a pension or a GIA belongs to an owner, and nothing else",
     (given): Inputs => changed(given, 3, (cash) => ({ ...cash, owner: 1 })),
   ],
   [
@@ -209,17 +209,34 @@ const thrown: readonly Thrown[] = [
       earning(given, 18, (consulting) => ({ ...consulting, owner: 2 })),
   ],
   [
-    "An ISA or a pension belongs to an owner the household lists",
-    "An ISA or a pension belongs to an owner the household lists",
+    "An ISA, a pension or a GIA belongs to an owner the household lists",
+    "An ISA, a pension or a GIA belongs to an owner the household lists",
     (given): Inputs => changed(given, 2, (isa) => ({ ...isa, owner: 2 })),
   ],
   [
-    "An ISA or a pension belongs to an owner, and nothing else",
-    "An ISA or a pension belongs to an owner, and nothing else",
+    "An ISA, a pension or a GIA belongs to an owner, and nothing else",
+    "An ISA, a pension or a GIA belongs to an owner, and nothing else",
     (given): Inputs =>
       changed(given, 2, (isa) =>
         toAccount({ ...toValues(isa), owner: null }, isa.id),
       ),
+  ],
+  [
+    "A GIA carries what it cost, and nothing else does",
+    "A GIA carries what it cost, and nothing else does",
+    (given): Inputs => changed(given, 3, (cash) => ({ ...cash, costBasis: 0 })),
+  ],
+  [
+    "A GIA carries what it cost, and nothing else does",
+    "A GIA carries what it cost, and nothing else does",
+    (given): Inputs =>
+      changed(given, 2, (isa) => ({ ...isa, kind: "taxable" })),
+  ],
+  [
+    "What a GIA cost is nothing or more",
+    "What a GIA cost is nothing or more",
+    (given): Inputs =>
+      changed(given, 2, (isa) => ({ ...isa, costBasis: -1, kind: "taxable" })),
   ],
   [
     "A salary feeds a pension alone",
@@ -1316,6 +1333,26 @@ describe("soundKept", () => {
       15,
     );
     expect(read.plan.rate).not.toBeCloseTo(0.0712544 + 0.0039837, 7);
+    expect(read.plan.dividendYield).toBeCloseTo(
+      "short" in derived ? 0 : 0.6 * derived.rates.dividends,
+      15,
+    );
+    expect(read.plan.dividendYieldByYear?.[0]).toBeCloseTo(
+      read.plan.dividendYield ?? 0,
+      15,
+    );
+
+    // A 100%-bond glide path holds zero equity share in every year, so
+    // it must strip any unglided dividendYield rather than leaking it.
+    const allBonds = soundKept({
+      ...kept,
+      glide: [{ age: 30, bonds: 1 }],
+      rates: { ...kept.rates, dividends: 0.02 },
+      rateSet: "custom",
+    }).household;
+
+    expect(allBonds.plan.dividendYield).toBeUndefined();
+    expect(allBonds.plan.dividendYieldByYear).toBeUndefined();
   });
 
   // Six tenths, three and one of equities add up to a hair under the

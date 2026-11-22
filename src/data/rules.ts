@@ -8,11 +8,13 @@
 // extends one the two share, so the pair reads as one rule.
 export const rules = {
   aboveBalloon: "A debt paid its own sum owes more than its balloon",
-  belongs: "An ISA or a pension belongs to an owner the household lists",
+  belongs: "An ISA, a pension or a GIA belongs to an owner the household lists",
   belowNothing: "A balance below nothing is a debt's",
   beyondGain: "A rate is no more than 50%",
   beyondLoss: "A rate loses no more than everything",
   borrowsOnLoan: "A move borrows on a loan already secured on the house",
+  costBasis: "A GIA carries what it cost, and nothing else does",
+  costBasisBelowNothing: "What a GIA cost is nothing or more",
   debtEnds: "A debt's payments end",
   droppable: "Only a pension is dropped when short",
   earner: "An income line is earned by an owner the plan lists",
@@ -22,7 +24,7 @@ export const rules = {
   listedOnce: "An account is listed once",
   matched: "An employer matches a share of the base",
   owes: "A debt's balance is nothing or less",
-  owned: "An ISA or a pension belongs to an owner, and nothing else",
+  owned: "An ISA, a pension or a GIA belongs to an owner, and nothing else",
   paysDebt: "A line pays a debt alone",
   paysSomething: "A line paying a debt pays something",
   retiresAtAge: "Only the plan's owner retires when conditions hold",

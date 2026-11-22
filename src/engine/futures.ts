@@ -300,10 +300,10 @@ export function futureOf(points: readonly ProjectionPoint[], run: Run): Future {
   return {
     fell,
     measured: movedYears(points, run).map(
-      ({ allowances, at, balances, run: moved }) => {
+      ({ allowances, at, balances, bases, exempt, run: moved }) => {
         const carried = ran.get(moved) ?? carriedBy(moved, retired);
         ran.set(moved, carried);
-        return measuredOf({ allowances, balances }, at, carried);
+        return measuredOf({ allowances, balances, bases, exempt }, at, carried);
       },
     ),
     ranOut: points.find(({ uncovered }) => uncovered > 0)?.year ?? null,

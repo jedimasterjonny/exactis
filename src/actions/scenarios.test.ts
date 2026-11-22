@@ -290,6 +290,7 @@ describe("createScenario", () => {
           cadence: "month",
           cap: 0,
           contribution: 0,
+          costBasis: 0,
           funding: "fixed",
           growth: "fixed",
           isDroppable: false,

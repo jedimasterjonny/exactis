@@ -9,6 +9,7 @@ import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
 import {
   allowanceOf,
+  isGia,
   isOwned,
   isPension,
   kindLabels,
@@ -63,7 +64,7 @@ const kinds = optionsOf(kindLabels, [
 
 // The fields the account's dialog takes, as the line fields are to the
 // schedules' dialogs: the name and the treatment on the first row, with
-// the owner beside them for an ISA or a pension, chosen from the owners
+// the owner beside them for an ISA, a pension or a GIA, chosen from the owners
 // the ledger hands down and held until there is one to choose, the
 // balance and, for a wrapper, a GIA or cash, the contribution choice on the
 // second, with a pension's choice beside them of what it is paid in a
@@ -138,7 +139,7 @@ export function AccountFields({
           />
         )}
       </FieldRow>
-      <FieldRow layout={isPension(draft) ? "triple" : "pair"}>
+      <FieldRow layout={isPension(draft) || isGia(draft) ? "triple" : "pair"}>
         <MoneyField
           defaultValue={initial.balance}
           hint={draft.kind === "debt" ? "A debt's is negative" : undefined}
@@ -147,6 +148,16 @@ export function AccountFields({
             onAmend({ balance });
           }}
         />
+        {isGia(draft) && (
+          <MoneyField
+            defaultValue={initial.costBasis}
+            hint="What was paid in, for CGT"
+            label="Cost basis"
+            onValueCommitted={(costBasis) => {
+              onAmend({ costBasis });
+            }}
+          />
+        )}
         {takesSpare(draft) && (
           <SelectField
             defaultValue={initial.funding}

@@ -209,6 +209,7 @@ describe("toPension", () => {
         cadence: "year",
         cap: 0,
         contribution: 0,
+        costBasis: 0,
         funding: "fixed",
         growth: "plan",
         isDroppable: false,

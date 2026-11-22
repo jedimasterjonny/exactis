@@ -44,6 +44,12 @@ type Step = (document: Record<string, unknown>) => Record<string, unknown>;
 // reading dropped, as it drops any key it does not hold, and saving it
 // back that way, since a reading is what the plan said then and nothing
 // can work it out again.
+//
+// 4 to 5: a GIA belongs to an owner and carries its pooled cost basis
+// beside its balance. Any GIA kept in the fourth shape without an owner
+// is assigned to the first listed owner, and any without a cost basis
+// takes its balance (floored at nothing), assuming no unrealised gain
+// until its owner enters what it cost.
 const steps: readonly Step[] = [
   (document): Record<string, unknown> => {
     const { accounts } = document;
@@ -53,6 +59,17 @@ const steps: readonly Step[] = [
   },
   (document): Record<string, unknown> => document,
   (document): Record<string, unknown> => document,
+  (document): Record<string, unknown> => {
+    const { accounts, owners } = document;
+    if (!Array.isArray(accounts)) {
+      return document;
+    }
+    const firstOwner = firstOwnerId(owners);
+    return {
+      ...document,
+      accounts: accounts.map((account) => ownedGia(account, firstOwner)),
+    };
+  },
 ];
 
 // The shape a household is kept in now, which every save stamps on it:
@@ -102,6 +119,47 @@ export function upcast(value: unknown, from: readonly Step[] = steps): unknown {
     throw new Refusal("This household was saved by a newer app than this one");
   }
   return from.slice(shape - 1).reduce((older, step) => step(older), document);
+}
+
+// The first owner's numeric id from a stored owners list, or undefined
+// when none is readable.
+function firstOwnerId(owners: unknown): number | undefined {
+  if (!Array.isArray(owners)) {
+    return undefined;
+  }
+  const first: unknown = owners[0];
+  return typeof first === "object" &&
+    first !== null &&
+    "id" in first &&
+    typeof first.id === "number"
+    ? first.id
+    : undefined;
+}
+
+// A GIA kept in the fourth shape given the first owner and a cost basis
+// equal to its balance where either is missing, and any other account as
+// it was found.
+function ownedGia(account: unknown, firstOwner: number | undefined): unknown {
+  if (
+    typeof account !== "object" ||
+    account === null ||
+    !("kind" in account) ||
+    account.kind !== "taxable"
+  ) {
+    return account;
+  }
+  const hasOwner = "owner" in account && account.owner !== undefined;
+  const hasBasis = "costBasis" in account && account.costBasis !== undefined;
+  const balance =
+    "balance" in account && typeof account.balance === "number"
+      ? account.balance
+      : undefined;
+  return {
+    ...account,
+    ...(!hasBasis &&
+      balance !== undefined && { costBasis: Math.max(0, balance) }),
+    ...(!hasOwner && firstOwner !== undefined && { owner: firstOwner }),
+  };
 }
 
 // An account kept in the first shape with the mark of a pension always

@@ -10,7 +10,7 @@ import { buttonVariants } from "@/components/kit/button";
 import { moveChoices } from "@/data/houses";
 import { markersOf } from "@/data/milestones";
 import { laidOut } from "@/engine/projection";
-import { balanceOf, drawingTaxOf } from "@/lib/ledger";
+import { balanceOf, drawingTaxOf, giaTaxOf } from "@/lib/ledger";
 import { formatGbp } from "@/lib/money";
 import { formatMonth, monthBefore, today } from "@/lib/months";
 import { accountsAndAssets, monthEnd, sectionLabel } from "@/lib/nav";
@@ -40,8 +40,9 @@ export const metadata: Metadata = { title: accountsAndAssets.label };
 // at whose end they were read, and links to the month end, which moves
 // the month on and checks the balances against it. The body opens on a
 // sentence saying the net worth the plan starts from, what the balances
-// come to once the pensions are counted at what drawing them would
-// leave, which is the balance sheet's own total and what the plan's
+// come to once pensions are counted at what drawing them would leave and
+// GIAs after estimated unrealised CGT, which is the balance sheet's own
+// total and what the plan's
 // first year opens on, as the other screens open on their answers; with
 // no account there is no sentence, since the sheet's empty state says
 // it. No-break spaces bind "a net worth", so no line breaks inside it.
@@ -71,7 +72,7 @@ export default async function Accounts(): Promise<JSX.Element> {
     >
       {accounts.length > 0 && (
         <h2 className="heading text-2xl text-balance tabular-nums">
-          {`The plan starts from a\u00a0net\u00a0worth of ${formatGbp(balanceOf(accounts) - drawingTaxOf(accounts))}.`}
+          {`The plan starts from a\u00a0net\u00a0worth of ${formatGbp(balanceOf(accounts) - drawingTaxOf(accounts) - giaTaxOf(accounts))}.`}
         </h2>
       )}
       <BalanceDates accounts={accounts} today={day} />

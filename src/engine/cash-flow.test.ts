@@ -2325,7 +2325,9 @@ describe("cashFlow", () => {
           { expenses: [], income: [plain] },
           { at: { month: 0, year: 2026 }, plan },
         ),
-      ).toThrow("An ISA or a pension belongs to an owner, and nothing else");
+      ).toThrow(
+        "An ISA, a pension or a GIA belongs to an owner, and nothing else",
+      );
     }
     expect(() =>
       cashFlow(

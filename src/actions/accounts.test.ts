@@ -58,6 +58,7 @@ const values = {
   cadence: "month",
   cap: 0,
   contribution: 333,
+  costBasis: 0,
   funding: "fixed",
   growth: "fixed",
   isDroppable: false,
@@ -519,20 +520,25 @@ describe("the account actions", () => {
     // An allowance is a person's, so an ISA or a pension names the owner
     // it is paid under, one the household lists, and an account nobody
     // owns names none.
-    it("holds an ISA or a pension to an owner and every other account to none", async () => {
+    it("holds an ISA, a pension or a GIA to an owner and every other account to none", async () => {
       for (const draft of [
         { ...values, owner: null },
         { ...values, kind: "tax-deferred", owner: null },
+        { ...values, kind: "taxable", owner: null },
         { ...values, kind: "cash", owner: 1 },
       ] as const) {
         await expect(saveAccount(null, draft, null)).resolves.toStrictEqual(
-          refused("An ISA or a pension belongs to an owner, and nothing else"),
+          refused(
+            "An ISA, a pension or a GIA belongs to an owner, and nothing else",
+          ),
         );
       }
       await expect(
         saveAccount(null, { ...values, owner: 99 }, null),
       ).resolves.toStrictEqual(
-        refused("An ISA or a pension belongs to an owner the household lists"),
+        refused(
+          "An ISA, a pension or a GIA belongs to an owner the household lists",
+        ),
       );
       expect(await versions()).toBe(1);
 
@@ -1579,7 +1585,50 @@ describe("the account actions", () => {
           balances: [{ balance: -1000, id: 2 }],
         }),
       ).toStrictEqual(refused("A balance below nothing is a debt's"));
+      expect(
+        await closeBalances({
+          asOf: { month: 7, year: 2026 },
+          balances: [{ balance: 271930, costBasis: 200000, id: 2 }],
+        }),
+      ).toStrictEqual(
+        refused("A GIA carries what it cost, and nothing else does"),
+      );
       expect(await versions()).toBe(1);
+    });
+
+    it("saves an updated GIA cost basis alongside its balance", async () => {
+      const gia: Account = {
+        balance: 20000,
+        costBasis: 15000,
+        growth: { kind: "plan" },
+        id: 20,
+        kind: "taxable",
+        name: "GIA",
+        owner: 1,
+      };
+      await keepAfter(
+        db,
+        { scenario: "", version: 1 },
+        { ...kept, accounts: [...kept.accounts, gia], next: 21 },
+      );
+
+      expect(
+        await closeBalances({
+          asOf: { month: 7, year: 2026 },
+          balances: [{ balance: 21500, costBasis: -1, id: 20 }],
+        }),
+      ).toStrictEqual(refused("What a GIA cost is nothing or more"));
+      expect(
+        await closeBalances({
+          asOf: { month: 7, year: 2026 },
+          balances: [{ balance: 21500, costBasis: 15800, id: 20 }],
+        }),
+      ).toStrictEqual(
+        saved({ asOf: { month: 7, year: 2026 }, isRecorded: true }),
+      );
+      expect(
+        soundKept(await latest()).kept.accounts.find(({ id }) => id === 20),
+      ).toMatchObject({ balance: 21500, costBasis: 15800 });
     });
 
     // A month closed in the scenario would be lost to it, adopted or

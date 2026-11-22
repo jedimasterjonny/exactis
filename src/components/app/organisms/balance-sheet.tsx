@@ -14,7 +14,7 @@ import { ShareBar } from "@/components/app/atoms/share-bar";
 import { EmptyState } from "@/components/app/molecules/empty-state";
 import { FoldedLines } from "@/components/app/molecules/folded-lines";
 import { Button } from "@/components/kit/button";
-import { isPension, kindLabels } from "@/data/accounts";
+import { isGia, isPension, kindLabels } from "@/data/accounts";
 import { mortgageOn } from "@/data/houses";
 import { fixedMonthly } from "@/lib/cadence";
 import { counted } from "@/lib/count";
@@ -23,10 +23,12 @@ import {
   drawingTaxOf,
   equityOf,
   formatMonthly,
+  giaTaxOf,
   sumOf,
 } from "@/lib/ledger";
 import { formatGbp, formatPercent, negated } from "@/lib/money";
 import { monthName } from "@/lib/months";
+import { cgtAllowance } from "@/lib/tax";
 
 interface BalanceSheetProps {
   readonly assets: readonly Secured[];
@@ -63,9 +65,11 @@ const groups = [
 
 // What the plan starts from, as one balance sheet: what the household
 // owns on the left, what it owes on the right, and the starting net
-// worth ruled off beneath both, worked out from the two totals and the
-// tax on the pensions counted as drawn at the basic rate, so it is read
-// as a sum rather than stated and is the net worth the plan opens on.
+// worth ruled off beneath both, worked out from the two totals, the
+// tax on the pensions counted as drawn at the basic rate, and the
+// estimated 18% capital gains tax on selling the GIAs above each owner's
+// exemption, so it is read as a sum rather than stated and is the net
+// worth the plan opens on.
 // The savings are grouped by kind,
 // each group under its subtotal, and numbered in the order they are
 // paid in when there are two or more, since that order runs across the
@@ -108,7 +112,9 @@ export function BalanceSheet({
   const secured = balanceOf(loans);
   const unsecured = balanceOf(debts);
   const pensions = balanceOf(savings.filter(isPension));
+  const gias = savings.filter(isGia);
   const tax = drawingTaxOf(savings);
+  const giaTax = giaTaxOf(savings);
   const isOrdered = savings.length > 1;
 
   return (
@@ -224,8 +230,19 @@ export function BalanceSheet({
                 figure: formatGbp(negated(tax)),
                 label: "Tax on drawing the pensions",
               },
+              ...(gias.length > 0
+                ? [
+                    {
+                      detail: `${formatGbp(balanceOf(gias))} in GIAs counted as sold at the basic 18% capital gains rate above each owner's ${formatGbp(cgtAllowance)} allowance`,
+                      figure: formatGbp(negated(giaTax)),
+                      label: "Tax on selling the GIAs",
+                    },
+                  ]
+                : []),
             ]}
-            total={formatGbp(saved + worth + secured + unsecured - tax)}
+            total={formatGbp(
+              saved + worth + secured + unsecured - tax - giaTax,
+            )}
             totalName="Starting net worth"
           />
         </div>
@@ -245,6 +262,9 @@ function aboutOf(
 ): JSX.Element | undefined {
   const said = [
     owners.find(({ id }) => id === account.owner)?.name,
+    isGia(account) && account.costBasis !== undefined
+      ? `cost ${formatGbp(account.costBasis)}`
+      : undefined,
     account.growth.kind === "fixed" ? growthOf(account) : undefined,
     account.isDroppable === true ? "dropped when short" : undefined,
   ].filter((part) => part !== undefined);

@@ -315,6 +315,7 @@ describe("the schedule actions", () => {
           cadence: "year",
           cap: 0,
           contribution: 28512,
+          costBasis: 0,
           funding: "fixed",
           growth: "plan",
           isDroppable: false,

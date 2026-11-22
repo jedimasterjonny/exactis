@@ -8,6 +8,21 @@ import { inflationIn } from "@/data/plan";
 import { yearly } from "@/lib/cadence";
 import { keptIn } from "@/lib/maps";
 
+// Where an owner's capital gains tax stands in a tax year: losses
+// brought forward from earlier years, the annual exempt amount for the
+// year, net gains (or losses, negative) already realised in the year,
+// the owner's taxable income (non-savings and dividends combined) and
+// gross relief-at-source pension payments over the stretch, and the
+// stretch of the tax year whose bands apply.
+export interface CgtStanding {
+  readonly carriedLoss: number;
+  readonly exempt: number;
+  readonly gainsSoFar: number;
+  readonly income: number;
+  readonly relieved: number;
+  readonly stretch: Stretch;
+}
+
 // A draw on a pension: what leaves it, what is left of that once taxed,
 // and the two parts the tax reads it as, the quarter that is free of tax
 // while the lump sum allowance lasts and the rest, which is taxed as
@@ -17,6 +32,17 @@ export interface Draw {
   readonly net: number;
   readonly taxable: number;
   readonly taxFree: number;
+}
+
+// A draw on a GIA: what is sold, the pooled cost basis disposed with
+// it, the realised gain (negative for a loss), the capital gains tax
+// charged on it, and the net cash left after tax.
+export interface GiaDraw {
+  readonly disposedBasis: number;
+  readonly gain: number;
+  readonly gross: number;
+  readonly net: number;
+  readonly tax: number;
 }
 
 // Where a draw on a pension stands when it is taxed: what is left of the
@@ -116,6 +142,27 @@ export const april = 3;
 // counted as drawn at.
 const basicRate = 0.2;
 
+// The annual exempt amount for capital gains tax per person per tax
+// year, frozen in nominal pounds as the other statutory allowances are.
+export const cgtAllowance = 3000;
+
+// Capital gains tax rates for individuals (holding through 2026/27):
+// 18% within the unused basic rate band and 24% above it.
+const cgtRates = { basic: 0.18, higher: 0.24 } as const;
+
+// The dividend nil-rate band per person per tax year, frozen in nominal
+// pounds. It taxes the first £500 of taxable dividends at 0% while
+// still consuming the income tax bands it sits in.
+const dividendAllowance = 500;
+
+// UK dividend tax rates for 2026/27 outside Scotland: 10.75% basic,
+// 35.75% higher and 39.35% additional.
+const dividendRates = {
+  additional: 0.3935,
+  basic: 0.1075,
+  higher: 0.3575,
+} as const;
+
 // The employer's National Insurance on pay, fifteen per cent from April
 // 2025, which a salary sacrifice saves the employer on the NI-exempt
 // portion of what is given up and which a scheme that reclaims it pays
@@ -198,6 +245,33 @@ export function bandTopsOn(stretch: Stretch): readonly number[] {
   });
 }
 
+// Capital gains tax on a net gain for a tax year (or year to date):
+// nothing on losses or gains within the annual exempt amount plus
+// brought-forward losses, then 18% on gains fitting inside the unused
+// basic rate band above the owner's taxable income, and 24% above it.
+// Personal allowance never shelters capital gains.
+export function capitalGainsTaxOn(
+  gain: number,
+  {
+    carriedLoss,
+    exempt,
+    income,
+    relieved,
+    stretch,
+  }: Omit<CgtStanding, "gainsSoFar">,
+): number {
+  checkCharge(stretch, carriedLoss, exempt, income, relieved);
+  if (!Number.isFinite(gain)) {
+    throw new Error("A tax is charged on nothing or more");
+  }
+  const taxableGain = Math.max(0, gain - exempt - carriedLoss);
+  if (taxableGain === 0) {
+    return 0;
+  }
+  const basic = Math.min(taxableGain, basicRoomOf(income, stretch, relieved));
+  return basic * cgtRates.basic + (taxableGain - basic) * cgtRates.higher;
+}
+
 // The draw that leaves `net` once it is taxed, grossed up through the
 // bands from where the income below it stands, or by the charge alone
 // before the pension age.
@@ -233,6 +307,125 @@ export function drawOf(gross: number, standing: Standing): Draw {
   return { gross, net: gross - tax, taxable, taxFree };
 }
 
+// The GIA sale that leaves `net` after capital gains tax, grossed up
+// across the three piecewise-linear segments (0% within remaining
+// exemption and losses, 18% within remaining basic rate band, 24%
+// above). When the GIA stands at or below its cost basis no CGT is
+// owed and the gross sale equals `net`.
+export function giaDrawFor(
+  net: number,
+  {
+    balance,
+    costBasis,
+    standing,
+  }: {
+    readonly balance: number;
+    readonly costBasis: number;
+    readonly standing: CgtStanding;
+  },
+): GiaDraw {
+  checkCharge(
+    standing.stretch,
+    net,
+    balance,
+    costBasis,
+    standing.carriedLoss,
+    standing.exempt,
+    standing.income,
+    standing.relieved,
+  );
+  if (!Number.isFinite(standing.gainsSoFar)) {
+    throw new Error("A tax is charged on nothing or more");
+  }
+  if (net === 0 || balance === 0) {
+    return { disposedBasis: 0, gain: 0, gross: 0, net: 0, tax: 0 };
+  }
+  const ratio = (balance - costBasis) / balance;
+  if (ratio <= 0) {
+    return giaDrawOf(net, { balance, costBasis, standing });
+  }
+  const freeHeadroom = Math.max(
+    0,
+    standing.exempt + standing.carriedLoss - standing.gainsSoFar,
+  );
+  const usedTaxable = Math.max(
+    0,
+    standing.gainsSoFar - standing.exempt - standing.carriedLoss,
+  );
+  const basicRoom = basicRoomOf(
+    standing.income,
+    standing.stretch,
+    standing.relieved,
+  );
+  const basicHeadroom = Math.max(0, basicRoom - usedTaxable);
+  const take = (
+    need: number,
+    gainRoom: number,
+    rate: number,
+  ): { readonly gross: number; readonly left: number } => {
+    const kept = 1 - ratio * rate;
+    const maxGross = gainRoom / ratio;
+    const maxNet = maxGross * kept;
+    return need <= maxNet
+      ? { gross: need / kept, left: 0 }
+      : { gross: maxGross, left: need - maxNet };
+  };
+  const free = take(net, freeHeadroom, 0);
+  const basic = take(free.left, basicHeadroom, cgtRates.basic);
+  const higher = basic.left / (1 - ratio * cgtRates.higher);
+  return giaDrawOf(free.gross + basic.gross + higher, {
+    balance,
+    costBasis,
+    standing,
+  });
+}
+
+// What selling `gross` out of a GIA holding `balance` with pooled
+// `costBasis` leaves after marginal capital gains tax on top of gains
+// already realised in the tax year.
+export function giaDrawOf(
+  gross: number,
+  {
+    balance,
+    costBasis,
+    standing,
+  }: {
+    readonly balance: number;
+    readonly costBasis: number;
+    readonly standing: CgtStanding;
+  },
+): GiaDraw {
+  checkCharge(
+    standing.stretch,
+    gross,
+    balance,
+    costBasis,
+    standing.carriedLoss,
+    standing.exempt,
+    standing.income,
+    standing.relieved,
+  );
+  if (!Number.isFinite(standing.gainsSoFar)) {
+    throw new Error("A tax is charged on nothing or more");
+  }
+  const disposedBasis = balance > 0 ? costBasis * (gross / balance) : 0;
+  const gain = gross - disposedBasis;
+  const tax =
+    gain <= 0
+      ? 0
+      : capitalGainsTaxOn(standing.gainsSoFar + gain, standing) -
+        capitalGainsTaxOn(standing.gainsSoFar, standing);
+  return { disposedBasis, gain, gross, net: gross - tax, tax };
+}
+
+// Conservative net realisable value of a GIA (charging the higher 24%
+// CGT rate on its full unrealised gain with no exempt amount), used as
+// the reserve available to keep a pension paid so a month never promises
+// more than selling the GIA can deliver after tax.
+export function giaReserveOf(balance: number, costBasis: number): number {
+  return balance - Math.max(0, balance - costBasis) * cgtRates.higher;
+}
+
 // The draw that adds `room` to what is taxed as income, and nothing for
 // room at or below nothing: a third more than the room while the lump
 // sum `allowance` lasts, since a quarter of the draw is free, and a
@@ -257,17 +450,52 @@ export function grossRelievedOf(relief: number): number {
 // contribution paid out of taxed money and relieved at source extends
 // the basic and higher rate limits and reduces the adjusted net income
 // the personal allowance is withdrawn against, shifting every band
-// past the personal allowance up by that gross sum.
+// past the personal allowance up by that gross sum. When `dividends`
+// are present, they count toward adjusted net income for the personal
+// allowance withdrawal, absorb any unused personal allowance, and stack
+// above non-savings income with a £500 nil-rate band (scaled by the
+// stretch's months) that consumes the bands it sits in, taxed at
+// 10.75% / 35.75% / 39.35% for 2026/27.
 export function incomeTaxOn(
   taxable: number,
   stretch: Stretch,
-  relieved = 0,
+  {
+    dividends = 0,
+    relieved = 0,
+  }: { readonly dividends?: number; readonly relieved?: number } = {},
 ): number {
-  checkCharge(stretch, taxable, relieved);
+  checkCharge(stretch, taxable, relieved, dividends);
   const share = shareOf(stretch);
-  return relieved === 0
-    ? chargedOn(incomeTax, taxable, share)
-    : chargedOn(incomeBands(share, relieved), taxable, 1);
+  if (dividends === 0) {
+    return relieved === 0
+      ? chargedOn(incomeTax, taxable, share)
+      : chargedOn(incomeBands(share, relieved), taxable, 1);
+  }
+  const pa = personalAllowanceOf(taxable + dividends, share, relieved);
+  const nonSavings = Math.max(0, taxable - pa);
+  const taxableDividends = Math.max(0, dividends - Math.max(0, pa - taxable));
+  const basicWidth = (50270 - 12570) * share + relieved;
+  const additionalAt = 125140 * share + relieved;
+  const nonSavingsTax = slicedOn(
+    [
+      { from: 0, rate: 0.2 },
+      { from: basicWidth, rate: 0.4 },
+      { from: additionalAt, rate: 0.45 },
+    ],
+    0,
+    nonSavings,
+  );
+  const free = dividendAllowance * (stretch.months / 12);
+  const dividendTax = slicedOn(
+    [
+      { from: 0, rate: dividendRates.basic },
+      { from: basicWidth, rate: dividendRates.higher },
+      { from: additionalAt, rate: dividendRates.additional },
+    ],
+    nonSavings + Math.min(taxableDividends, free),
+    nonSavings + taxableDividends,
+  );
+  return nonSavingsTax + dividendTax;
 }
 
 // The National Insurance a kind of income pays on what a stretch of the
@@ -309,6 +537,17 @@ export function isWithinAllowance(values: AccountValues): boolean {
     most === null ||
     yearly(values.contribution, values.cadence) <= most
   );
+}
+
+// What an owner's GIAs leave counted as sold at the basic rate of
+// capital gains tax (18%), above one year's annual exempt amount.
+export function keptGiaOf(
+  balance: number,
+  costBasis: number,
+  exempt: number,
+): number {
+  const gain = Math.max(0, balance - costBasis);
+  return balance - Math.max(0, gain - exempt) * cgtRates.basic;
 }
 
 // What a pension of `gross` leaves counted as drawn at the basic rate:
@@ -438,6 +677,22 @@ export function upratingIn(
   );
 }
 
+// How much of the basic rate band remains unused above an owner's
+// taxable income over a stretch of the tax year, with gross relieved
+// pension contributions widening the band and lifting the £100,000
+// personal allowance withdrawal threshold.
+function basicRoomOf(
+  income: number,
+  stretch: Stretch,
+  relieved: number,
+): number {
+  const share = shareOf(stretch);
+  const pa = personalAllowanceOf(income, share, relieved);
+  const taxableIncome = Math.max(0, income - pa);
+  const basicWidth = (50270 - 12570) * share + relieved;
+  return Math.max(0, basicWidth - taxableIncome);
+}
+
 // What the bands charge on a share of them: each band's rate on the
 // part of the amount between where it starts and where the next one
 // does, both taken as that share of the year's figures.
@@ -536,8 +791,32 @@ function incomeBands(share: number, relieved: number): readonly Band[] {
   }));
 }
 
+// Effective personal allowance for a stretch after withdrawing £1 for
+// every £2 of adjusted net income (total income less gross relieved
+// pension contributions) above £100,000 scaled to the stretch.
+function personalAllowanceOf(
+  income: number,
+  share: number,
+  relieved: number,
+): number {
+  return Math.max(
+    0,
+    12570 * share - Math.max(0, income - (100000 * share + relieved)) / 2,
+  );
+}
+
 // The share of each band's yearly figure a stretch of the year meets: a
 // twelfth a month of the figures as they have risen.
 function shareOf({ months, uprating }: Stretch): number {
   return (months / 12) * uprating;
+}
+
+// What the bands charge across the slice `[from, to]` in post-personal-
+// allowance taxable income space.
+function slicedOn(bands: readonly Band[], from: number, to: number): number {
+  return bands.reduce((sum, { from: start, rate }, index) => {
+    const end = bands[index + 1]?.from ?? Number.POSITIVE_INFINITY;
+    const slice = Math.max(0, Math.min(to, end) - Math.max(from, start));
+    return sum + rate * slice;
+  }, 0);
 }

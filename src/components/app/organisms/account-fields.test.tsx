@@ -14,6 +14,7 @@ const isa: AccountValues = {
   cadence: "month",
   cap: 0,
   contribution: 500,
+  costBasis: 0,
   funding: "fixed",
   growth: "plan",
   isDroppable: false,
@@ -245,9 +246,15 @@ describe("AccountFields", () => {
   });
 
   // A GIA is offered after the wrappers and before cash, and is asked
-  // what cash is asked: no owner, and a cap with no allowance beneath it.
-  it("offers a GIA between the ISA and cash, and asks it no owner and no allowance", () => {
-    renderFields({ ...isa, funding: "spare", kind: "taxable", owner: null });
+  // its owner and cost basis, and a cap with no allowance beneath it.
+  it("offers a GIA between the ISA and cash, with an owner, a cost basis and no allowance", () => {
+    const { onAmend } = renderFields({
+      ...isa,
+      costBasis: 10000,
+      funding: "spare",
+      kind: "taxable",
+      owner: 1,
+    });
 
     expect(
       within(screen.getByRole("combobox", { name: "Type" }))
@@ -264,12 +271,20 @@ describe("AccountFields", () => {
     expect(screen.getByRole("combobox", { name: "Type" })).toHaveValue(
       "taxable",
     );
+    expect(screen.getByRole("combobox", { name: "Owner" })).toHaveValue("1");
+    expect(screen.getByRole("textbox", { name: "Cost basis" })).toHaveValue(
+      "£10,000",
+    );
     expect(
-      screen.queryByRole("combobox", { name: "Owner" }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("textbox", { name: "Cost basis" }),
+    ).toHaveAccessibleDescription("What was paid in, for CGT");
     expect(
       screen.getByRole("textbox", { name: "Cap, a year" }),
     ).not.toHaveAccessibleDescription();
+
+    commit(screen.getByRole("textbox", { name: "Cost basis" }), "8,500");
+
+    expect(onAmend).toHaveBeenCalledExactlyOnceWith({ costBasis: 8500 });
   });
 
   it("locks the treatment when given a reason, and says it", () => {
