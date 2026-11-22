@@ -167,6 +167,7 @@ export interface Kept {
 // What the plan comes to under one split the glide path holds: its
 // rate, the split itself, and how far it strays.
 interface AtSplit {
+  readonly dividendYield: number;
   readonly rate: number;
   readonly split: Allocation;
   readonly spread: Shortfall | Spread;
@@ -695,6 +696,8 @@ const plan = z
     born: z.number().int(),
     byYear: z.array(z.number().min(-1, rules.beyondLoss)).exactOptional(),
     children: z.array(child).exactOptional(),
+    dividendYield: z.number().nonnegative().exactOptional(),
+    dividendYieldByYear: z.array(z.number().nonnegative()).exactOptional(),
     drawdown: z.enum(drawdowns).exactOptional(),
     from: z.number().int(),
     inflation: z.number().gt(-1, rules.inflation),
@@ -1225,6 +1228,7 @@ function glidedOf(
     }
     const held = liveOf(kept, bonds);
     const atSplit = {
+      dividendYield: held.allocation.stocks * held.rates.dividends,
       rate: planRate(held.rates, held.allocation, held.rebalancing),
       split: held.allocation,
       spread: spreadOf(kept, held),
@@ -1236,8 +1240,19 @@ function glidedOf(
   const years = Array.from({ length: plan.years }, (_, offset) =>
     atSplitIn(plan.from + offset),
   );
+  const base: { -readonly [TKey in keyof Plan]: Plan[TKey] } = { ...plan };
+  delete base.dividendYield;
+  const hasDividends = years.some(({ dividendYield }) => dividendYield > 0);
   return {
-    plan: { ...plan, byYear: years.map(({ rate }) => rate), rate: now.rate },
+    plan: {
+      ...base,
+      byYear: years.map(({ rate }) => rate),
+      ...(hasDividends && {
+        dividendYield: now.dividendYield,
+        dividendYieldByYear: years.map(({ dividendYield }) => dividendYield),
+      }),
+      rate: now.rate,
+    },
     split: now.split,
     spread: straysAlong(
       now.spread,

@@ -14,7 +14,13 @@ import { atAge, retiringAt, timed } from "@/data/milestones";
 import { sam, working } from "@/data/owners.fixture";
 import { endYear } from "@/data/plan";
 import { statePensionLines } from "@/data/state-pension";
-import { cgtAllowance, drawFor, drawOf, lumpSumAllowance } from "@/lib/tax";
+import {
+  cgtAllowance,
+  drawFor,
+  drawOf,
+  incomeTaxOn,
+  lumpSumAllowance,
+} from "@/lib/tax";
 
 import type { Schedule } from "./cash-flow";
 import type { ProjectionPoint, Run } from "./projection";
@@ -1020,6 +1026,223 @@ describe("project", () => {
     expect(capped?.uncovered).toBe(0);
     expect(capped?.balances[10]).toBe(240);
     expect(capped?.deferred).toBe(760 + 60);
+  });
+
+  // A plan-rate GIA accrues monthly dividends from the portfolio's
+  // equity yield, uplifts its cost basis as dividends are reinvested,
+  // and settles annual dividend tax in April; a fixed-rate GIA earns no
+  // dividends, and a glide path tapers the dividend yield by year.
+  it("accrues GIA dividends on plan-rate accounts, uplifts cost basis, and settles dividend tax in April", () => {
+    const planGia: Account = {
+      balance: 100000,
+      costBasis: 100000,
+      growth: { kind: "plan" },
+      id: 10,
+      kind: "taxable",
+      name: "Plan GIA",
+      owner: 1,
+    };
+    const fixedGia: Account = {
+      balance: 100000,
+      costBasis: 100000,
+      growth: { kind: "fixed", rate: 0 },
+      id: 11,
+      kind: "taxable",
+      name: "Fixed GIA",
+      owner: 1,
+    };
+    const cashBag: Account = { ...pocket, balance: 10000, id: 3, name: "Cash" };
+    // Salary of £20,000 fills personal allowance and sits in basic band;
+    // £100,000 plan GIA at 0% growth and 3% dividend yield accrues £3,000
+    // of dividends across 12 months (April 2026 - March 2027), uplifting
+    // its cost basis to £103,000 and owing (£3,000 - £500) * 10.75% =
+    // £268.75 of dividend tax in April 2027. Fixed GIA accrues £0.
+    const salaryLine: IncomeLine = {
+      ...salary,
+      amount: 20000,
+      bonus: 0,
+      cadence: "year",
+      feeds: null,
+      kind: "pension",
+      lastYear: null,
+      match: 0,
+      name: "Pension income",
+      rsu: 0,
+      sacrifice: 0,
+    };
+    const dividendPlan: Plan = {
+      ...plan,
+      dividendYield: 0.03,
+      month: 3,
+      rate: 0,
+      years: 2,
+    };
+    const points = project(
+      [cashBag, planGia, fixedGia],
+      {
+        expenses: [
+          {
+            ...household,
+            amount: 20000 - incomeTaxOn(20000, { months: 12, uprating: 1 }),
+            cadence: "year",
+            growth: "nominal",
+          },
+        ],
+        income: [salaryLine],
+      },
+      dividendPlan,
+    );
+
+    // By April 2027 (opening of year 2027 has Jan-Mar 2027 yet to settle;
+    // by opening of 2028, April 2027 settled the 2026/27 tax year).
+    expect(points[1]?.bases[10]).toBeCloseTo(100000 + (3000 * 9) / 12, 0);
+    expect(points[1]?.bases[11]).toBe(100000);
+    expect(points[2]?.bases[10]).toBeCloseTo(100000 + (3000 * 21) / 12, 0);
+    expect(points[2]?.bases[11]).toBe(100000);
+    expect(points[2]?.balances[3]).toBeCloseTo(10000 - 2500 * 0.1075, 0);
+
+    // Glide path yield by year tapers dividends down in year 2.
+    const tapered = project(
+      [cashBag, planGia],
+      { expenses: [], income: [] },
+      { ...dividendPlan, dividendYieldByYear: [0.03, 0.01] },
+    );
+
+    expect(tapered[2]?.bases[10]).toBeCloseTo(
+      100000 + (3000 * 9) / 12 + 1000,
+      0,
+    );
+  });
+
+  // Dividends stack with non-savings income and consume basic-rate band
+  // room before capital gains realised in the same tax year.
+  it("reduces CGT basic-rate room by dividends accrued earlier in the tax year", () => {
+    const fixedGia: Account = {
+      balance: 100000,
+      costBasis: 0,
+      growth: { kind: "fixed", rate: 0 },
+      id: 10,
+      kind: "taxable",
+      name: "Fixed GIA",
+      owner: 1,
+    };
+    const planGia: Account = {
+      balance: 100000,
+      costBasis: 100000,
+      growth: { kind: "plan" },
+      id: 11,
+      kind: "taxable",
+      name: "Plan GIA",
+      owner: 1,
+    };
+    const basePlan: Plan = { ...plan, month: 3, rate: 0, years: 2 };
+    // Salary £48,000/yr leaves £1,891.67 of YTD basic-rate room by
+    // January 2027 (10 months). Drawing £10,000 net from fixedGia in
+    // January 2027 (100% gain):
+    // - Without dividends: £3,000 AEA + £1,891.67 @ 18% (£1,551.17 net)
+    //   + £5,448.83 / 0.76 = £7,169.51 @ 24% -> £12,061.18 sold, leaving
+    //   £87,939.
+    // - With 4% dividend yield on planGia (£3,000 accrued Apr–Dec): YTD
+    //   basic room is £0, so £3,000 AEA + £7,000 / 0.76 = £12,210.53 is
+    //   sold in Jan (£149.35 more CGT), plus £808.75 dividend tax drawn
+    //   from fixedGia in April 2027 (inside 2027/28 AEA) -> £86,981 left.
+    const schedule = {
+      expenses: [
+        {
+          ...household,
+          amount: 48000 - incomeTaxOn(48000, { months: 12, uprating: 1 }),
+          cadence: "year" as const,
+          growth: "nominal" as const,
+        },
+        {
+          ...household,
+          amount: 10000,
+          cadence: "month" as const,
+          firstYear: 2027,
+          growth: "nominal" as const,
+          id: 99,
+          lastMonth: 0,
+          lastYear: 2027,
+        },
+      ],
+      income: [
+        {
+          ...salary,
+          amount: 48000,
+          bonus: 0,
+          cadence: "year" as const,
+          feeds: null,
+          kind: "pension" as const,
+          lastYear: null,
+          match: 0,
+          name: "Pension",
+          rsu: 0,
+          sacrifice: 0,
+        },
+      ],
+    };
+    const withoutDividends = project([fixedGia, planGia], schedule, basePlan);
+    const withDividends = project([fixedGia, planGia], schedule, {
+      ...basePlan,
+      dividendYield: 0.04,
+    });
+
+    expect(withoutDividends.every((p) => p.uncovered === 0)).toBe(true);
+    expect(withDividends.every((p) => p.uncovered === 0)).toBe(true);
+    expect(withoutDividends[2]?.balances[10]).toBe(87939);
+    expect(withDividends[2]?.balances[10]).toBe(86981);
+    expect(withDividends[2]?.bases[11]).toBe(
+      Math.round(100000 + (4000 * 21) / 12),
+    );
+  });
+
+  // Band-filling pension drawdowns count accrued GIA dividends in the
+  // tax year so far, leaving room inside the basic-rate band rather
+  // than pushing dividends into the 35.75% higher rate.
+  it("leaves room for accrued GIA dividends when band-filling from a pension", () => {
+    const retiredPlan: Plan = {
+      ...bornIn(1966),
+      drawdown: "pension-to-basic-rate",
+      month: 3,
+      rate: 0,
+      years: 2,
+    };
+    const pensionPot: Account = {
+      ...sipp,
+      balance: 200000,
+      growth: { kind: "fixed", rate: 0 },
+      id: 6,
+      owner: 1,
+    };
+    const isaPot: Account = { ...flatIsa, balance: 200000, id: 2, owner: 1 };
+    const planGia: Account = {
+      balance: 200000,
+      costBasis: 200000,
+      growth: { kind: "plan" },
+      id: 10,
+      kind: "taxable",
+      name: "Plan GIA",
+      owner: 1,
+    };
+    const living: Schedule = {
+      expenses: [
+        { ...household, amount: 5000, cadence: "month", growth: "nominal" },
+      ],
+      income: [],
+    };
+    const noDiv = project([pensionPot, isaPot, planGia], living, retiredPlan);
+    const withDiv = project([pensionPot, isaPot, planGia], living, {
+      ...retiredPlan,
+      dividendYield: 0.03,
+    });
+
+    // Without dividends, pension fills the full £50,270 basic band each
+    // year (drawing £67,027 gross in 2026/27). With £6,000/yr of GIA
+    // dividends (£500/mo), pension draws less so dividends stay inside
+    // the basic-rate band rather than spilling into 35.75%.
+    expect(withDiv[2]?.balances[6]).toBeGreaterThan(
+      (noDiv[2]?.balances[6] ?? 0) + 5000,
+    );
   });
 
   it("refuses a GIA without a cost basis, a non-GIA with one, and a cost basis below nothing", () => {

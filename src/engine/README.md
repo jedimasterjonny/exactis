@@ -262,20 +262,30 @@ personal allowance is withdrawn is charged 45% on pay its year is charged 60%
 on, so the year can owe. So the run carries each owner's tax year, April to
 April, what its months were taxed on, what they paid into pensions out of taxed
 money with relief and what they were charged. In the April after, each owner's
-year is worked out whole: their income tax on everything their months earned and
-drew from their pensions, with the gross relieved payments extending their basic
-and higher rate limits and reducing the adjusted net income the personal
-allowance is withdrawn against, and their Class 4 on all their profit, each
-against as much of each band as the months the plan held of the year, as the
-bands stood that year. What that comes to less what the months paid is refunded
-into April's money or owed out of it, every owner's together, since the month's
-money is the household's. It comes in as income does, untaxed, and is spent,
-saved or drawn for with the rest. Class 4 is settled with the income tax since
-it too is due on the year's profit rather than a month's; Class 1 is charged a
-pay period at a time, as the months charge it, and is not settled. The plan's
-first tax year is the months of it the plan holds, against their share of each
-band, and its last is cut off where the plan ends and never settled. A month
-read on its own settles nothing.
+year is worked out whole: their income tax on everything their months earned,
+drew from their pensions and accrued as dividends on plan-rate GIAs, with the
+gross relieved payments extending their basic and higher rate limits and
+reducing the adjusted net income the personal allowance is withdrawn against,
+their capital gains tax on net realised GIA gains, and their Class 4 on all
+their profit, each against as much of each band as the months the plan held of
+the year, as the bands stood that year. Dividends accrue monthly on a plan-rate
+GIA at a twelfth of the portfolio's equity dividend yield (following any glide
+path; a fixed-rate GIA earns no dividend yield), count toward adjusted net
+income for the personal allowance withdrawal, absorb any unused personal
+allowance, and stack above non-savings income under a £500 nil-rate allowance
+(frozen in nominal pounds and scaled by the plan's share of the opening tax
+year) that consumes the bands it sits in, taxed at 10.75%, 35.75% and 39.35% for
+2026/27. Because every plan-rate account reinvests its dividends, each month's
+GIA dividends also raise that GIA's Section 104 cost basis so they are not taxed
+again on sale. What that comes to less what the months paid is refunded into
+April's money or owed out of it, every owner's together, since the month's money
+is the household's. It comes in as income does, untaxed, and is spent, saved or
+drawn for with the rest. Class 4 is settled with the income tax since it too is
+due on the year's profit rather than a month's; Class 1 is charged a pay period
+at a time, as the months charge it, and is not settled. The plan's first tax
+year is the months of it the plan holds, against their share of each band, and
+its last is cut off where the plan ends and never settled. A month read on its
+own settles nothing.
 
 The bands are frozen until April 2031 and are held so: flat in pounds through
 the 2030/31 tax year, so an income rising with prices is dragged into a higher
@@ -416,14 +426,14 @@ one month is counted once rather than twelve times over: the adjusted income is
 that pay after the sacrifice with what the salaries land in the pension on top,
 and the threshold income is that pay with the sacrifice counted back in. What is
 paid into a pension out of taxed money is not taken off the threshold income, so
-an owner within those payments of £200,000 is tapered a little early. Once an
-owner has drawn on a pension as income, a flexible access, their pension
-allowance is the money purchase one, £10,000, from the month after for the rest
-of the plan, whatever their incomes, and what the tax year has landed already
-counts against it, so an owner who paid £10,000 in before the draw has no room
-left that year and every pound a salary feeds after it is charged; a draw before
-the pension age is an unauthorised payment rather than an access, and does not
-do that.
+an owner within those payments of £200,000 is tapered a little early, and GIA
+dividends are left out of both incomes as pension draws are. Once an owner has
+drawn on a pension as income, a flexible access, their pension allowance is the
+money purchase one, £10,000, from the month after for the rest of the plan,
+whatever their incomes, and what the tax year has landed already counts against
+it, so an owner who paid £10,000 in before the draw has no room left that year
+and every pound a salary feeds after it is charged; a draw before the pension
+age is an unauthorised payment rather than an access, and does not do that.
 
 A fixed sum or the spare money paid into a pension comes out of taxed money
 instead, so the pension claims the basic rate back on it, and £800 paid lands as
@@ -619,20 +629,21 @@ the year, rather than as a fresh twelfth each month: the share of the band for
 the months the plan has held of the year, this one among them, plus for the
 basic rate band any gross relief-at-source pension contributions made in those
 months, less everything the owner has been taxed on in them, this month's income
-and draws included. So a year whose salary stopped part-way, having used the
-band already, fills nothing until the months catch it up, rather than drawing at
-20% what April charges at 40%; and a month after one that drew less than its
-share catches up, charged as a twelfth of a year as every month is, which is too
-much, and refunded the excess in April, as a bonus month is. Income later in the
-tax year, such as a State Pension starting in January, is not foreseen, so a
-band filled before it starts is overfilled once it does, and April charges what
-is over. The room is what may be taxed, so while the owner's lump sum allowance
-lasts the draw is a third more than the room, a quarter of it being free, and a
-pound for a pound once the allowance is used up, exactly where it runs out
-part-way through a draw. Room of less than a penny is none, since a draw on a
-pension marks its owner as having drawn on one as income, which holds what is
-paid into their pensions to the money purchase allowance from then on, and the
-residue of the arithmetic, or a few pence, is no reason to.
+and draws and accrued GIA dividends included. So a year whose salary stopped
+part-way, having used the band already, fills nothing until the months catch it
+up, rather than drawing at 20% what April charges at 40%; and a month after one
+that drew less than its share catches up, charged as a twelfth of a year as
+every month is, which is too much, and refunded the excess in April, as a bonus
+month is. Income later in the tax year, such as a State Pension starting in
+January, is not foreseen, so a band filled before it starts is overfilled once
+it does, and April charges what is over. The room is what may be taxed, so while
+the owner's lump sum allowance lasts the draw is a third more than the room, a
+quarter of it being free, and a pound for a pound once the allowance is used up,
+exactly where it runs out part-way through a draw. Room of less than a penny is
+none, since a draw on a pension marks its owner as having drawn on one as
+income, which holds what is paid into their pensions to the money purchase
+allowance from then on, and the residue of the arithmetic, or a few pence, is no
+reason to.
 
 A pension is drawn as income, where its kind falls in the order, from its
 owner's pension age: from the year the owner the pension belongs to turns 55
@@ -648,19 +659,19 @@ registered scheme will not normally make one, so the run marks such a draw
 rather than counting on it, under The run.
 
 Cash and the ISA give up what the month is short. A GIA carries its pooled
-Section 104 cost basis (raised by every contribution paid into it, and reduced
-proportionally as units are sold). A draw on a GIA realises a gain or loss of
-the gross sale less the disposed share of its cost basis, and is grossed up so
-that what is left after marginal capital gains tax covers what the month is
-short: nothing on losses or within the owner's £3,000 annual exempt amount
-(scaled by the plan's share of the opening tax year and held whole thereafter)
-plus any carried-forward capital losses, 18% on taxable gains fitting inside the
-owner's unused basic-rate band above their taxable income (personal allowance
-never shelters capital gains), and 24% above it. Mid-year draws read the
-basic-rate band on the tax year's months elapsed so far alongside the full
-year's annual exempt amount; any difference from the full year's bands settles
-in April. What each draw realises and pays joins its owner's tax year and
-settles in April: a net capital loss for the year is carried forward
+Section 104 cost basis (raised by every contribution and reinvested dividend,
+and reduced proportionally as units are sold). A draw on a GIA realises a gain
+or loss of the gross sale less the disposed share of its cost basis, and is
+grossed up so that what is left after marginal capital gains tax covers what the
+month is short: nothing on losses or within the owner's £3,000 annual exempt
+amount (scaled by the plan's share of the opening tax year and held whole
+thereafter) plus any carried-forward capital losses, 18% on taxable gains
+fitting inside the owner's unused basic-rate band above their taxable income
+(personal allowance never shelters capital gains), and 24% above it. Mid-year
+draws read the basic-rate band on the tax year's months elapsed so far alongside
+the full year's annual exempt amount; any difference from the full year's bands
+settles in April. What each draw realises and pays joins its owner's tax year
+and settles in April: a net capital loss for the year is carried forward
 indefinitely, and brought-forward losses are consumed only against gains above
 the annual exempt amount so the exemption is never wasted. When measuring the
 reserve available to keep a pension paid, each GIA is counted conservatively
@@ -695,12 +706,12 @@ Everything an account states is in the pounds of the day, as a statement or an
 agreement gives it: its balance, its fixed sum, its cap and its rate, the plan
 rate among them, which is a nominal return. So are the figures the law sets and
 does not raise: the ISA and pension allowances, the lump sum allowance, the
-capital gains tax annual exempt amount (£3,000), the £3,600 of relief, the
-£2,000 salary sacrifice National Insurance cap from April 2029 and the stamp
-duty bands. Held so, an allowance shrinks in today's money over a plan of
-decades as prices rise, as it would if no government changed it again. The tax
-bands are held flat in pounds until their freeze ends, under The tax on the
-month.
+dividend allowance (£500), the capital gains tax annual exempt amount (£3,000),
+the £3,600 of relief, the £2,000 salary sacrifice National Insurance cap from
+April 2029 and the stamp duty bands. Held so, an allowance shrinks in today's
+money over a plan of decades as prices rise, as it would if no government
+changed it again. The tax bands are held flat in pounds until their freeze ends,
+under The tax on the month.
 
 A point divides every balance by how far prices have risen by the start of its
 year, and what the year went short or drew early by, a month at a time, by how

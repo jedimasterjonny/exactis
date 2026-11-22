@@ -150,6 +150,19 @@ export const cgtAllowance = 3000;
 // 18% within the unused basic rate band and 24% above it.
 const cgtRates = { basic: 0.18, higher: 0.24 } as const;
 
+// The dividend nil-rate band per person per tax year, frozen in nominal
+// pounds. It taxes the first £500 of taxable dividends at 0% while
+// still consuming the income tax bands it sits in.
+const dividendAllowance = 500;
+
+// UK dividend tax rates for 2026/27 outside Scotland: 10.75% basic,
+// 35.75% higher and 39.35% additional.
+const dividendRates = {
+  additional: 0.3935,
+  basic: 0.1075,
+  higher: 0.3575,
+} as const;
+
 // The employer's National Insurance on pay, fifteen per cent from April
 // 2025, which a salary sacrifice saves the employer on the NI-exempt
 // portion of what is given up and which a scheme that reclaims it pays
@@ -437,17 +450,52 @@ export function grossRelievedOf(relief: number): number {
 // contribution paid out of taxed money and relieved at source extends
 // the basic and higher rate limits and reduces the adjusted net income
 // the personal allowance is withdrawn against, shifting every band
-// past the personal allowance up by that gross sum.
+// past the personal allowance up by that gross sum. When `dividends`
+// are present, they count toward adjusted net income for the personal
+// allowance withdrawal, absorb any unused personal allowance, and stack
+// above non-savings income with a £500 nil-rate band (scaled by the
+// stretch's months) that consumes the bands it sits in, taxed at
+// 10.75% / 35.75% / 39.35% for 2026/27.
 export function incomeTaxOn(
   taxable: number,
   stretch: Stretch,
-  relieved = 0,
+  {
+    dividends = 0,
+    relieved = 0,
+  }: { readonly dividends?: number; readonly relieved?: number } = {},
 ): number {
-  checkCharge(stretch, taxable, relieved);
+  checkCharge(stretch, taxable, relieved, dividends);
   const share = shareOf(stretch);
-  return relieved === 0
-    ? chargedOn(incomeTax, taxable, share)
-    : chargedOn(incomeBands(share, relieved), taxable, 1);
+  if (dividends === 0) {
+    return relieved === 0
+      ? chargedOn(incomeTax, taxable, share)
+      : chargedOn(incomeBands(share, relieved), taxable, 1);
+  }
+  const pa = personalAllowanceOf(taxable + dividends, share, relieved);
+  const nonSavings = Math.max(0, taxable - pa);
+  const taxableDividends = Math.max(0, dividends - Math.max(0, pa - taxable));
+  const basicWidth = (50270 - 12570) * share + relieved;
+  const additionalAt = 125140 * share + relieved;
+  const nonSavingsTax = slicedOn(
+    [
+      { from: 0, rate: 0.2 },
+      { from: basicWidth, rate: 0.4 },
+      { from: additionalAt, rate: 0.45 },
+    ],
+    0,
+    nonSavings,
+  );
+  const free = dividendAllowance * (stretch.months / 12);
+  const dividendTax = slicedOn(
+    [
+      { from: 0, rate: dividendRates.basic },
+      { from: basicWidth, rate: dividendRates.higher },
+      { from: additionalAt, rate: dividendRates.additional },
+    ],
+    nonSavings + Math.min(taxableDividends, free),
+    nonSavings + taxableDividends,
+  );
+  return nonSavingsTax + dividendTax;
 }
 
 // The National Insurance a kind of income pays on what a stretch of the
@@ -639,9 +687,7 @@ function basicRoomOf(
   relieved: number,
 ): number {
   const share = shareOf(stretch);
-  const paFull = 12570 * share;
-  const taperAt = 100000 * share + relieved;
-  const pa = Math.max(0, paFull - Math.max(0, income - taperAt) / 2);
+  const pa = personalAllowanceOf(income, share, relieved);
   const taxableIncome = Math.max(0, income - pa);
   const basicWidth = (50270 - 12570) * share + relieved;
   return Math.max(0, basicWidth - taxableIncome);
@@ -745,8 +791,32 @@ function incomeBands(share: number, relieved: number): readonly Band[] {
   }));
 }
 
+// Effective personal allowance for a stretch after withdrawing £1 for
+// every £2 of adjusted net income (total income less gross relieved
+// pension contributions) above £100,000 scaled to the stretch.
+function personalAllowanceOf(
+  income: number,
+  share: number,
+  relieved: number,
+): number {
+  return Math.max(
+    0,
+    12570 * share - Math.max(0, income - (100000 * share + relieved)) / 2,
+  );
+}
+
 // The share of each band's yearly figure a stretch of the year meets: a
 // twelfth a month of the figures as they have risen.
 function shareOf({ months, uprating }: Stretch): number {
   return (months / 12) * uprating;
+}
+
+// What the bands charge across the slice `[from, to]` in post-personal-
+// allowance taxable income space.
+function slicedOn(bands: readonly Band[], from: number, to: number): number {
+  return bands.reduce((sum, { from: start, rate }, index) => {
+    const end = bands[index + 1]?.from ?? Number.POSITIVE_INFINITY;
+    const slice = Math.max(0, Math.min(to, end) - Math.max(from, start));
+    return sum + rate * slice;
+  }, 0);
 }

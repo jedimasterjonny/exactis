@@ -93,6 +93,8 @@ export interface Plan {
   readonly born: number;
   readonly byYear?: readonly number[];
   readonly children?: readonly Child[];
+  readonly dividendYield?: number;
+  readonly dividendYieldByYear?: readonly number[];
   readonly drawdown?: Drawdown;
   readonly from: number;
   readonly inflation: number;
@@ -326,9 +328,11 @@ export function planOf(
     throw new Error(rules.retiresWith);
   }
   const [only, ...rest] = owner.retirement;
+  const dividendYield = allocation.stocks * rates.dividends;
   return {
     born: owner.born,
     ...(children !== undefined && { children }),
+    ...(dividendYield > 0 && { dividendYield }),
     ...(drawdown !== undefined && { drawdown }),
     from: start.year,
     inflation: rates.inflation,
@@ -435,6 +439,16 @@ export function statedSpread(rate: number, logged: number): number {
 // the whole of the year counts, as it does there.
 export function yearAt(age: number, plan: Pick<Plan, "born">): number {
   return plan.born + age;
+}
+
+// The portfolio's yearly dividend yield in a year: the glide path's
+// equity share times the dividend yield for that year where a glide
+// path carries yields by year, or the plan's own dividend yield, or
+// nothing where none is set.
+export function yieldIn(plan: Plan, year: number): number {
+  return (
+    plan.dividendYieldByYear?.[year - plan.from] ?? plan.dividendYield ?? 0
+  );
 }
 
 // The owner the plan carries under an id, or a refusal in the words of

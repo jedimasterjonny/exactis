@@ -16,6 +16,7 @@ import {
   rateIn,
   retirementYear,
   risenBy,
+  yieldIn,
 } from "@/data/plan";
 import { rules } from "@/data/rules";
 import { statePensionLines } from "@/data/state-pension";
@@ -218,6 +219,7 @@ interface Moved {
 // capital gains tax each month was charged on its own. Each owner has
 // one, since a year is settled a person at a time.
 interface TaxYear {
+  readonly dividends: number;
   readonly gains: number;
   readonly months: number;
   readonly paid: number;
@@ -281,6 +283,7 @@ const penny = 0.01;
 // A tax year the plan holds no months of yet: an owner's as April opens,
 // and one the plan has not entered.
 const noMonths: TaxYear = {
+  dividends: 0,
   gains: 0,
   months: 0,
   paid: 0,
@@ -760,6 +763,22 @@ export function project(
         drawn = draw.drawn;
         due = 0;
         early += draw.early / risen;
+        const monthDividends = new Map<number, number>();
+        held = draw.held.map((entry) => {
+          const next = monthOf(entry, flow, { at, plan: carried.plan });
+          if (next.dividend > 0) {
+            const owner = holderOf(entry.account, plan).id;
+            monthDividends.set(
+              owner,
+              (monthDividends.get(owner) ?? 0) + next.dividend,
+            );
+          }
+          return {
+            account: entry.account,
+            balance: next.balance,
+            costBasis: next.costBasis,
+          };
+        });
         taxYears = new Map(
           plan.owners.map(({ id }) => {
             const taxYear = taxYears.get(id) ?? noMonths;
@@ -769,6 +788,7 @@ export function project(
             return [
               id,
               {
+                dividends: taxYear.dividends + (monthDividends.get(id) ?? 0),
                 gains: taxYear.gains + (draw.gains.get(id) ?? 0),
                 months: taxYear.months + 1,
                 paid:
@@ -784,14 +804,6 @@ export function project(
           }),
         );
         uncovered += draw.uncovered / risen;
-        held = draw.held.map((entry) => {
-          const next = monthOf(entry, flow, { at, plan: carried.plan });
-          return {
-            account: entry.account,
-            balance: next.balance,
-            costBasis: next.costBasis,
-          };
-        });
         owing = owing.map((entry) => ({
           account: entry.account,
           balance: monthOf(entry, flow, { at, plan: carried.plan }).balance,
@@ -1089,7 +1101,7 @@ function drawnFrom(
       carriedLoss: capitalLosses.get(owner.id) ?? 0,
       exempt: yearExempt,
       gainsSoFar: taxYear.gains + (monthGains.get(owner.id) ?? 0),
-      income: taxYear.taxable + (below.get(owner.id) ?? 0),
+      income: taxYear.taxable + taxYear.dividends + (below.get(owner.id) ?? 0),
       relieved: taxYear.relieved + relievedOf(relief, owner.id),
       stretch: { months: taxYear.months + 1, uprating },
     };
@@ -1117,11 +1129,13 @@ function drawnFrom(
   };
   const { bands, order } = drawdownSteps[plan.drawdown ?? "savings-first"];
   // What an owner is taxed on over the tax year so far, this month's
-  // income and draws among it, and the room a band has for them: a
-  // month's share of it for each month of the year the plan has held,
-  // this one among them, less that.
-  const taxedOf = (id: number): number =>
-    (taxYears.get(id) ?? noMonths).taxable + (below.get(id) ?? 0);
+  // income, draws and accrued GIA dividends among it, and the room a
+  // band has for them: a month's share of it for each month of the year
+  // the plan has held, this one among them, less that.
+  const taxedOf = (id: number): number => {
+    const taxYear = taxYears.get(id) ?? noMonths;
+    return taxYear.taxable + taxYear.dividends + (below.get(id) ?? 0);
+  };
   const penniesOf = (id: number): number => Math.round(taxedOf(id) * 100);
   const tops =
     bands === 0 ? [] : bandTopsOn({ months: 1, uprating }).slice(0, bands);
@@ -1359,6 +1373,7 @@ function monthOf(
 ): {
   readonly balance: number;
   readonly costBasis: number;
+  readonly dividend: number;
   readonly paid: number;
 } {
   const rate = rateOf(account, plan, at.year);
@@ -1370,6 +1385,10 @@ function monthOf(
       paid,
       month === undefined ? (1 + rate) ** (1 / 12) : 1 + month,
     );
+    const dividend =
+      isGia(account) && account.growth.kind === "plan"
+        ? (balance + paid) * (yieldIn(plan, at.year) / 12)
+        : 0;
     return {
       balance:
         account.limit === undefined
@@ -1379,7 +1398,8 @@ function monthOf(
               grown,
               account.limit * pricesIn(plan, monthAfter(at)),
             ),
-      costBasis: isGia(account) ? costBasis + paid : 0,
+      costBasis: isGia(account) ? costBasis + paid + dividend : 0,
+      dividend,
       paid,
     };
   }
@@ -1387,6 +1407,7 @@ function monthOf(
   return {
     balance: paidDown(balance, off, rate),
     costBasis: 0,
+    dividend: 0,
     paid: Math.min(off, Math.max(0, -balance * (1 + rate / 12))),
   };
 }
@@ -1697,13 +1718,16 @@ function settledYear(
     const cgt = capitalGainsTaxOn(taxYear.gains, {
       carriedLoss,
       exempt,
-      income: taxYear.taxable,
+      income: taxYear.taxable + taxYear.dividends,
       relieved: taxYear.relieved,
       stretch,
     });
     settlement +=
       taxYear.paid -
-      incomeTaxOn(taxYear.taxable, stretch, taxYear.relieved) -
+      incomeTaxOn(taxYear.taxable, stretch, {
+        dividends: taxYear.dividends,
+        relieved: taxYear.relieved,
+      }) -
       insuranceOn("self-employment", taxYear.profit, stretch) -
       cgt;
     if (taxYear.gains < 0) {

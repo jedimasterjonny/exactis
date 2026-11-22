@@ -285,25 +285,84 @@ describe("incomeTaxOn", () => {
   //   gross shifts the £100,540 basic-rate limit to £110,540, saving
   //   £2,000.
   it("extends the bands and restores the personal allowance for gross pension relief", () => {
-    expect(incomeTaxOn(15000, wholeYear, 10000)).toBeCloseTo(486, 10);
-    expect(incomeTaxOn(30000, wholeYear, 10000)).toBeCloseTo(3486, 10);
+    expect(incomeTaxOn(15000, wholeYear, { relieved: 10000 })).toBeCloseTo(
+      486,
+      10,
+    );
+    expect(incomeTaxOn(30000, wholeYear, { relieved: 10000 })).toBeCloseTo(
+      3486,
+      10,
+    );
     expect(
-      incomeTaxOn(60000, wholeYear) - incomeTaxOn(60000, wholeYear, 10000),
+      incomeTaxOn(60000, wholeYear) -
+        incomeTaxOn(60000, wholeYear, { relieved: 10000 }),
     ).toBeCloseTo(1946, 10);
     expect(
-      incomeTaxOn(120000, wholeYear) - incomeTaxOn(120000, wholeYear, 20000),
+      incomeTaxOn(120000, wholeYear) -
+        incomeTaxOn(120000, wholeYear, { relieved: 20000 }),
     ).toBeCloseTo(8000, 10);
     expect(
-      incomeTaxOn(150000, wholeYear) - incomeTaxOn(150000, wholeYear, 30000),
+      incomeTaxOn(150000, wholeYear) -
+        incomeTaxOn(150000, wholeYear, { relieved: 30000 }),
     ).toBeCloseTo(8271, 10);
     expect(
       incomeTaxOn(60000, { months: 6, uprating: 1 }) -
-        incomeTaxOn(60000, { months: 6, uprating: 1 }, 6000),
+        incomeTaxOn(60000, { months: 6, uprating: 1 }, { relieved: 6000 }),
     ).toBeCloseTo(2400, 10);
     expect(
       incomeTaxOn(120000, { months: 12, uprating: 2 }) -
-        incomeTaxOn(120000, { months: 12, uprating: 2 }, 10000),
+        incomeTaxOn(120000, { months: 12, uprating: 2 }, { relieved: 10000 }),
     ).toBeCloseTo(2000, 10);
+  });
+
+  // Dividends sit on top of non-savings income, absorb unused personal
+  // allowance, take a £500 nil-rate band that consumes the bands it sits
+  // in, count toward the £100,000 personal allowance withdrawal, and pay
+  // 10.75% / 35.75% / 39.35% for 2026/27.
+  it("taxes dividends on top of non-savings income with the £500 nil-rate band and personal allowance taper", () => {
+    // £10,000 non-savings + £3,070 dividends: £2,570 absorbs remaining PA,
+    // £500 uses dividend nil-rate band -> £0 tax.
+    expect(incomeTaxOn(10000, wholeYear, { dividends: 3070 })).toBe(0);
+    // £10,000 non-savings + £4,070 dividends: £1,000 taxed at 10.75% = £107.50.
+    expect(incomeTaxOn(10000, wholeYear, { dividends: 4070 })).toBeCloseTo(
+      107.5,
+      10,
+    );
+
+    // £50,070 non-savings + £1,000 dividends: £200 of the £500 nil-rate band
+    // uses the rest of the basic band, £300 sits in higher band, leaving
+    // £500 taxed at 35.75% = £178.75 on top of non-savings tax.
+    expect(
+      incomeTaxOn(50070, wholeYear, { dividends: 1000 }) -
+        incomeTaxOn(50070, wholeYear),
+    ).toBeCloseTo(500 * 0.3575, 10);
+
+    // £100,000 non-savings + £25,140 dividends: total £125,140 wipes out
+    // the £12,570 PA (raising non-savings tax by £12,570 * 40% = £5,028),
+    // £500 nil-rate band, £24,640 taxed at 35.75% = £8,808.80.
+    expect(
+      incomeTaxOn(100000, wholeYear, { dividends: 25140 }) -
+        incomeTaxOn(100000, wholeYear),
+    ).toBeCloseTo(12570 * 0.4 + 24640 * 0.3575, 10);
+
+    // Above £125,140: additional rate 39.35% applies.
+    expect(
+      incomeTaxOn(130000, wholeYear, { dividends: 1500 }) -
+        incomeTaxOn(130000, wholeYear),
+    ).toBeCloseTo(1000 * 0.3935, 10);
+
+    // Relief-at-source pension contributions extend bands and restore PA
+    // when dividends are present.
+    expect(
+      incomeTaxOn(100000, wholeYear, { dividends: 10000, relieved: 20000 }) -
+        incomeTaxOn(100000, wholeYear, { relieved: 20000 }),
+    ).toBeCloseTo(9500 * 0.3575, 10);
+
+    // Partial tax year scales the £500 dividend allowance by months / 12.
+    expect(
+      incomeTaxOn(20000, { months: 6, uprating: 1 }, { dividends: 1000 }) -
+        incomeTaxOn(20000, { months: 6, uprating: 1 }),
+    ).toBeCloseTo(750 * 0.1075, 10);
   });
 });
 
@@ -406,7 +465,10 @@ describe("refusing a charge", () => {
       expect(() => incomeTaxOn(sum, wholeYear)).toThrow(
         "A tax is charged on nothing or more",
       );
-      expect(() => incomeTaxOn(1000, wholeYear, sum)).toThrow(
+      expect(() => incomeTaxOn(1000, wholeYear, { relieved: sum })).toThrow(
+        "A tax is charged on nothing or more",
+      );
+      expect(() => incomeTaxOn(1000, wholeYear, { dividends: sum })).toThrow(
         "A tax is charged on nothing or more",
       );
       expect(() => insuranceOn("other", sum, wholeYear)).toThrow(

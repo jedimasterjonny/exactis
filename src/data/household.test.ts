@@ -1333,6 +1333,26 @@ describe("soundKept", () => {
       15,
     );
     expect(read.plan.rate).not.toBeCloseTo(0.0712544 + 0.0039837, 7);
+    expect(read.plan.dividendYield).toBeCloseTo(
+      "short" in derived ? 0 : 0.6 * derived.rates.dividends,
+      15,
+    );
+    expect(read.plan.dividendYieldByYear?.[0]).toBeCloseTo(
+      read.plan.dividendYield ?? 0,
+      15,
+    );
+
+    // A 100%-bond glide path holds zero equity share in every year, so
+    // it must strip any unglided dividendYield rather than leaking it.
+    const allBonds = soundKept({
+      ...kept,
+      glide: [{ age: 30, bonds: 1 }],
+      rates: { ...kept.rates, dividends: 0.02 },
+      rateSet: "custom",
+    }).household;
+
+    expect(allBonds.plan.dividendYield).toBeUndefined();
+    expect(allBonds.plan.dividendYieldByYear).toBeUndefined();
   });
 
   // Six tenths, three and one of equities add up to a hair under the

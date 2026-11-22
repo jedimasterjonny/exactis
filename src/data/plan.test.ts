@@ -25,6 +25,7 @@ import {
   risenBy,
   risenWith,
   statedSpread,
+  yieldIn,
 } from "./plan";
 
 // The rates a household opens with, 5% for stocks and bonds alike and
@@ -95,6 +96,7 @@ describe("planOf", () => {
       planOf(setting, { allocation, rates, rebalancing: 0 }),
     ).toStrictEqual({
       born: 1992,
+      dividendYield: 0.016,
       from: 2026,
       inflation: 0.0295,
       month: 9,
@@ -181,6 +183,17 @@ describe("planOf", () => {
       years: 0,
     });
   });
+
+  it("carries the equity dividend yield when above nothing, and omits it otherwise", () => {
+    expect(
+      planOf(setting, {
+        allocation: { stocks: 0.8 },
+        rates: { ...openingRates, dividends: 0.025 },
+        rebalancing: 0,
+      }).dividendYield,
+    ).toBeCloseTo(0.02, 15);
+    expect(planOf(setting, opening)).not.toHaveProperty("dividendYield");
+  });
 });
 
 describe("earnerOf", () => {
@@ -259,6 +272,22 @@ describe("rateIn", () => {
     expect(rateIn(plan, 2025)).toBeCloseTo(0.05, 15);
     expect(rateIn(plan, 2028)).toBeCloseTo(0.05, 15);
     expect(rateIn({ from: 2026, rate: 0.05 }, 2026)).toBeCloseTo(0.05, 15);
+  });
+});
+
+describe("yieldIn", () => {
+  it("reads a year's dividend yield off the glide path, then the plan's own, or nothing", () => {
+    const base = planOf(setting, opening);
+    const glided = {
+      ...base,
+      dividendYield: 0.02,
+      dividendYieldByYear: [0.025, 0.015],
+    };
+
+    expect(yieldIn(glided, 2026)).toBeCloseTo(0.025, 15);
+    expect(yieldIn(glided, 2027)).toBeCloseTo(0.015, 15);
+    expect(yieldIn(glided, 2028)).toBeCloseTo(0.02, 15);
+    expect(yieldIn(base, 2026)).toBe(0);
   });
 });
 
