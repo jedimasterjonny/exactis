@@ -10,11 +10,11 @@ import { PortfolioScreen } from "./portfolio-screen";
 export const metadata: Metadata = { title: portfolio.label };
 
 // The portfolio screen, read behind the session: whether a scenario is
-// open, the requested tab from the address (?tab=holdings or
-// ?tab=accounts), and the day on the server. The .portfolio file itself
-// is opened in the browser and never leaves the device, so the page
-// renders behind the loading screen beside it while the session and
-// scenario state answer.
+// open, the requested tab from the address (?tab=holdings, ?tab=accounts
+// or ?tab=transactions), and the day on the server. The .portfolio file
+// itself is opened in the browser and never leaves the device, so the
+// page renders behind the loading screen beside it while the session
+// and scenario state answer.
 export default async function Portfolio({
   searchParams,
 }: Readonly<{

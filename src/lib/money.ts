@@ -56,6 +56,10 @@ const sharesFormat = new Intl.NumberFormat("en-GB", {
   signDisplay: "negative",
 });
 
+export function currencyFormatOf(currency: string): Intl.NumberFormatOptions {
+  return decimalCurrencyOptions(currency, 2);
+}
+
 export function formatCurrency(value: number, currency: string): string {
   return formatDecimalCurrency(value, currency, 2);
 }
@@ -72,20 +76,35 @@ export function formatShares(value: number): string {
   return sharesFormat.format(value).replace(/^-/, "−");
 }
 
+// A transaction amount signed by cash-flow direction: "+" for inflows
+// and real minus U+2212 for outflows above zero once rounded to two
+// decimal places, and unsigned for neutral transfers or zero.
+export function formatSignedCurrency(
+  value: number,
+  currency: string,
+  direction: "in" | "neutral" | "out",
+): string {
+  const magnitude = Math.abs(value);
+  if (Math.round(magnitude * 100) === 0) {
+    return formatCurrency(0, currency);
+  }
+  const formatted = formatCurrency(magnitude, currency);
+  switch (direction) {
+    case "in":
+      return `+${formatted}`;
+    case "neutral":
+      return formatted;
+    case "out":
+      return `−${formatted}`;
+  }
+}
+
 // The Intl format options PriceField hands Base UI to format and parse
 // quotes in the currency given: currency style for ISO codes Intl
 // accepts, or plain decimals for GBX pence and any non-ISO code so
 // NumberField never throws RangeError.
 export function priceFormatOf(currency: string): Intl.NumberFormatOptions {
-  if (currency !== "GBX" && isoFormatter(currency, 6) !== null) {
-    return {
-      currency,
-      maximumFractionDigits: 6,
-      minimumFractionDigits: 2,
-      style: "currency",
-    };
-  }
-  return { maximumFractionDigits: 6, minimumFractionDigits: 2 };
+  return decimalCurrencyOptions(currency, 6);
 }
 
 // A move in pounds, signed whichever way it went, as a figure standing
@@ -195,6 +214,24 @@ export function formatPoints(
 ): string {
   const text = points[places].format(value * 100);
   return `${text.replace(/^-/, "−")}pp`;
+}
+
+function decimalCurrencyOptions(
+  currency: string,
+  maximumFractionDigits: keyof typeof decimals,
+): Intl.NumberFormatOptions {
+  if (
+    currency !== "GBX" &&
+    isoFormatter(currency, maximumFractionDigits) !== null
+  ) {
+    return {
+      currency,
+      maximumFractionDigits,
+      minimumFractionDigits: 2,
+      style: "currency",
+    };
+  }
+  return { maximumFractionDigits, minimumFractionDigits: 2 };
 }
 
 function formatDecimalCurrency(

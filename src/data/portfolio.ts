@@ -1,4 +1,7 @@
+import type { OptionGroup } from "@/lib/options";
+
 import { sumOf } from "@/lib/ledger";
+import { optionsOf } from "@/lib/options";
 
 // A reference cash account paired beside a securities account: the cash
 // account itself, and whether an earlier securities account already
@@ -64,7 +67,8 @@ export interface HoldingRow {
 // screen: the file name and base currency, the latest quote date across
 // priced securities (or null when none have quotes), the securities and
 // cash accounts, the security catalogue with per-account shares, the
-// Asset Allocation categories when present, and active sterling totals.
+// Asset Allocation categories when present, active sterling totals, and
+// every transaction newest first.
 export interface PortfolioSnapshot {
   readonly baseCurrency: string;
   readonly cashAccounts: readonly CashAccount[];
@@ -75,6 +79,36 @@ export interface PortfolioSnapshot {
   readonly securitiesAccounts: readonly SecuritiesAccount[];
   readonly totalCash: number;
   readonly totalInvested: number;
+  readonly transactions: readonly PortfolioTransaction[];
+}
+
+// One transaction as a Portfolio Performance file holds it, or a preview
+// added in this browser tab: its UUID, type, ISO date and epoch-second
+// timestamp, currency, positive amount, fee and tax totals, share count,
+// optional resolved account/portfolio/security references, note, and
+// draft marker.
+export interface PortfolioTransaction {
+  readonly accountId?: string;
+  readonly accountName?: string;
+  readonly amount: number;
+  readonly currency: string;
+  readonly date: string;
+  readonly fees: number;
+  readonly id: string;
+  readonly isDraft?: true;
+  readonly note?: string;
+  readonly otherAccountId?: string;
+  readonly otherAccountName?: string;
+  readonly otherPortfolioId?: string;
+  readonly otherPortfolioName?: string;
+  readonly portfolioId?: string;
+  readonly portfolioName?: string;
+  readonly securityId?: string;
+  readonly securityName?: string;
+  readonly shares: number;
+  readonly taxes: number;
+  readonly timestamp: number;
+  readonly type: TransactionType;
 }
 
 // A securities account as a Portfolio Performance file holds it, or a
@@ -92,6 +126,24 @@ export interface SecuritiesAccount {
   readonly note?: string;
   readonly referenceAccountId?: string;
 }
+
+// Every transaction type Portfolio Performance writes in PTransaction.Type.
+export type TransactionType =
+  | "cash-transfer"
+  | "deposit"
+  | "dividend"
+  | "fee"
+  | "fee-refund"
+  | "inbound-delivery"
+  | "interest"
+  | "interest-charge"
+  | "outbound-delivery"
+  | "purchase"
+  | "removal"
+  | "sale"
+  | "security-transfer"
+  | "tax"
+  | "tax-refund";
 
 interface AccountPair {
   readonly reference: AccountReference | null;
@@ -133,6 +185,69 @@ interface HoldingsView {
   readonly rows: readonly HoldingRow[];
   readonly totalGbp: number;
 }
+
+interface TransactionsFilter {
+  readonly accountId: string;
+  readonly securityId: string;
+  readonly type: "" | TransactionType;
+}
+
+// Human-readable names for every Portfolio Performance transaction type.
+export const transactionTypeLabels: Record<TransactionType, string> = {
+  "cash-transfer": "Cash transfer",
+  deposit: "Deposit",
+  dividend: "Dividend",
+  fee: "Fee",
+  "fee-refund": "Fee refund",
+  "inbound-delivery": "Inbound delivery",
+  interest: "Interest",
+  "interest-charge": "Interest charge",
+  "outbound-delivery": "Outbound delivery",
+  purchase: "Purchase",
+  removal: "Removal",
+  sale: "Sale",
+  "security-transfer": "Security transfer",
+  tax: "Tax",
+  "tax-refund": "Tax refund",
+};
+
+// The fifteen transaction types grouped for filter and dialog selects.
+export const transactionTypeGroups: readonly OptionGroup<TransactionType>[] = [
+  {
+    label: "Trades",
+    options: optionsOf(transactionTypeLabels, ["purchase", "sale"]),
+  },
+  {
+    label: "Deliveries",
+    options: optionsOf(transactionTypeLabels, [
+      "inbound-delivery",
+      "outbound-delivery",
+    ]),
+  },
+  {
+    label: "Cash flow",
+    options: optionsOf(transactionTypeLabels, ["deposit", "removal"]),
+  },
+  {
+    label: "Income & costs",
+    options: optionsOf(transactionTypeLabels, [
+      "dividend",
+      "interest",
+      "interest-charge",
+      "tax",
+      "tax-refund",
+      "fee",
+      "fee-refund",
+    ]),
+  },
+  {
+    label: "Transfers",
+    options: optionsOf(transactionTypeLabels, [
+      "cash-transfer",
+      "security-transfer",
+    ]),
+  },
+];
 
 const statusRank: Record<HoldingStatus, number> = {
   "no-fx": 1,
@@ -268,6 +383,56 @@ export function holdingsViewOf(
 export function roundPence(value: number): number {
   const rounded = Math.round(value * 100) / 100;
   return rounded === 0 ? 0 : rounded;
+}
+
+// Which way a transaction's amount moves cash: in (+), out (−), or
+// neutral (deliveries and internal transfers).
+export function transactionDirectionOf(
+  type: TransactionType,
+): "in" | "neutral" | "out" {
+  switch (type) {
+    case "cash-transfer":
+    case "inbound-delivery":
+    case "outbound-delivery":
+    case "security-transfer":
+      return "neutral";
+    case "deposit":
+    case "dividend":
+    case "fee-refund":
+    case "interest":
+    case "sale":
+    case "tax-refund":
+      return "in";
+    case "fee":
+    case "interest-charge":
+    case "purchase":
+    case "removal":
+    case "tax":
+      return "out";
+  }
+}
+
+// Transactions matching the optional account/portfolio UUID, security
+// UUID, and transaction type filters, preserving the caller's order.
+export function transactionsViewOf(
+  transactions: readonly PortfolioTransaction[],
+  { accountId, securityId, type }: TransactionsFilter,
+): readonly PortfolioTransaction[] {
+  return transactions.filter((transaction) => {
+    if (
+      accountId !== "" &&
+      transaction.accountId !== accountId &&
+      transaction.portfolioId !== accountId &&
+      transaction.otherAccountId !== accountId &&
+      transaction.otherPortfolioId !== accountId
+    ) {
+      return false;
+    }
+    if (securityId !== "" && transaction.securityId !== securityId) {
+      return false;
+    }
+    return type === "" || transaction.type === type;
+  });
 }
 
 // Valued holdings first (largest sterling value first, then by name),

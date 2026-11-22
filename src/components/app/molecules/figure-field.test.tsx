@@ -5,10 +5,12 @@ import { commit } from "@/test/dom";
 
 import {
   CountField,
+  CurrencyField,
   MoneyField,
   MultipleField,
   PriceField,
   RateField,
+  SharesField,
   YearField,
   YearsInput,
 } from "./figure-field";
@@ -301,5 +303,88 @@ describe("YearField", () => {
 
     expect(onValueCommitted).toHaveBeenCalledExactlyOnceWith(2031);
     expect(input).toHaveValue("2031");
+  });
+});
+
+describe("CurrencyField", () => {
+  it("formats two-decimal ISO currencies, steps by 1 and 100, and reports clearing", () => {
+    const onCleared = vi.fn<() => void>();
+    const onValueCommitted = vi.fn<(value: number) => void>();
+    render(
+      <CurrencyField
+        currency="GBP"
+        defaultValue={125.5}
+        hint="Including fees"
+        label="Total paid"
+        min={0}
+        onCleared={onCleared}
+        onValueCommitted={onValueCommitted}
+      />,
+    );
+
+    const input = screen.getByRole("textbox", { name: "Total paid" });
+    expect(input).toHaveValue("£125.50");
+    expect(screen.getByRole("paragraph")).toHaveTextContent("Including fees");
+
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    expect(input).toHaveValue("£126.50");
+    fireEvent.keyDown(input, { key: "ArrowDown", shiftKey: true });
+    expect(input).toHaveValue("£26.50");
+
+    commit(input, "42.18");
+    expect(onValueCommitted.mock.calls).toStrictEqual([
+      [126.5],
+      [26.5],
+      [42.18],
+    ]);
+
+    commit(input, "");
+    expect(onCleared).toHaveBeenCalledOnce();
+  });
+
+  it("formats GBX and non-ISO currencies as plain decimals without throwing", () => {
+    render(
+      <>
+        <CurrencyField currency="GBX" defaultValue={214.5} label="Pence" />
+        <CurrencyField currency="EURO" defaultValue={18.25} label="Custom" />
+      </>,
+    );
+
+    expect(screen.getByRole("textbox", { name: "Pence" })).toHaveValue(
+      "214.50",
+    );
+    expect(screen.getByRole("textbox", { name: "Custom" })).toHaveValue(
+      "18.25",
+    );
+  });
+});
+
+describe("SharesField", () => {
+  it("accepts fractional shares up to eight decimal places and steps by 1 and 10", () => {
+    const onValueCommitted = vi.fn<(value: number) => void>();
+    render(
+      <SharesField
+        defaultValue={10}
+        label="Shares"
+        min={0}
+        onValueCommitted={onValueCommitted}
+      />,
+    );
+
+    const input = screen.getByRole("textbox", { name: "Shares" });
+    expect(input).toHaveValue("10");
+
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    expect(input).toHaveValue("11");
+    fireEvent.keyDown(input, { key: "ArrowDown", shiftKey: true });
+    expect(input).toHaveValue("1");
+
+    commit(input, "0.12345678");
+    expect(input).toHaveValue("0.12345678");
+    expect(onValueCommitted.mock.calls).toStrictEqual([
+      [11],
+      [1],
+      [0.12345678],
+    ]);
   });
 });

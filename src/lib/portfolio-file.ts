@@ -6,7 +6,9 @@ import type {
   CashAccount,
   Holding,
   PortfolioSnapshot,
+  PortfolioTransaction,
   SecuritiesAccount,
+  TransactionType,
 } from "@/data/portfolio";
 import type { Portfolio, Target } from "@/data/targets";
 import type { Message } from "@/lib/protobuf";
@@ -148,14 +150,40 @@ const removal = 7;
 // What an amount of money is written in: hundredths of the currency.
 const hundredths = 100;
 
-// Unit type tag for PTransactionUnit.Type.GROSS_VALUE and the highest
-// known PTransaction.Type enum value (0..14).
+// Unit type tags in PTransactionUnit.Type and the highest known
+// PTransaction.Type enum value (0..14).
 const grossValueUnit = 0;
+const taxUnit = 1;
+const feeUnit = 2;
 const maxTransactionType = 14;
 
-// Safe epoch-day range producing valid four-digit ISO years (1000..9999).
+// Safe epoch-day and epoch-second ranges producing valid four-digit ISO
+// years (1000..9999).
 const minEpochDay = -354_285;
 const maxEpochDay = 2_932_896;
+const minTimestamp = -30_610_224_000;
+const maxTimestamp = 253_402_300_799;
+
+// Every transaction type enum Portfolio Performance writes in
+// PTransaction.Type (0..14); unknown future enum values are skipped
+// rather than throwing when opening a file.
+const transactionTypes: ReadonlyMap<number, TransactionType> = new Map([
+  [0, "purchase"],
+  [1, "sale"],
+  [2, "inbound-delivery"],
+  [3, "outbound-delivery"],
+  [4, "security-transfer"],
+  [5, "cash-transfer"],
+  [6, "deposit"],
+  [7, "removal"],
+  [8, "dividend"],
+  [9, "interest"],
+  [10, "interest-charge"],
+  [11, "tax"],
+  [12, "tax-refund"],
+  [13, "fee"],
+  [14, "fee-refund"],
+]);
 
 // What a transaction of each type does to the cash account it names: a
 // sale, a deposit, a dividend, interest and a refund put its amount in,
@@ -222,6 +250,8 @@ const fields = {
     amount: 11,
     currency: 10,
     date: 9,
+    id: 1,
+    note: 13,
     otherAccount: 5,
     otherPortfolio: 6,
     portfolio: 4,
@@ -400,6 +430,18 @@ export function readPortfolioSnapshot(
     categoryBySecurity,
     pounds,
   });
+  const accountNames = new Map(
+    cashAccounts.map((account) => [account.id, account.name]),
+  );
+  const portfolioNames = new Map(
+    securitiesAccounts.map((account) => [account.id, account.name]),
+  );
+  const decodedTransactions = transactionsOf(transactions, {
+    accountNames,
+    baseCurrency,
+    portfolioNames,
+    securities,
+  });
 
   return {
     baseCurrency,
@@ -411,6 +453,7 @@ export function readPortfolioSnapshot(
     securitiesAccounts,
     totalCash,
     totalInvested,
+    transactions: decodedTransactions,
   };
 }
 
@@ -621,6 +664,81 @@ function dayOf(transaction: Message): string {
   return new Date(dateOf(transaction) * 1000).toISOString().slice(0, 10);
 }
 
+// One decoded transaction alongside its original index for stable
+// tie-breaking, or null for an unknown future enum value.
+function decodeTransaction(
+  entry: Message,
+  index: number,
+  {
+    accountNames,
+    baseCurrency,
+    portfolioNames,
+    securities,
+  }: {
+    readonly accountNames: ReadonlyMap<string, string>;
+    readonly baseCurrency: string;
+    readonly portfolioNames: ReadonlyMap<string, string>;
+    readonly securities: ReadonlyMap<string, Security>;
+  },
+): null | {
+  readonly index: number;
+  readonly transaction: PortfolioTransaction;
+} {
+  const type = transactionTypes.get(int32At(entry, fields.transaction.type));
+  if (type === undefined) {
+    return null;
+  }
+  const timestamp = dateOf(entry);
+  if (timestamp < minTimestamp || timestamp > maxTimestamp) {
+    throw new Refusal("A transaction carries an unreadable date");
+  }
+  const accountId = optionalText(entry, fields.transaction.account);
+  const otherAccountId = optionalText(entry, fields.transaction.otherAccount);
+  const portfolioId = optionalText(entry, fields.transaction.portfolio);
+  const otherPortfolioId = optionalText(
+    entry,
+    fields.transaction.otherPortfolio,
+  );
+  const securityId = optionalText(entry, fields.transaction.security);
+  const note = optionalText(entry, fields.transaction.note);
+  const accountName = lookupName(accountNames, accountId);
+  const otherAccountName = lookupName(accountNames, otherAccountId);
+  const portfolioName = lookupName(portfolioNames, portfolioId);
+  const otherPortfolioName = lookupName(portfolioNames, otherPortfolioId);
+  const securityName =
+    securityId === undefined ? undefined : securities.get(securityId)?.name;
+  const { fees, taxes } = transactionCostsOf(entry);
+
+  return {
+    index,
+    transaction: {
+      ...(accountId !== undefined && { accountId }),
+      ...(accountName !== undefined && { accountName }),
+      amount: roundPence(
+        int64At(entry, fields.transaction.amount) / hundredths,
+      ),
+      currency:
+        optionalText(entry, fields.transaction.currency) ?? baseCurrency,
+      date: new Date(timestamp * 1000).toISOString().slice(0, 10),
+      fees,
+      id: optionalText(entry, fields.transaction.id) ?? `tx-${String(index)}`,
+      ...(note !== undefined && { note }),
+      ...(otherAccountId !== undefined && { otherAccountId }),
+      ...(otherAccountName !== undefined && { otherAccountName }),
+      ...(otherPortfolioId !== undefined && { otherPortfolioId }),
+      ...(otherPortfolioName !== undefined && { otherPortfolioName }),
+      ...(portfolioId !== undefined && { portfolioId }),
+      ...(portfolioName !== undefined && { portfolioName }),
+      ...(securityId !== undefined && { securityId }),
+      ...(securityName !== undefined && { securityName }),
+      shares: int64At(entry, fields.transaction.shares) / scaled,
+      taxes,
+      timestamp,
+      type,
+    },
+  };
+}
+
 // Each security in the catalogue paired with its active per-account
 // share breakdown, Asset Allocation category (when present), latest
 // positive quote and GBP conversion rate.
@@ -733,6 +851,13 @@ function listed(taxonomies: readonly Message[]): string {
     (each) => textAt(each, fields.taxonomy.name) ?? [],
   );
   return names.length === 0 ? "none" : names.join(", ");
+}
+
+function lookupName(
+  names: ReadonlyMap<string, string>,
+  id: string | undefined,
+): string | undefined {
+  return id === undefined ? undefined : names.get(id);
 }
 
 // The file opened, as Portfolio Performance knows a file it saved in
@@ -1038,6 +1163,48 @@ function taxonomyLeavesOf(
 // or a name the file leaves out reads.
 function textOf(message: Message, number: number): string {
   return textAt(message, number) ?? "";
+}
+
+// Summed fee and tax units for a single transaction, rounded to the penny.
+function transactionCostsOf(entry: Message): {
+  readonly fees: number;
+  readonly taxes: number;
+} {
+  let fees = 0;
+  let taxes = 0;
+  for (const unit of messagesAt(entry, fields.transaction.units)) {
+    const unitType = int32At(unit, fields.unit.type);
+    const unitAmount = int64At(unit, fields.unit.amount) / hundredths;
+    if (unitType === feeUnit) {
+      fees += unitAmount;
+    } else if (unitType === taxUnit) {
+      taxes += unitAmount;
+    }
+  }
+  return { fees: roundPence(fees), taxes: roundPence(taxes) };
+}
+
+// Every known Portfolio Performance transaction decoded with resolved
+// account/portfolio/security names, summed fee and tax units, and
+// sorted newest first with deterministic original-order tie-breaking.
+function transactionsOf(
+  rawTransactions: readonly Message[],
+  context: {
+    readonly accountNames: ReadonlyMap<string, string>;
+    readonly baseCurrency: string;
+    readonly portfolioNames: ReadonlyMap<string, string>;
+    readonly securities: ReadonlyMap<string, Security>;
+  },
+): readonly PortfolioTransaction[] {
+  return rawTransactions
+    .map((entry, index) => decodeTransaction(entry, index, context))
+    .filter((item) => item !== null)
+    .toSorted((one, other) =>
+      other.transaction.timestamp !== one.transaction.timestamp
+        ? other.transaction.timestamp - one.transaction.timestamp
+        : one.index - other.index,
+    )
+    .map(({ transaction }) => transaction);
 }
 
 // What a cash transfer credits to its receiving account: the foreign

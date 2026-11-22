@@ -1,19 +1,12 @@
 import type { JSX } from "react";
 
-import type { Option } from "@/lib/options";
+import type { OptionGroup } from "@/lib/options";
 
 import {
   NativeSelect,
   NativeSelectOptGroup,
   NativeSelectOption,
 } from "@/components/kit/native-select";
-
-// Choices as a select heads them: the heading, and the choices beneath
-// it in the order given.
-export interface OptionGroup {
-  readonly label: string;
-  readonly options: readonly Option<string>[];
-}
 
 interface CellSelectProps {
   readonly groups: readonly OptionGroup[];

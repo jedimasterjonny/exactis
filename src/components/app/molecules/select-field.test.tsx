@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { SelectField } from "./select-field";
@@ -100,5 +100,53 @@ describe("SelectField", () => {
       />,
     );
     expect(control).toHaveValue("month");
+  });
+
+  it("renders option groups after any flat options and resolves selections from groups", () => {
+    const onValueChange = vi.fn<(value: string) => void>();
+    render(
+      <SelectField
+        groups={[
+          {
+            label: "Securities",
+            options: [{ label: "Northstar ISA", value: "port-isa" }],
+          },
+          {
+            label: "Cash",
+            options: [{ label: "Reserve Cash", value: "cash-reserve" }],
+          },
+        ]}
+        label="Account"
+        onValueChange={onValueChange}
+        options={[{ label: "All accounts", value: "" }]}
+        value=""
+      />,
+    );
+
+    const control = screen.getByRole("combobox", { name: "Account" });
+    expect(
+      within(control)
+        .getAllByRole("group")
+        .map((group) => group.getAttribute("label")),
+    ).toStrictEqual(["Securities", "Cash"]);
+
+    fireEvent.change(control, { target: { value: "cash-reserve" } });
+    expect(onValueChange).toHaveBeenCalledExactlyOnceWith("cash-reserve");
+  });
+
+  it("renders option groups alone when no flat options are given", () => {
+    const onValueChange = vi.fn<(value: Cadence) => void>();
+    render(
+      <SelectField
+        defaultValue="year"
+        groups={[{ label: "Intervals", options }]}
+        label="Cadence"
+        onValueChange={onValueChange}
+      />,
+    );
+
+    const control = screen.getByRole("combobox", { name: "Cadence" });
+    fireEvent.change(control, { target: { value: "month" } });
+    expect(onValueChange).toHaveBeenCalledExactlyOnceWith("month");
   });
 });
