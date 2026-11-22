@@ -112,6 +112,7 @@ describe("PhoneNav", () => {
       ["/accounts", "Accounts & assetsIII"],
       ["/plan", "Income & expensesIV"],
       ["/assumptions", "AssumptionsVI"],
+      ["/portfolio", "PortfolioIX"],
     ]);
     expect(
       within(list).getByRole("link", {

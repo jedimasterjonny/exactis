@@ -118,6 +118,7 @@ describe("AppNav", () => {
       ["AssumptionsVI", false],
       ["Month endVII", true],
       ["CogitatorVIII", true],
+      ["PortfolioIX", false],
     ]);
   });
 
@@ -182,7 +183,17 @@ describe("AppNav", () => {
   it("hides each numeral from a screen reader", () => {
     renderNav("/", closed);
 
-    for (const numeral of ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"]) {
+    for (const numeral of [
+      "I",
+      "II",
+      "III",
+      "IV",
+      "V",
+      "VI",
+      "VII",
+      "VIII",
+      "IX",
+    ]) {
       expect(screen.getByText(numeral)).toHaveAttribute("aria-hidden", "true");
     }
   });

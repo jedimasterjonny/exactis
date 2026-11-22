@@ -13,7 +13,12 @@ import {
 } from "@/lib/portfolio-file.fixture";
 import { int32At, messageOf, messagesAt, textAt } from "@/lib/protobuf";
 
-import { readPortfolios, readTargets, reweighted } from "./portfolio-file";
+import {
+  readPortfolios,
+  readPortfolioSnapshot,
+  readTargets,
+  reweighted,
+} from "./portfolio-file";
 
 // A transaction as a test writes it out: the security it is on, or
 // none, the currency it was made in, sterling unless said, and when it
@@ -242,6 +247,895 @@ describe("readPortfolios", () => {
     expect(() => readPortfolios(strToU8("Account,Balance\nISA,1000"))).toThrow(
       new Refusal(
         "The file is not a zip, as a Portfolio Performance file saved in binary is",
+      ),
+    );
+  });
+});
+
+describe("readPortfolioSnapshot", () => {
+  // Epoch day 20_718 is 2026-09-22; 20_720 is 2026-09-24; 20_721 is 2026-09-25.
+  it("reads securities accounts, cash accounts, notes, retired flags, FX conversions, and latest quote date", () => {
+    const file = portfolioFile([
+      [1, 66],
+      // Sterling fund priced via historical close on 2026-09-22, then a newer latest quote on 2026-09-25.
+      [
+        2,
+        [
+          [1, "sec-gbp"],
+          [3, "Global Equity Index"],
+          [4, "GBP"],
+          [
+            13,
+            [
+              [1, 20_718],
+              [2, 10_000_000_000],
+            ],
+          ],
+          [
+            13,
+            [
+              [1, 20_719],
+              [2, 0],
+            ],
+          ],
+          [
+            16,
+            [
+              [1, 20_721],
+              [2, 12_550_000_000],
+            ],
+          ],
+        ],
+      ],
+      // Pence fund where historical close on 2026-09-24 beats a stale latest quote on 2026-09-22.
+      [
+        2,
+        [
+          [1, "sec-gbx"],
+          [3, "UK Gilts Fund"],
+          [4, "GBX"],
+          [
+            13,
+            [
+              [1, 20_720],
+              [2, 25_000_000_000],
+            ],
+          ],
+          [
+            16,
+            [
+              [1, 20_718],
+              [2, 20_000_000_000],
+            ],
+          ],
+        ],
+      ],
+      // USD fund priced via latest quote alone; FX rate comes from GBP purchase unit (£75 / $100 = 0.75).
+      [
+        2,
+        [
+          [1, "sec-usd"],
+          [3, "North America ETF"],
+          [4, "USD"],
+          [
+            16,
+            [
+              [1, 20_718],
+              [2, 10_000_000_000],
+            ],
+          ],
+        ],
+      ],
+      // JPY fund with no GBP FX rate: counted in holdingsCount, valued at 0 without refusing the file.
+      [
+        2,
+        [
+          [1, "sec-jpy"],
+          [3, "Tokyo Tracker"],
+          [4, "JPY"],
+          [
+            13,
+            [
+              [1, 20_718],
+              [2, 100_000_000_000],
+            ],
+          ],
+        ],
+      ],
+      // Unpriced fund with a zero-close latest quote.
+      [
+        2,
+        [
+          [1, "sec-zero"],
+          [3, "Pending Launch"],
+          [4, "GBP"],
+          [
+            16,
+            [
+              [1, 20_718],
+              [2, 0],
+            ],
+          ],
+        ],
+      ],
+      // Cash accounts: GBP reference, USD with known rate, EUR without rate, empty CHF, retired GBP.
+      [
+        3,
+        [
+          [1, "cash-isa"],
+          [2, "Northstar ISA Cash"],
+          [3, "GBP"],
+          [4, "  Settled cash  "],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-usd"],
+          [2, "Dollar Cash"],
+          [3, "USD"],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-eur"],
+          [2, "Euro Cash"],
+          [3, "EUR"],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-chf"],
+          [2, "Swiss Cash"],
+          [3, "CHF"],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-old"],
+          [2, "Closed Cash"],
+          [3, ""],
+          [4, "   "],
+          [5, 1],
+        ],
+      ],
+      // Securities accounts: active ISA, retired GIA, empty unlinked.
+      [
+        4,
+        [
+          [1, "port-isa"],
+          [2, "Northstar ISA"],
+          [3, "Tax wrapper"],
+          [5, "cash-isa"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-old"],
+          [2, "Closed Dealing"],
+          [4, 1],
+          [5, "cash-old"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-empty"],
+          [2, "Unfunded"],
+        ],
+      ],
+      // Transactions:
+      // Deposit £2,000 into cash-isa.
+      [
+        5,
+        [
+          [2, 6],
+          [3, "cash-isa"],
+          [10, "GBP"],
+          [11, 200_000],
+        ],
+      ],
+      // Purchase 10 shares of sec-gbp (£125.50 each = £1,255.00) from cash-isa into port-isa for £1,255.00.
+      [
+        5,
+        [
+          [2, 0],
+          [3, "cash-isa"],
+          [4, "port-isa"],
+          [10, "GBP"],
+          [11, 125_500],
+          [12, 1_000_000_000],
+          [14, "sec-gbp"],
+        ],
+      ],
+      // Purchase 40 shares of sec-gbx (250p = £2.50 each = £100.00) from cash-isa into port-isa for £100.00.
+      [
+        5,
+        [
+          [2, 0],
+          [3, "cash-isa"],
+          [4, "port-isa"],
+          [10, "GBP"],
+          [11, 10_000],
+          [12, 4_000_000_000],
+          [14, "sec-gbx"],
+        ],
+      ],
+      // Purchase 2 shares of sec-usd ($100 each * 0.75 = £150.00) in GBP with FX unit into port-isa for £150.00.
+      [
+        5,
+        [
+          [2, 0],
+          [3, "cash-isa"],
+          [4, "port-isa"],
+          [9, [[1, 1_789_000_000]]],
+          [10, "GBP"],
+          [11, 15_000],
+          [12, 200_000_000],
+          [14, "sec-usd"],
+          [
+            15,
+            [
+              [2, 15_000],
+              [4, 20_000],
+              [5, "USD"],
+            ],
+          ],
+        ],
+      ],
+      // Inbound delivery of 5 shares of sec-jpy naming cash-isa (no cash impact, counts as a transaction).
+      [
+        5,
+        [
+          [2, 2],
+          [3, "cash-isa"],
+          [4, "port-isa"],
+          [10, "GBP"],
+          [11, 50_000],
+          [12, 500_000_000],
+          [14, "sec-jpy"],
+        ],
+      ],
+      // Buy and sell all shares of sec-zero in port-isa (net 0 shares, not counted in holdingsCount).
+      [
+        5,
+        [
+          [2, 2],
+          [4, "port-isa"],
+          [12, 100_000_000],
+          [14, "sec-zero"],
+        ],
+      ],
+      [
+        5,
+        [
+          [2, 3],
+          [4, "port-isa"],
+          [12, 100_000_000],
+          [14, "sec-zero"],
+        ],
+      ],
+      // Delivery of an unlisted security and 1 share of sec-gbp (£125.50) into retired port-old
+      // (excluded from active totalInvested).
+      [
+        5,
+        [
+          [2, 2],
+          [4, "port-old"],
+          [12, 100_000_000],
+          [14, "sec-missing"],
+        ],
+      ],
+      [
+        5,
+        [
+          [2, 2],
+          [4, "port-old"],
+          [12, 100_000_000],
+          [14, "sec-gbp"],
+        ],
+      ],
+      // Cash transfer of £100 from cash-isa to cash-old (counts on both accounts).
+      [
+        5,
+        [
+          [2, 5],
+          [3, "cash-isa"],
+          [5, "cash-old"],
+          [10, "GBP"],
+          [11, 10_000],
+        ],
+      ],
+      // Cash transfer with no destination account (outflow from cash-isa only).
+      [
+        5,
+        [
+          [2, 5],
+          [3, "cash-isa"],
+          [10, "GBP"],
+          [11, 500],
+        ],
+      ],
+      // Deposit $200 into cash-usd (£150 at 0.75) and €400 into cash-eur (no rate).
+      [
+        5,
+        [
+          [2, 6],
+          [3, "cash-usd"],
+          [10, "USD"],
+          [11, 20_000],
+        ],
+      ],
+      [
+        5,
+        [
+          [2, 6],
+          [3, "cash-eur"],
+          [10, "EUR"],
+          [11, 40_000],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+
+    expect(readPortfolioSnapshot(file, "household.portfolio")).toStrictEqual({
+      baseCurrency: "GBP",
+      cashAccounts: [
+        {
+          balance: 390,
+          balanceGbp: 390,
+          currency: "GBP",
+          id: "cash-isa",
+          isRetired: false,
+          name: "Northstar ISA Cash",
+          note: "Settled cash",
+          transactionCount: 7,
+        },
+        {
+          balance: 200,
+          balanceGbp: 150,
+          currency: "USD",
+          id: "cash-usd",
+          isRetired: false,
+          name: "Dollar Cash",
+          transactionCount: 1,
+        },
+        {
+          balance: 400,
+          balanceGbp: null,
+          currency: "EUR",
+          id: "cash-eur",
+          isRetired: false,
+          name: "Euro Cash",
+          transactionCount: 1,
+        },
+        {
+          balance: 0,
+          balanceGbp: 0,
+          currency: "CHF",
+          id: "cash-chf",
+          isRetired: false,
+          name: "Swiss Cash",
+          transactionCount: 0,
+        },
+        {
+          balance: 100,
+          balanceGbp: 100,
+          currency: "GBP",
+          id: "cash-old",
+          isRetired: true,
+          name: "Closed Cash",
+          transactionCount: 1,
+        },
+      ],
+      fileName: "household.portfolio",
+      latestQuoteDate: "2026-09-25",
+      securitiesAccounts: [
+        {
+          holdingsCount: 4,
+          id: "port-isa",
+          isRetired: false,
+          marketValue: 1505,
+          name: "Northstar ISA",
+          note: "Tax wrapper",
+          referenceAccountId: "cash-isa",
+        },
+        {
+          holdingsCount: 1,
+          id: "port-old",
+          isRetired: true,
+          marketValue: 125.5,
+          name: "Closed Dealing",
+          referenceAccountId: "cash-old",
+        },
+        {
+          holdingsCount: 0,
+          id: "port-empty",
+          isRetired: false,
+          marketValue: 0,
+          name: "Unfunded",
+        },
+      ],
+      totalCash: 540,
+      totalInvested: 1505,
+    });
+  });
+
+  it("defaults baseCurrency to GBP when omitted and handles undated or missing quotes", () => {
+    const file = portfolioFile([
+      [
+        2,
+        [
+          [1, "sec-undated"],
+          [3, "Undated Fund"],
+          [4, "GBP"],
+          [13, [[2, 5_000_000_000]]],
+          [16, [[2, 6_000_000_000]]],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-1"],
+          [2, "Dealing"],
+        ],
+      ],
+      [
+        5,
+        [
+          [2, 2],
+          [4, "port-1"],
+          [12, 200_000_000],
+          [14, "sec-undated"],
+        ],
+      ],
+    ]);
+
+    expect(readPortfolioSnapshot(file, "plain.portfolio")).toStrictEqual({
+      baseCurrency: "GBP",
+      cashAccounts: [],
+      fileName: "plain.portfolio",
+      latestQuoteDate: null,
+      securitiesAccounts: [
+        {
+          holdingsCount: 1,
+          id: "port-1",
+          isRetired: false,
+          marketValue: 120,
+          name: "Dealing",
+        },
+      ],
+      totalCash: 0,
+      totalInvested: 120,
+    });
+  });
+
+  it("preserves a non-GBP baseCurrency and keeps dated quotes ahead of undated ones", () => {
+    const file = portfolioFile([
+      [
+        2,
+        [
+          [1, "sec-dated"],
+          [3, "Dated Fund"],
+          [4, "GBP"],
+          [
+            13,
+            [
+              [1, 20_720],
+              [2, 5_000_000_000],
+            ],
+          ],
+          [16, [[2, 9_000_000_000]]],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-1"],
+          [2, "Dealing"],
+        ],
+      ],
+      [
+        5,
+        [
+          [2, 2],
+          [4, "port-1"],
+          [12, 100_000_000],
+          [14, "sec-dated"],
+        ],
+      ],
+      [12, "USD"],
+    ]);
+
+    expect(readPortfolioSnapshot(file, "dollar.portfolio")).toStrictEqual({
+      baseCurrency: "USD",
+      cashAccounts: [],
+      fileName: "dollar.portfolio",
+      latestQuoteDate: "2026-09-24",
+      securitiesAccounts: [
+        {
+          holdingsCount: 1,
+          id: "port-1",
+          isRetired: false,
+          marketValue: 50,
+          name: "Dealing",
+        },
+      ],
+      totalCash: 0,
+      totalInvested: 50,
+    });
+  });
+
+  it("handles cross-currency and self cash transfers, skips unknown types, and prefers positive gross FX units", () => {
+    const file = portfolioFile([
+      [
+        2,
+        [
+          [1, "sec-usd"],
+          [3, "Dollar Tracker"],
+          [4, "USD"],
+          [
+            13,
+            [
+              [1, 20_720],
+              [2, 10_000_000_000],
+            ],
+          ],
+          // Older price written after newer price proves sort-agnostic quote picking.
+          [
+            13,
+            [
+              [1, 20_700],
+              [2, 9_000_000_000],
+            ],
+          ],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-eur"],
+          [3, "Euro Tracker"],
+          [4, "EUR"],
+          [16, [[2, 10_000_000_000]]],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-gbp"],
+          [2, "Sterling Cash"],
+          [3, "GBP"],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-usd"],
+          [2, "Dollar Cash"],
+          [3, "USD"],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-eur"],
+          [2, "Euro Cash"],
+          [3, "EUR"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-main"],
+          [2, "Dealing"],
+        ],
+      ],
+      // Cross-currency cash transfer: £100 out of cash-gbp, $125 into cash-usd.
+      // Includes a non-gross fee unit before the gross unit and a zero-fx gross unit.
+      [
+        5,
+        [
+          [2, 5],
+          [3, "cash-gbp"],
+          [5, "cash-usd"],
+          [9, [[1, 1_789_000_000]]],
+          [10, "GBP"],
+          [11, 10_000],
+          [
+            15,
+            [
+              [1, 2],
+              [2, 500],
+              [4, 900],
+              [5, "USD"],
+            ],
+          ],
+          [
+            15,
+            [
+              [1, 0],
+              [2, 10_000],
+              [4, 12_500],
+              [5, "USD"],
+            ],
+          ],
+          // Noisy tax unit written AFTER gross unit must not overwrite gross FX rate (0.8).
+          [
+            15,
+            [
+              [1, 1],
+              [2, 1],
+              [4, 2],
+              [5, "USD"],
+            ],
+          ],
+          // 0p fee unit must never write a 0 FX rate.
+          [
+            15,
+            [
+              [1, 2],
+              [2, 0],
+              [4, 100],
+              [5, "USD"],
+            ],
+          ],
+        ],
+      ],
+      // Transaction with ONLY a tax unit giving EUR rate (0.85) falls back to non-gross unit.
+      [
+        5,
+        [
+          [2, 11],
+          [3, "cash-gbp"],
+          [9, [[1, 1_789_100_000]]],
+          [10, "GBP"],
+          [11, 850],
+          [
+            15,
+            [
+              [1, 1],
+              [2, 850],
+              [4, 1000],
+              [5, "EUR"],
+            ],
+          ],
+        ],
+      ],
+      // Self-transfer on cash-gbp counts once and leaves balance unchanged.
+      [
+        5,
+        [
+          [2, 5],
+          [3, "cash-gbp"],
+          [5, "cash-gbp"],
+          [10, "GBP"],
+          [11, 2500],
+          [
+            15,
+            [
+              [1, 0],
+              [2, 2500],
+              [4, 0],
+            ],
+          ],
+        ],
+      ],
+      // Unknown future transaction enum values are skipped from cash ledger counts.
+      [
+        5,
+        [
+          [2, 99],
+          [3, "cash-gbp"],
+          [10, "GBP"],
+          [11, 1000],
+        ],
+      ],
+      [
+        5,
+        [
+          [2, -1],
+          [3, "cash-gbp"],
+          [10, "GBP"],
+          [11, 1000],
+        ],
+      ],
+      // Deposit €100 into cash-eur to verify tax-unit fallback rate (0.85 -> £85).
+      [
+        5,
+        [
+          [2, 6],
+          [3, "cash-eur"],
+          [10, "EUR"],
+          [11, 10_000],
+        ],
+      ],
+      // 1 share of sec-usd ($100 * 0.8 = £80) and 1 share of sec-eur (€100 * 0.85 = £85).
+      [
+        5,
+        [
+          [2, 2],
+          [4, "port-main"],
+          [12, 100_000_000],
+          [14, "sec-usd"],
+        ],
+      ],
+      [
+        5,
+        [
+          [2, 2],
+          [4, "port-main"],
+          [12, 100_000_000],
+          [14, "sec-eur"],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+
+    const snapshot = readPortfolioSnapshot(file, "fx.portfolio");
+
+    expect(snapshot.latestQuoteDate).toBe("2026-09-24");
+    expect(snapshot.securitiesAccounts).toStrictEqual([
+      {
+        holdingsCount: 2,
+        id: "port-main",
+        isRetired: false,
+        marketValue: 165,
+        name: "Dealing",
+      },
+    ]);
+    expect(snapshot.cashAccounts).toStrictEqual([
+      {
+        balance: -108.5,
+        balanceGbp: -108.5,
+        currency: "GBP",
+        id: "cash-gbp",
+        isRetired: false,
+        name: "Sterling Cash",
+        transactionCount: 3,
+      },
+      {
+        balance: 125,
+        balanceGbp: 100,
+        currency: "USD",
+        id: "cash-usd",
+        isRetired: false,
+        name: "Dollar Cash",
+        transactionCount: 1,
+      },
+      {
+        balance: 100,
+        balanceGbp: 85,
+        currency: "EUR",
+        id: "cash-eur",
+        isRetired: false,
+        name: "Euro Cash",
+        transactionCount: 1,
+      },
+    ]);
+  });
+
+  it("guards out-of-range quote epoch days, rounds each holding lot to the penny, falls back missing UUIDs, and defaults omitted account currency to baseCurrency", () => {
+    const file = portfolioFile([
+      // Two securities whose fractional lots each round down from £10.004 to £10.00 (total £20.00, not £20.01).
+      [
+        2,
+        [
+          [1, "sec-a"],
+          [3, "Fund A"],
+          [4, "GBP"],
+          [
+            13,
+            [
+              [1, 5_000_000],
+              [2, 1_000_400_000],
+            ],
+          ],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-b"],
+          [3, "Fund B"],
+          [4, "GBP"],
+          [
+            13,
+            [
+              [1, -1_000_000],
+              [2, 1_000_400_000],
+            ],
+          ],
+        ],
+      ],
+      // Blank UUID and whitespace-only currency on a security.
+      [
+        2,
+        [
+          [1, "   "],
+          [3, "Blank Id Fund"],
+          [4, "   "],
+        ],
+      ],
+      // Cash account with missing UUID and omitted currency (inherits baseCurrency "EUR").
+      [3, [[2, "Unnamed Id Cash"]]],
+      // Portfolio with missing UUID.
+      [4, [[2, "Unnamed Id Portfolio"]]],
+      // Portfolio holding the two fractional lots.
+      [
+        4,
+        [
+          [1, "port-lots"],
+          [2, "Lots Account"],
+        ],
+      ],
+      [
+        5,
+        [
+          [2, 2],
+          [4, "port-lots"],
+          [12, 100_000_000],
+          [14, "sec-a"],
+        ],
+      ],
+      [
+        5,
+        [
+          [2, 2],
+          [4, "port-lots"],
+          [12, 100_000_000],
+          [14, "sec-b"],
+        ],
+      ],
+      [12, "EUR"],
+    ]);
+
+    expect(readPortfolioSnapshot(file, "edge.portfolio")).toStrictEqual({
+      baseCurrency: "EUR",
+      cashAccounts: [
+        {
+          balance: 0,
+          balanceGbp: 0,
+          currency: "EUR",
+          id: "account-0",
+          isRetired: false,
+          name: "Unnamed Id Cash",
+          transactionCount: 0,
+        },
+      ],
+      fileName: "edge.portfolio",
+      latestQuoteDate: null,
+      securitiesAccounts: [
+        {
+          holdingsCount: 0,
+          id: "portfolio-0",
+          isRetired: false,
+          marketValue: 0,
+          name: "Unnamed Id Portfolio",
+        },
+        {
+          holdingsCount: 2,
+          id: "port-lots",
+          isRetired: false,
+          marketValue: 20,
+          name: "Lots Account",
+        },
+      ],
+      totalCash: 0,
+      totalInvested: 20,
+    });
+  });
+
+  it("refuses files that are not unencrypted binary Portfolio Performance files", () => {
+    expect(() =>
+      readPortfolioSnapshot(strToU8("<client></client>"), "bad.portfolio"),
+    ).toThrow(
+      new Refusal(
+        "The file is saved as XML, and only a Portfolio Performance file saved in binary can be read",
       ),
     );
   });

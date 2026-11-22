@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatAxisGbp,
   formatChance,
+  formatCurrency,
   formatCurveRate,
   formatGbp,
   formatPercent,
@@ -42,6 +43,30 @@ describe("formatChance", () => {
   it("reads a chance short of all as 99%, and one more than none as 1%", () => {
     expect(formatChance(0.999)).toBe("99%");
     expect(formatChance(0.001)).toBe("1%");
+  });
+});
+
+describe("formatCurrency", () => {
+  it("writes ISO currencies to two decimal places with a real minus and unsigned zero", () => {
+    expect(formatCurrency(1234.5, "GBP")).toBe("£1,234.50");
+    expect(formatCurrency(0, "GBP")).toBe("£0.00");
+    expect(formatCurrency(-42.18, "GBP")).toBe("−£42.18");
+    expect(formatCurrency(-0.004, "GBP")).toBe("£0.00");
+    expect(formatCurrency(-0, "GBP")).toBe("£0.00");
+    expect(formatCurrency(850, "USD")).toBe("US$850.00");
+    expect(formatCurrency(-99.9, "EUR")).toBe("−€99.90");
+  });
+
+  it("writes GBX in pence rather than passing it to Intl as an ISO currency", () => {
+    expect(formatCurrency(214.5, "GBX")).toBe("214.50p");
+    expect(formatCurrency(-12.3, "GBX")).toBe("−12.30p");
+    expect(formatCurrency(-0.004, "GBX")).toBe("0.00p");
+  });
+
+  it("falls back to two decimal places for a non-ISO code without throwing", () => {
+    expect(formatCurrency(1500, "EURO")).toBe("1,500.00 EURO");
+    expect(formatCurrency(-25.5, "EURO")).toBe("−25.50 EURO");
+    expect(formatCurrency(10, "")).toBe("10.00");
   });
 });
 

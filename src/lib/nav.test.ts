@@ -9,6 +9,7 @@ import {
   dashboard,
   monthEnd,
   plan,
+  portfolio,
   progress,
   screenAt,
   screens,
@@ -31,6 +32,7 @@ describe("sectionLabel", () => {
     expect(sectionLabel(assumptions)).toBe("Sect. VI · Assumptions");
     expect(sectionLabel(monthEnd)).toBe("Sect. VII · Month end");
     expect(sectionLabel(cogitator)).toBe("Sect. VIII · Cogitator");
+    expect(sectionLabel(portfolio)).toBe("Sect. IX · Portfolio");
   });
 
   it("numbers a card within a screen in lower case after the screen's", () => {
@@ -40,10 +42,11 @@ describe("sectionLabel", () => {
     expect(subsectionLabel(assumptions, 6)).toBe("Sect. VI.vi");
     expect(subsectionLabel(assumptions, 2)).toBe("Sect. VI.ii");
     expect(subsectionLabel(cogitator, 1)).toBe("Sect. VIII.i");
+    expect(subsectionLabel(portfolio, 1)).toBe("Sect. IX.i");
   });
 
   it("writes a place past the numerals in figures", () => {
-    expect(subsectionLabel(plan, 9)).toBe("Sect. IV.9");
+    expect(subsectionLabel(plan, 10)).toBe("Sect. IV.10");
   });
 
   it("lists every screen with a distinct typed route", () => {
@@ -57,6 +60,7 @@ describe("sectionLabel", () => {
     expect(hrefs).toContain("/assumptions");
     expect(hrefs).toContain("/close");
     expect(hrefs).toContain("/cogitator");
+    expect(hrefs).toContain("/portfolio");
   });
 });
 
@@ -64,6 +68,7 @@ describe("screenAt", () => {
   it("finds the screen at its own route and none anywhere else", () => {
     expect(screenAt("/")).toBe(dashboard);
     expect(screenAt("/plan")).toBe(plan);
+    expect(screenAt("/portfolio")).toBe(portfolio);
     expect(screenAt("/plan/extra")).toBeUndefined();
     expect(screenAt("/login")).toBeUndefined();
   });

@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import type { Route } from "next";
 
 import {
+  Briefcase,
   CalendarCheck,
   Cpu,
   Dices,
@@ -81,17 +82,24 @@ export const cogitator: Screen = {
   title: "Next best trades",
 };
 
+export const portfolio: Screen = {
+  href: "/portfolio",
+  icon: Briefcase,
+  label: "Portfolio",
+  title: "Portfolio",
+};
+
 // The screens in navigation order. Section numerals derive from this order,
 // so inserting a screen renumbers every header after it and nothing else
 // has to change. Only built screens appear, since a typed route cannot
 // point at one that does not exist. The chance of success sits beside the
 // dashboard, the two readings of where the plan goes, ahead of the
-// screens it is read from. The month end and the cogitator close the
-// list, since each says what to do rather than what the plan rests on:
-// the month end checks the balances and says what moved the plan, and
-// the cogitator, read from the target allocation at the end of the
-// assumptions, says what to buy and sell next, which a month end
-// closes on.
+// screens it is read from. The month end, the cogitator and the
+// portfolio close the list as the monthly operational loop: the month
+// end checks the balances and says what moved the plan, the cogitator
+// says what to buy and sell next from the target allocation, and the
+// portfolio opens the Portfolio Performance file to inspect its
+// accounts, holdings and transactions.
 export const screens: readonly Screen[] = [
   dashboard,
   chance,
@@ -101,6 +109,7 @@ export const screens: readonly Screen[] = [
   assumptions,
   monthEnd,
   cogitator,
+  portfolio,
 ];
 
 // The screens a phone reaches from the bar along its foot, in navigation
@@ -114,11 +123,21 @@ export const tabs: readonly Screen[] = [
 ];
 
 // Section numerals are roman, decorative and consistent, never the only
-// way to identify a screen. There are eight screens and no screen has
+// way to identify a screen. There are nine screens and no screen has
 // more than six cards, so the numerals are listed rather than worked
 // out; a place past the list is written in figures, so it shows rather
 // than vanishing.
-const numerals = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"] as const;
+const numerals = [
+  "I",
+  "II",
+  "III",
+  "IV",
+  "V",
+  "VI",
+  "VII",
+  "VIII",
+  "IX",
+] as const;
 
 // The screen at a pathname, or undefined where no built screen is.
 export function screenAt(pathname: string): Screen | undefined {
