@@ -4,7 +4,9 @@ import type { Figure } from "@/components/app/atoms/figure-input";
 
 import { Field } from "@/components/app/atoms/field";
 import { FigureInput } from "@/components/app/atoms/figure-input";
-import { percentFormat, priceFormatOf } from "@/lib/money";
+import { currencyFormatOf, percentFormat, priceFormatOf } from "@/lib/money";
+
+type ClearableBounds = "max" | "min" | "onCleared";
 
 type FigureFieldProps = ComponentProps<typeof FigureInput> & {
   readonly error?: string;
@@ -49,6 +51,9 @@ const presets = {
   // way, with the options the ledger formats with, and the number field
   // parses the other. A tenth of a point, a whole point with shift.
   rate: { format: percentFormat, largeStep: 0.01, step: 0.001 },
+  // A count of fund shares or units, to up to eight decimal places as
+  // Portfolio Performance writes them. One at a time, ten with shift.
+  shares: { format: { maximumFractionDigits: 8 }, largeStep: 10, step: 1 },
   // A year is a whole number written without a separator, so 2026 never
   // reads 2,026, and a fraction typed is rounded to one, as an age is.
   year: {
@@ -65,6 +70,25 @@ const presets = {
 // if any.
 export function CountField(props: PresetProps<"max" | "min">): JSX.Element {
   return <FigureField {...props} {...presets.count} />;
+}
+
+// A two-decimal currency input formatted in the ISO currency given, or
+// plain decimals for GBX and non-ISO codes so Base UI never throws.
+export function CurrencyField({
+  currency,
+  ...props
+}: PresetProps<ClearableBounds> & {
+  readonly currency: string;
+  readonly hint?: string | undefined;
+}): JSX.Element {
+  return (
+    <FigureField
+      {...props}
+      format={currencyFormatOf(currency)}
+      largeStep={100}
+      step={1}
+    />
+  );
 }
 
 // A money input, under a hint that carries the derivation. The figure is
@@ -105,7 +129,7 @@ export function MultipleField(
 export function PriceField({
   currency,
   ...props
-}: PresetProps<"max" | "min" | "onCleared"> & {
+}: PresetProps<ClearableBounds> & {
   readonly currency: string;
   readonly hint?: string | undefined;
 }): JSX.Element {
@@ -125,6 +149,13 @@ export function RateField(
   props: PresetProps<"error" | "hint" | "isReadOnly" | "max" | "min">,
 ): JSX.Element {
   return <FigureField {...props} {...presets.rate} />;
+}
+
+// A share count input accepting up to eight decimal places.
+export function SharesField(
+  props: PresetProps<ClearableBounds> & { readonly hint?: string | undefined },
+): JSX.Element {
+  return <FigureField {...props} {...presets.shares} />;
 }
 
 // A year input, under a hint that carries the age reached, inside the

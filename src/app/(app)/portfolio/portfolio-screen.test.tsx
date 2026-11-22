@@ -68,7 +68,9 @@ describe("PortfolioScreen", () => {
       "aria-selected",
       "true",
     );
-    expect(screen.getAllByText("Global Equity Index")).toHaveLength(2);
+    expect(
+      within(screen.getByRole("tabpanel")).getAllByText("Global Equity Index"),
+    ).toHaveLength(2);
     expect(
       screen.queryByText("Portfolio belongs to the household"),
     ).not.toBeInTheDocument();
@@ -110,6 +112,25 @@ describe("PortfolioScreen", () => {
     ).toHaveValue("port-isa");
     expect(
       within(holdingsPanel).getByText("Northstar ISA subtotal"),
+    ).toBeInTheDocument();
+
+    // Switch back to Accounts and drill down from a cash account into filtered Transactions.
+    fireEvent.click(screen.getByRole("tab", { name: "Accounts" }));
+    const cashButton = screen.getByRole("button", { name: "Reserve Cash" });
+    cashButton.focus();
+    fireEvent.click(cashButton);
+
+    const transactionsPanel = screen.getByRole("tabpanel");
+    expect(screen.getByRole("tab", { name: "Transactions" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(transactionsPanel).toHaveFocus();
+    expect(
+      within(transactionsPanel).getByRole("combobox", { name: "Account" }),
+    ).toHaveValue("cash-reserve");
+    expect(
+      within(transactionsPanel).getByText("1 transaction"),
     ).toBeInTheDocument();
   });
 
@@ -159,15 +180,22 @@ describe("PortfolioScreen", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Add preview" }));
 
-    expect(await screen.findAllByText("UK Gilts Preview")).toHaveLength(2);
+    const holdingsPanel = screen.getByRole("tabpanel");
+    expect(
+      await within(holdingsPanel).findAllByText("UK Gilts Preview"),
+    ).toHaveLength(2);
     expect(
       screen.getByRole("dialog", { name: "Security added to preview" }),
     ).toHaveAccessibleDescription(
       "Shown in this view only. Changes are not saved to the file yet.",
     );
-    expect(screen.getByRole("combobox", { name: "Account" })).toHaveValue("");
     expect(
-      screen.getByRole("switch", { name: "Show zero-share securities" }),
+      within(holdingsPanel).getByRole("combobox", { name: "Account" }),
+    ).toHaveValue("");
+    expect(
+      within(holdingsPanel).getByRole("switch", {
+        name: "Show zero-share securities",
+      }),
     ).toBeChecked();
 
     // Add minimal USD and GBP preview securities to cover all draft currency branches.
@@ -179,14 +207,18 @@ describe("PortfolioScreen", () => {
       target: { value: "USD" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Add preview" }));
-    expect(await screen.findAllByText("US Preview ETF")).toHaveLength(2);
+    expect(
+      await within(holdingsPanel).findAllByText("US Preview ETF"),
+    ).toHaveLength(2);
 
     fireEvent.click(screen.getByRole("button", { name: "Add security" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Security name" }), {
       target: { value: "Sterling Preview Bond" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Add preview" }));
-    expect(await screen.findAllByText("Sterling Preview Bond")).toHaveLength(2);
+    expect(
+      await within(holdingsPanel).findAllByText("Sterling Preview Bond"),
+    ).toHaveLength(2);
 
     // Switch to Accounts tab to add preview securities and cash accounts.
     fireEvent.click(screen.getByRole("tab", { name: "Accounts" }));
@@ -240,14 +272,20 @@ describe("PortfolioScreen", () => {
       target: { value: "FX pot" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Add preview" }));
-    expect(await screen.findByText("Dollar Reserve")).toBeInTheDocument();
+    expect(
+      await within(accountsPanel).findByRole("button", {
+        name: "Dollar Reserve",
+      }),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Add cash account" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Name" }), {
       target: { value: "Euro Float" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Add preview" }));
-    expect(await screen.findByText("Euro Float")).toBeInTheDocument();
+    expect(
+      await within(accountsPanel).findByRole("button", { name: "Euro Float" }),
+    ).toBeInTheDocument();
 
     // Real-file headline and summary KPIs stay unchanged despite preview entries,
     // while newly previewed cash accounts are selectable as reference accounts.
@@ -287,7 +325,11 @@ describe("PortfolioScreen", () => {
       target: { value: "Temporary Fund" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Add preview" }));
-    expect(await screen.findAllByText("Temporary Fund")).toHaveLength(2);
+    expect(
+      await within(screen.getByRole("tabpanel")).findAllByText(
+        "Temporary Fund",
+      ),
+    ).toHaveLength(2);
 
     openPortfolio(usdFile, "dollar.portfolio");
 
@@ -330,6 +372,118 @@ describe("PortfolioScreen", () => {
     expect(addCash).toHaveAccessibleDescription(
       "Portfolio belongs to the household Leave the scenario to add preview entries.",
     );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Transactions" }));
+    const addTransaction = screen.getByRole("button", {
+      name: "Add transaction",
+    });
+    expect(addTransaction).toBeDisabled();
+    expect(addTransaction).toHaveAccessibleDescription(
+      "Portfolio belongs to the household Leave the scenario to add preview entries.",
+    );
+  });
+
+  it("opens on ?tab=transactions, adds preview purchase and transfers, clears filters on add, and clears preview transactions", async () => {
+    render(
+      <PortfolioScreen
+        initialTab="Transactions"
+        isInScenario={false}
+        today="2026-09-25"
+      />,
+      { wrapper: Toaster },
+    );
+
+    openPortfolio(gbpFile, "northstar.portfolio");
+    await screen.findByText("northstar.portfolio · GBP");
+
+    expect(screen.getByRole("tab", { name: "Transactions" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+
+    // Add a second preview securities account so security-transfer can also be exercised.
+    fireEvent.click(screen.getByRole("tab", { name: "Accounts" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Add securities account" }),
+    );
+    fireEvent.change(screen.getByRole("textbox", { name: "Name" }), {
+      target: { value: "Harbour GIA" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add preview" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Transactions" }));
+
+    // Open and cancel Add transaction first.
+    fireEvent.click(screen.getByRole("button", { name: "Add transaction" }));
+    expect(
+      screen.getByRole("dialog", { name: "Purchase · Global Equity Index" }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", {
+          name: "Purchase · Global Equity Index",
+        }),
+      ).not.toBeInTheDocument();
+    });
+
+    // Apply a filter, then add a preview purchase; filters reset so the new entry shows immediately.
+    const txPanel = screen.getByRole("tabpanel");
+    fireEvent.change(within(txPanel).getByRole("combobox", { name: "Type" }), {
+      target: { value: "deposit" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add transaction" }));
+    commit(screen.getByRole("textbox", { name: "Shares" }), "5");
+    commit(screen.getByRole("textbox", { name: "Total paid" }), "625");
+    fireEvent.change(screen.getByRole("textbox", { name: "Note" }), {
+      target: { value: "Preview buy" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add preview" }));
+
+    expect(
+      await screen.findByRole("dialog", {
+        name: "Transaction added to preview",
+      }),
+    ).toHaveAccessibleDescription(
+      "Shown in this view only. Changes are not saved to the file yet.",
+    );
+    expect(within(txPanel).getByRole("combobox", { name: "Type" })).toHaveValue(
+      "",
+    );
+    expect(within(txPanel).getAllByText("Preview buy")).toHaveLength(2);
+
+    // Add a preview cash transfer and security transfer to cover every reference-name branch.
+    fireEvent.click(screen.getByRole("button", { name: "Add transaction" }));
+    fireEvent.change(
+      within(
+        screen.getByRole("dialog", { name: "Purchase · Global Equity Index" }),
+      ).getByRole("combobox", { name: "Type" }),
+      { target: { value: "cash-transfer" } },
+    );
+    commit(screen.getByRole("textbox", { name: "Amount" }), "100");
+    fireEvent.click(screen.getByRole("button", { name: "Add preview" }));
+    expect(
+      await within(txPanel).findByRole("cell", {
+        name: "Northstar ISA Cash → Reserve Cash",
+      }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add transaction" }));
+    fireEvent.change(
+      within(
+        screen.getByRole("dialog", { name: "Purchase · Global Equity Index" }),
+      ).getByRole("combobox", { name: "Type" }),
+      { target: { value: "security-transfer" } },
+    );
+    commit(screen.getByRole("textbox", { name: "Shares" }), "2");
+    fireEvent.click(screen.getByRole("button", { name: "Add preview" }));
+    expect(
+      await within(txPanel).findByRole("cell", {
+        name: "Northstar ISA → Harbour GIA",
+      }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear preview" }));
+    expect(within(txPanel).queryByText("Preview buy")).not.toBeInTheDocument();
   });
 
   it("resets Show retired accounts when switching to another file", async () => {

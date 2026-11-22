@@ -667,7 +667,13 @@ describe("readPortfolioSnapshot", () => {
       [12, "GBP"],
     ]);
 
-    expect(readPortfolioSnapshot(file, "household.portfolio")).toStrictEqual({
+    const { transactions, ...rest } = readPortfolioSnapshot(
+      file,
+      "household.portfolio",
+    );
+
+    expect(transactions).toHaveLength(13);
+    expect(rest).toStrictEqual({
       baseCurrency: "GBP",
       cashAccounts: [
         {
@@ -874,6 +880,23 @@ describe("readPortfolioSnapshot", () => {
       ],
       totalCash: 0,
       totalInvested: 120,
+      transactions: [
+        {
+          amount: 0,
+          currency: "GBP",
+          date: "1970-01-01",
+          fees: 0,
+          id: "tx-0",
+          portfolioId: "port-1",
+          portfolioName: "Dealing",
+          securityId: "sec-undated",
+          securityName: "Undated Fund",
+          shares: 2,
+          taxes: 0,
+          timestamp: 0,
+          type: "inbound-delivery",
+        },
+      ],
     });
   });
 
@@ -944,6 +967,23 @@ describe("readPortfolioSnapshot", () => {
       ],
       totalCash: 0,
       totalInvested: 50,
+      transactions: [
+        {
+          amount: 0,
+          currency: "USD",
+          date: "1970-01-01",
+          fees: 0,
+          id: "tx-0",
+          portfolioId: "port-1",
+          portfolioName: "Dealing",
+          securityId: "sec-dated",
+          securityName: "Dated Fund",
+          shares: 1,
+          taxes: 0,
+          timestamp: 0,
+          type: "inbound-delivery",
+        },
+      ],
     });
   });
 
@@ -1340,6 +1380,38 @@ describe("readPortfolioSnapshot", () => {
       ],
       totalCash: 0,
       totalInvested: 20,
+      transactions: [
+        {
+          amount: 0,
+          currency: "EUR",
+          date: "1970-01-01",
+          fees: 0,
+          id: "tx-0",
+          portfolioId: "port-lots",
+          portfolioName: "Lots Account",
+          securityId: "sec-a",
+          securityName: "Fund A",
+          shares: 1,
+          taxes: 0,
+          timestamp: 0,
+          type: "inbound-delivery",
+        },
+        {
+          amount: 0,
+          currency: "EUR",
+          date: "1970-01-01",
+          fees: 0,
+          id: "tx-1",
+          portfolioId: "port-lots",
+          portfolioName: "Lots Account",
+          securityId: "sec-b",
+          securityName: "Fund B",
+          shares: 1,
+          taxes: 0,
+          timestamp: 0,
+          type: "inbound-delivery",
+        },
+      ],
     });
   });
 
@@ -1539,6 +1611,212 @@ describe("readPortfolioSnapshot", () => {
     expect(
       readPortfolioSnapshot(emptyRoot, "empty-root.portfolio").categories,
     ).toStrictEqual([]);
+  });
+
+  it("decodes transactions newest first with fee/tax units, notes, transfer targets, tie-breaking, and skips unknown types", () => {
+    const file = portfolioFile([
+      [
+        2,
+        [
+          [1, "sec-world"],
+          [3, "Global Equity Index"],
+          [4, "GBP"],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-isa"],
+          [2, "Northstar ISA Cash"],
+          [3, "GBP"],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-reserve"],
+          [2, "Reserve Cash"],
+          [3, "GBP"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-isa"],
+          [2, "Northstar ISA"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-gia"],
+          [2, "Dealing Account"],
+        ],
+      ],
+      // Earlier purchase with gross value, fee, tax units and note.
+      [
+        5,
+        [
+          [1, "tx-buy"],
+          [2, 0],
+          [3, "cash-isa"],
+          [4, "port-isa"],
+          [9, [[1, 1_789_000_000]]],
+          [10, "GBP"],
+          [11, 125_775],
+          [12, 1_000_000_000],
+          [13, "Monthly invest"],
+          [14, "sec-world"],
+          [
+            15,
+            [
+              [1, 0],
+              [2, 125_000],
+            ],
+          ],
+          [
+            15,
+            [
+              [1, 2],
+              [2, 150],
+            ],
+          ],
+          [
+            15,
+            [
+              [1, 1],
+              [2, 625],
+            ],
+          ],
+        ],
+      ],
+      // Same timestamp tie-break: first written stays ahead of second written.
+      [
+        5,
+        [
+          [1, "tx-sec-transfer"],
+          [2, 4],
+          [4, "port-isa"],
+          [6, "port-gia"],
+          [9, [[1, 1_789_200_000]]],
+          [10, "GBP"],
+          [11, 50_000],
+          [12, 400_000_000],
+          [14, "sec-world"],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-cash-transfer"],
+          [2, 5],
+          [3, "cash-isa"],
+          [5, "cash-reserve"],
+          [9, [[1, 1_789_200_000]]],
+          [10, "GBP"],
+          [11, 30_000],
+        ],
+      ],
+      // Unknown future transaction enum value is safely ignored.
+      [
+        5,
+        [
+          [1, "tx-unknown"],
+          [2, 99],
+          [9, [[1, 1_789_300_000]]],
+          [10, "GBP"],
+          [11, 100],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+
+    expect(
+      readPortfolioSnapshot(file, "tx.portfolio").transactions,
+    ).toStrictEqual([
+      {
+        amount: 500,
+        currency: "GBP",
+        date: "2026-09-12",
+        fees: 0,
+        id: "tx-sec-transfer",
+        otherPortfolioId: "port-gia",
+        otherPortfolioName: "Dealing Account",
+        portfolioId: "port-isa",
+        portfolioName: "Northstar ISA",
+        securityId: "sec-world",
+        securityName: "Global Equity Index",
+        shares: 4,
+        taxes: 0,
+        timestamp: 1_789_200_000,
+        type: "security-transfer",
+      },
+      {
+        accountId: "cash-isa",
+        accountName: "Northstar ISA Cash",
+        amount: 300,
+        currency: "GBP",
+        date: "2026-09-12",
+        fees: 0,
+        id: "tx-cash-transfer",
+        otherAccountId: "cash-reserve",
+        otherAccountName: "Reserve Cash",
+        shares: 0,
+        taxes: 0,
+        timestamp: 1_789_200_000,
+        type: "cash-transfer",
+      },
+      {
+        accountId: "cash-isa",
+        accountName: "Northstar ISA Cash",
+        amount: 1257.75,
+        currency: "GBP",
+        date: "2026-09-10",
+        fees: 1.5,
+        id: "tx-buy",
+        note: "Monthly invest",
+        portfolioId: "port-isa",
+        portfolioName: "Northstar ISA",
+        securityId: "sec-world",
+        securityName: "Global Equity Index",
+        shares: 10,
+        taxes: 6.25,
+        timestamp: 1_789_000_000,
+        type: "purchase",
+      },
+    ]);
+  });
+
+  it("refuses a transaction whose timestamp falls outside four-digit ISO years", () => {
+    const tooLate = portfolioFile([
+      [
+        5,
+        [
+          [2, 6],
+          [9, [[1, 300_000_000_000]]],
+          [10, "GBP"],
+          [11, 1000],
+        ],
+      ],
+    ]);
+    const tooEarly = portfolioFile([
+      [
+        5,
+        [
+          [2, 6],
+          [9, [[1, -40_000_000_000]]],
+          [10, "GBP"],
+          [11, 1000],
+        ],
+      ],
+    ]);
+
+    expect(() => readPortfolioSnapshot(tooLate, "late.portfolio")).toThrow(
+      new Refusal("A transaction carries an unreadable date"),
+    );
+    expect(() => readPortfolioSnapshot(tooEarly, "early.portfolio")).toThrow(
+      new Refusal("A transaction carries an unreadable date"),
+    );
   });
 
   it("refuses files that are not unencrypted binary Portfolio Performance files", () => {

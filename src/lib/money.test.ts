@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  currencyFormatOf,
   formatAxisGbp,
   formatChance,
   formatCurrency,
@@ -11,11 +12,31 @@ import {
   formatPoints,
   formatPrice,
   formatShares,
+  formatSignedCurrency,
   formatSignedGbp,
   formatWholePercent,
   negated,
   priceFormatOf,
 } from "./money";
+
+describe("currencyFormatOf", () => {
+  it("returns two-place currency format for ISO codes and plain decimals for GBX or invalid codes", () => {
+    expect(currencyFormatOf("GBP")).toStrictEqual({
+      currency: "GBP",
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 2,
+      style: "currency",
+    });
+    expect(currencyFormatOf("GBX")).toStrictEqual({
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 2,
+    });
+    expect(currencyFormatOf("EURO")).toStrictEqual({
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 2,
+    });
+  });
+});
 
 describe("formatAxisGbp", () => {
   it("shortens millions and thousands for an axis, to two places where they need them", () => {
@@ -187,6 +208,17 @@ describe("priceFormatOf", () => {
       maximumFractionDigits: 6,
       minimumFractionDigits: 2,
     });
+  });
+});
+
+describe("formatSignedCurrency", () => {
+  it("signs inflows with +, outflows with a real minus, and leaves neutral or zero figures unsigned", () => {
+    expect(formatSignedCurrency(42.18, "GBP", "in")).toBe("+£42.18");
+    expect(formatSignedCurrency(1250, "GBP", "out")).toBe("−£1,250.00");
+    expect(formatSignedCurrency(500, "GBP", "neutral")).toBe("£500.00");
+    expect(formatSignedCurrency(0, "GBP", "in")).toBe("£0.00");
+    expect(formatSignedCurrency(0.004, "GBP", "out")).toBe("£0.00");
+    expect(formatSignedCurrency(100, "USD", "out")).toBe("−US$100.00");
   });
 });
 

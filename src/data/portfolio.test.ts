@@ -1,13 +1,23 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import type { CashAccount, Holding, SecuritiesAccount } from "./portfolio";
+import type {
+  CashAccount,
+  Holding,
+  PortfolioTransaction,
+  SecuritiesAccount,
+  TransactionType,
+} from "./portfolio";
 
 import {
   accountsLayoutOf,
   cashTotalsOf,
   holdingsViewOf,
   roundPence,
+  transactionDirectionOf,
+  transactionsViewOf,
+  transactionTypeGroups,
+  transactionTypeLabels,
 } from "./portfolio";
 
 const isaCash: CashAccount = {
@@ -476,5 +486,135 @@ describe("holdingsViewOf", () => {
     expect(view.totalGbp).toBe(20);
     expect(view.rows[0]?.marketValueGbp).toBe(20);
     expect(view.hasForeignPrices).toBe(false);
+  });
+});
+
+describe("transactionDirectionOf and transactionTypeGroups", () => {
+  it("groups every transaction type once and assigns cash-flow directions exhaustively", () => {
+    const grouped = transactionTypeGroups.flatMap((group) =>
+      group.options.map((option) => option.value),
+    );
+    expect(grouped).toHaveLength(15);
+    expect(new Set(grouped).size).toBe(15);
+    expect(transactionTypeGroups.map((group) => group.label)).toStrictEqual([
+      "Trades",
+      "Deliveries",
+      "Cash flow",
+      "Income & costs",
+      "Transfers",
+    ]);
+
+    const expected: Record<TransactionType, "in" | "neutral" | "out"> = {
+      "cash-transfer": "neutral",
+      deposit: "in",
+      dividend: "in",
+      fee: "out",
+      "fee-refund": "in",
+      "inbound-delivery": "neutral",
+      interest: "in",
+      "interest-charge": "out",
+      "outbound-delivery": "neutral",
+      purchase: "out",
+      removal: "out",
+      sale: "in",
+      "security-transfer": "neutral",
+      tax: "out",
+      "tax-refund": "in",
+    };
+
+    for (const type of grouped) {
+      expect(transactionDirectionOf(type)).toBe(expected[type]);
+    }
+    expect(transactionTypeLabels["cash-transfer"]).toBe("Cash transfer");
+  });
+});
+
+describe("transactionsViewOf", () => {
+  const rows: readonly PortfolioTransaction[] = [
+    {
+      accountId: "cash-isa",
+      accountName: "ISA Cash",
+      amount: 1250,
+      currency: "GBP",
+      date: "2026-09-22",
+      fees: 1.5,
+      id: "tx-buy",
+      portfolioId: "sec-isa",
+      portfolioName: "ISA",
+      securityId: "sec-world",
+      securityName: "World Equity",
+      shares: 10,
+      taxes: 0,
+      timestamp: 1_790_000_000,
+      type: "purchase",
+    },
+    {
+      accountId: "cash-isa",
+      accountName: "ISA Cash",
+      amount: 300,
+      currency: "GBP",
+      date: "2026-09-20",
+      fees: 0,
+      id: "tx-cash-move",
+      otherAccountId: "cash-reserve",
+      otherAccountName: "Reserve Cash",
+      shares: 0,
+      taxes: 0,
+      timestamp: 1_789_900_000,
+      type: "cash-transfer",
+    },
+    {
+      amount: 500,
+      currency: "GBP",
+      date: "2026-09-18",
+      fees: 0,
+      id: "tx-sec-move",
+      otherPortfolioId: "sec-gia",
+      otherPortfolioName: "GIA",
+      portfolioId: "sec-isa",
+      portfolioName: "ISA",
+      securityId: "sec-gilts",
+      securityName: "UK Gilts",
+      shares: 5,
+      taxes: 0,
+      timestamp: 1_789_800_000,
+      type: "security-transfer",
+    },
+  ];
+
+  it("filters by account/portfolio UUID across source and destination fields, security UUID, and type", () => {
+    expect(
+      transactionsViewOf(rows, { accountId: "", securityId: "", type: "" }).map(
+        (tx) => tx.id,
+      ),
+    ).toStrictEqual(["tx-buy", "tx-cash-move", "tx-sec-move"]);
+    expect(
+      transactionsViewOf(rows, {
+        accountId: "cash-reserve",
+        securityId: "",
+        type: "",
+      }).map((tx) => tx.id),
+    ).toStrictEqual(["tx-cash-move"]);
+    expect(
+      transactionsViewOf(rows, {
+        accountId: "sec-gia",
+        securityId: "",
+        type: "",
+      }).map((tx) => tx.id),
+    ).toStrictEqual(["tx-sec-move"]);
+    expect(
+      transactionsViewOf(rows, {
+        accountId: "sec-isa",
+        securityId: "sec-world",
+        type: "purchase",
+      }).map((tx) => tx.id),
+    ).toStrictEqual(["tx-buy"]);
+    expect(
+      transactionsViewOf(rows, {
+        accountId: "cash-isa",
+        securityId: "",
+        type: "dividend",
+      }),
+    ).toStrictEqual([]);
   });
 });

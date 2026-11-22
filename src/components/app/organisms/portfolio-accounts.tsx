@@ -30,6 +30,7 @@ interface PortfolioAccountsProps {
   readonly label: string;
   readonly onAddCash: () => void;
   readonly onAddSecurities: () => void;
+  readonly onOpenCash?: (accountId: string) => void;
   readonly onOpenSecurities?: (portfolioId: string) => void;
   readonly readOnlyId?: string | undefined;
   readonly securitiesAccounts: readonly SecuritiesAccount[];
@@ -48,6 +49,7 @@ export function PortfolioAccounts({
   label,
   onAddCash,
   onAddSecurities,
+  onOpenCash,
   onOpenSecurities,
   readOnlyId,
   securitiesAccounts,
@@ -179,7 +181,10 @@ export function PortfolioAccounts({
                         </FoldedLines>
                       </div>
                       <div className="relative py-3 folded:pt-0 folded:pl-4">
-                        <ReferenceLines reference={reference} />
+                        <ReferenceLines
+                          onOpenCash={onOpenCash}
+                          reference={reference}
+                        />
                       </div>
                     </li>
                   ))}
@@ -202,6 +207,13 @@ export function PortfolioAccounts({
                           account.currency,
                         )}
                         name={account.name}
+                        onOpen={
+                          onOpenCash === undefined
+                            ? undefined
+                            : (): void => {
+                                onOpenCash(account.id);
+                              }
+                        }
                       >
                         <span>{cashDetail(account)}</span>
                         <AccountFlags
@@ -321,8 +333,10 @@ function None({ children }: { readonly children: string }): JSX.Element {
 // account on first appearance, a muted "—" reference when shared with
 // an earlier row, or a plain note when unlinked.
 function ReferenceLines({
+  onOpenCash,
   reference,
 }: {
+  readonly onOpenCash?: ((accountId: string) => void) | undefined;
   readonly reference: AccountReference | null;
 }): JSX.Element {
   if (reference === null) {
@@ -330,9 +344,20 @@ function ReferenceLines({
       <p className="text-sm text-muted-foreground">No reference cash account</p>
     );
   }
+  const onOpen =
+    onOpenCash === undefined
+      ? undefined
+      : (): void => {
+          onOpenCash(reference.account.id);
+        };
   if (reference.isShared) {
     return (
-      <FoldedLines figure="—" isFigureMuted name={reference.account.name}>
+      <FoldedLines
+        figure="—"
+        isFigureMuted
+        name={reference.account.name}
+        onOpen={onOpen}
+      >
         <span>Shared reference cash account</span>
       </FoldedLines>
     );
@@ -344,6 +369,7 @@ function ReferenceLines({
         reference.account.currency,
       )}
       name={reference.account.name}
+      onOpen={onOpen}
     >
       <span>{cashDetail(reference.account)}</span>
       <AccountFlags

@@ -278,12 +278,14 @@ describe("PortfolioAccounts", () => {
     );
   });
 
-  it("opens an active securities account in Holdings by UUID and keeps retired accounts non-interactive", () => {
+  it("opens securities and cash accounts (including revealed retired cash) by UUID and keeps retired securities non-interactive", () => {
     const onOpenSecurities = vi.fn<(portfolioId: string) => void>();
+    const onOpenCash = vi.fn<(accountId: string) => void>();
     renderAccounts({
-      cashAccounts: [isaCash, retiredCash],
+      cashAccounts: [isaCash, reserveCash, retiredCash],
+      onOpenCash,
       onOpenSecurities,
-      securitiesAccounts: [isaSecurities, retiredSecurities],
+      securitiesAccounts: [isaSecurities, jointSecurities, retiredSecurities],
     });
 
     fireEvent.click(
@@ -292,6 +294,21 @@ describe("PortfolioAccounts", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Northstar ISA" }));
     expect(onOpenSecurities).toHaveBeenCalledExactlyOnceWith("sec-isa");
+
+    const isaCashButtons = screen.getAllByRole("button", { name: "ISA Cash" });
+    expect(isaCashButtons).toHaveLength(2);
+    for (const button of isaCashButtons) {
+      fireEvent.click(button);
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Reserve Cash" }));
+    fireEvent.click(screen.getByRole("button", { name: "Old Cash" }));
+    expect(onOpenCash.mock.calls).toStrictEqual([
+      ["cash-isa"],
+      ["cash-isa"],
+      ["cash-reserve"],
+      ["cash-old"],
+    ]);
+
     expect(
       screen.queryByRole("button", { name: "Closed Account" }),
     ).not.toBeInTheDocument();

@@ -39,6 +39,8 @@ in Postgres on Neon and the app on Vercel.
   as Portfolio Performance says, to invest.
 - Cogitator — what to buy and sell next in an account, towards that target
   allocation.
+- Portfolio — a browser-side view of a binary Portfolio Performance file, its
+  holdings, paired securities and cash accounts, and transactions.
 
 A scenario is a what-if copy of the household, or of another scenario. Every
 screen, and export and import, works on whichever is open. Compare sets one

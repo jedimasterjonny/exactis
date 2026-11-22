@@ -6,9 +6,9 @@ import { cn } from "cn";
 import { TriangleAlert } from "lucide-react";
 import { useOptimistic } from "react";
 
-import type { OptionGroup } from "@/components/app/atoms/cell-select";
 import type { Asset, Cma, Mapping, Sleeve } from "@/data/cma";
 import type { Target } from "@/data/targets";
+import type { OptionGroup } from "@/lib/options";
 
 import { mapCategory } from "@/actions/targets";
 import { CellSelect } from "@/components/app/atoms/cell-select";

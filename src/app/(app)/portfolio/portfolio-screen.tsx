@@ -10,11 +10,14 @@ import type {
   NewPortfolioAccount,
 } from "@/components/app/organisms/portfolio-account-dialog";
 import type { NewPortfolioSecurity } from "@/components/app/organisms/portfolio-security-dialog";
+import type { NewPortfolioTransaction } from "@/components/app/organisms/portfolio-transaction-dialog";
 import type {
   CashAccount,
   Holding,
   PortfolioSnapshot,
+  PortfolioTransaction,
   SecuritiesAccount,
+  TransactionType,
 } from "@/data/portfolio";
 
 import { PortfolioPicker } from "@/components/app/atoms/portfolio-picker";
@@ -26,6 +29,8 @@ import { PortfolioAccountDialog } from "@/components/app/organisms/portfolio-acc
 import { PortfolioAccounts } from "@/components/app/organisms/portfolio-accounts";
 import { PortfolioHoldings } from "@/components/app/organisms/portfolio-holdings";
 import { PortfolioSecurityDialog } from "@/components/app/organisms/portfolio-security-dialog";
+import { PortfolioTransactionDialog } from "@/components/app/organisms/portfolio-transaction-dialog";
+import { PortfolioTransactions } from "@/components/app/organisms/portfolio-transactions";
 import { SectionCard } from "@/components/app/organisms/section-card";
 import { Screen } from "@/components/app/templates/screen";
 import { Badge } from "@/components/kit/badge";
@@ -42,19 +47,20 @@ interface PortfolioScreenProps {
   readonly today: string;
 }
 
-type PortfolioTab = "Accounts" | "Holdings";
+type PortfolioTab = "Accounts" | "Holdings" | "Transactions";
 
 // The Portfolio screen, held in the browser around a binary Portfolio
 // Performance (.portfolio) file opened from this device. Before a file
 // is chosen it offers a single primary picker and states that the file
 // stays on the device. Once opened it leads with the headline answer
 // sentence, the four-column summary strip, any scenario, currency or
-// preview notices, and controlled Holdings and Accounts tabs. Clicking
-// a securities account in Accounts switches straight to Holdings
-// filtered by that account's UUID and restores focus onto the Holdings
-// panel. Preview additions stay in tab state only and never modify the
-// file or alter the real-file headline and summary strip; opening
-// another file resets them cleanly.
+// preview notices, and controlled Holdings, Accounts and Transactions
+// tabs. Clicking a securities account in Accounts switches to Holdings
+// filtered by that account's UUID, clicking a cash account switches to
+// Transactions filtered by that account's UUID, and ScreenTabs restores
+// focus onto the destination panel. Preview additions stay in tab state
+// only and never modify the file or alter the real-file headline and
+// summary strip; opening another file resets them cleanly.
 export function PortfolioScreen({
   initialTab,
   isInScenario,
@@ -67,13 +73,22 @@ export function PortfolioScreen({
   >([]);
   const [draftCash, setDraftCash] = useState<readonly CashAccount[]>([]);
   const [draftHoldings, setDraftHoldings] = useState<readonly Holding[]>([]);
+  const [draftTransactions, setDraftTransactions] = useState<
+    readonly PortfolioTransaction[]
+  >([]);
   const [activeTab, setActiveTab] = useState<PortfolioTab>(() =>
-    initialTab?.toLowerCase() === "accounts" ? "Accounts" : "Holdings",
+    initialTabOf(initialTab),
   );
   const [holdingsAccountId, setHoldingsAccountId] = useState("");
   const [isShowingZeroShares, setIsShowingZeroShares] = useState(false);
+  const [transactionsAccountId, setTransactionsAccountId] = useState("");
+  const [transactionsType, setTransactionsType] = useState<
+    "" | TransactionType
+  >("");
+  const [transactionsSecurityId, setTransactionsSecurityId] = useState("");
   const [addingAccount, setAddingAccount] = useState<AccountKind | null>(null);
   const [isAddingSecurity, setIsAddingSecurity] = useState(false);
+  const [isAddingTransaction, setIsAddingTransaction] = useState(false);
   const scenarioNoteId = useId();
 
   function addPreviewAccount(draft: NewPortfolioAccount): void {
@@ -148,6 +163,14 @@ export function PortfolioScreen({
     setDraftSecurities([]);
     setDraftCash([]);
     setDraftHoldings([]);
+    setDraftTransactions([]);
+  }
+
+  function openCashInTransactions(accountId: string): void {
+    setTransactionsAccountId(accountId);
+    setTransactionsType("");
+    setTransactionsSecurityId("");
+    setActiveTab("Transactions");
   }
 
   function openFile(opened: PortfolioSnapshot): void {
@@ -156,10 +179,15 @@ export function PortfolioScreen({
     setDraftSecurities([]);
     setDraftCash([]);
     setDraftHoldings([]);
+    setDraftTransactions([]);
     setHoldingsAccountId("");
     setIsShowingZeroShares(false);
+    setTransactionsAccountId("");
+    setTransactionsType("");
+    setTransactionsSecurityId("");
     setAddingAccount(null);
     setIsAddingSecurity(false);
+    setIsAddingTransaction(false);
   }
 
   function openSecuritiesInHoldings(portfolioId: string): void {
@@ -194,11 +222,68 @@ export function PortfolioScreen({
   ];
   const cashAccounts = [...snapshot.cashAccounts, ...draftCash];
   const holdings = [...snapshot.holdings, ...draftHoldings];
+  const transactions = [...draftTransactions, ...snapshot.transactions];
   const dialogCashAccounts = [...snapshotActiveCash, ...draftCash];
   const hasPreview =
     draftSecurities.length > 0 ||
     draftCash.length > 0 ||
-    draftHoldings.length > 0;
+    draftHoldings.length > 0 ||
+    draftTransactions.length > 0;
+
+  function addPreviewTransaction(draft: NewPortfolioTransaction): void {
+    const accountNames = new Map(
+      cashAccounts.map((account) => [account.id, account.name]),
+    );
+    const portfolioNames = new Map(
+      securitiesAccounts.map((account) => [account.id, account.name]),
+    );
+    const securityNames = new Map(
+      holdings.map((holding) => [holding.id, holding.name]),
+    );
+    const accountName =
+      draft.accountId === undefined
+        ? undefined
+        : accountNames.get(draft.accountId);
+    const otherAccountName =
+      draft.otherAccountId === undefined
+        ? undefined
+        : accountNames.get(draft.otherAccountId);
+    const portfolioName =
+      draft.portfolioId === undefined
+        ? undefined
+        : portfolioNames.get(draft.portfolioId);
+    const otherPortfolioName =
+      draft.otherPortfolioId === undefined
+        ? undefined
+        : portfolioNames.get(draft.otherPortfolioId);
+    const securityName =
+      draft.securityId === undefined
+        ? undefined
+        : securityNames.get(draft.securityId);
+
+    const added: PortfolioTransaction = {
+      ...draft,
+      ...(accountName !== undefined && { accountName }),
+      id: crypto.randomUUID(),
+      isDraft: true,
+      ...(otherAccountName !== undefined && { otherAccountName }),
+      ...(otherPortfolioName !== undefined && { otherPortfolioName }),
+      ...(portfolioName !== undefined && { portfolioName }),
+      ...(securityName !== undefined && { securityName }),
+      timestamp: Math.floor(Date.parse(`${draft.date}T00:00:00Z`) / 1000),
+    };
+    setDraftTransactions((current) => [added, ...current]);
+    setTransactionsAccountId("");
+    setTransactionsType("");
+    setTransactionsSecurityId("");
+    setIsAddingTransaction(false);
+    toast.add({
+      description:
+        "Shown in this view only. Changes are not saved to the file yet.",
+      title: "Transaction added to preview",
+      type: "info",
+    });
+  }
 
   return (
     <Screen
@@ -285,12 +370,37 @@ export function PortfolioScreen({
                 onAddSecurities={() => {
                   setAddingAccount("securities");
                 }}
+                onOpenCash={openCashInTransactions}
                 onOpenSecurities={openSecuritiesInHoldings}
                 readOnlyId={isInScenario ? scenarioNoteId : undefined}
                 securitiesAccounts={securitiesAccounts}
               />
             ),
             label: "Accounts",
+          },
+          {
+            children: (
+              <PortfolioTransactions
+                accountId={transactionsAccountId}
+                cashAccounts={cashAccounts}
+                holdings={holdings}
+                isReadOnly={isInScenario}
+                key={fileKey}
+                label={subsectionLabel(portfolio, 3)}
+                onAccountChange={setTransactionsAccountId}
+                onAddTransaction={() => {
+                  setIsAddingTransaction(true);
+                }}
+                onSecurityChange={setTransactionsSecurityId}
+                onTypeChange={setTransactionsType}
+                readOnlyId={isInScenario ? scenarioNoteId : undefined}
+                securitiesAccounts={securitiesAccounts}
+                securityId={transactionsSecurityId}
+                transactions={transactions}
+                type={transactionsType}
+              />
+            ),
+            label: "Transactions",
           },
         ]}
         value={activeTab}
@@ -316,6 +426,19 @@ export function PortfolioScreen({
           }}
         />
       )}
+      {isAddingTransaction && (
+        <PortfolioTransactionDialog
+          baseCurrency={snapshot.baseCurrency}
+          cashAccounts={cashAccounts}
+          holdings={holdings}
+          onAdd={addPreviewTransaction}
+          onDismiss={() => {
+            setIsAddingTransaction(false);
+          }}
+          securitiesAccounts={securitiesAccounts}
+          today={today}
+        />
+      )}
     </Screen>
   );
 }
@@ -326,6 +449,15 @@ function draftGbpRateOf(currency: string): null | number {
     return 1;
   }
   return currency === "GBX" ? 0.01 : null;
+}
+
+// The starting tab from an optional ?tab= query parameter.
+function initialTabOf(tab: string | undefined): PortfolioTab {
+  const normalized = tab?.toLowerCase();
+  if (normalized === "accounts") {
+    return "Accounts";
+  }
+  return normalized === "transactions" ? "Transactions" : "Holdings";
 }
 
 // The opening card shown before a .portfolio file has been selected.
