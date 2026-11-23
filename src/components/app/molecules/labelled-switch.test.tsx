@@ -77,7 +77,7 @@ describe("LabelledSwitch", () => {
   });
 
   // jsdom has no pointer to match, so the class that keys on one is read.
-  it("stands its row 44px tall on a touch screen", () => {
+  it("stands its row at least 32px tall, 44px on a touch screen, and keeps the icon from shrinking", () => {
     render(
       <LabelledSwitch
         icon={Sun}
@@ -88,10 +88,12 @@ describe("LabelledSwitch", () => {
       </LabelledSwitch>,
     );
 
-    expect(
-      // eslint-disable-next-line testing-library/no-node-access -- the label is the row and has no role of its own to query by
-      screen.getByRole("switch", { name: "Daylight" }).closest("label"),
-    ).toHaveClass("h-8", "pointer-coarse:min-h-11");
+    const control = screen.getByRole("switch", { name: "Daylight" });
+    // eslint-disable-next-line testing-library/no-node-access -- the label is the row and has no role of its own to query by
+    const row = control.closest("label");
+    expect(row).toHaveClass("min-h-8", "pointer-coarse:min-h-11");
+    // eslint-disable-next-line testing-library/no-node-access -- the icon is aria-hidden so it has no accessible role to query by
+    expect(row?.querySelector("svg")).toHaveClass("shrink-0");
   });
 
   // jsdom lays nothing out, so the class that takes the reach off is read.

@@ -82,6 +82,6 @@ describe("ThemeToggle", () => {
     expect(
       // eslint-disable-next-line testing-library/no-node-access -- the label is the switch's parent and has no role or text of its own to query by
       screen.getByRole("switch", { name: "Daylight" }).closest("label"),
-    ).toHaveClass("h-8", "max-md:h-11");
+    ).toHaveClass("min-h-8", "max-md:min-h-11");
   });
 });
