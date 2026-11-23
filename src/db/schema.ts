@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   check,
+  customType,
   integer,
   jsonb,
   pgTable,
@@ -8,6 +9,22 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
+
+// Drizzle has no built-in Postgres bytea column. PGlite returns a plain
+// Uint8Array while Neon HTTP returns a Node Buffer; copying into a fresh
+// Uint8Array<ArrayBuffer> normalizes both drivers without retaining a
+// shared Buffer slab.
+const bytea = customType<{
+  data: Uint8Array<ArrayBuffer>;
+  driverData: Uint8Array;
+}>({
+  dataType(): string {
+    return "bytea";
+  },
+  fromDriver(value: Uint8Array): Uint8Array<ArrayBuffer> {
+    return new Uint8Array(value);
+  },
+});
 
 // Every version of the household the store has kept, one row a save,
 // on the branch it was saved to: the household itself, which is the
@@ -51,3 +68,17 @@ export const householdVersions = pgTable(
     ),
   ],
 );
+
+// Up to the latest 750 versions of the household's binary Portfolio
+// Performance (.portfolio) file, outside household_versions so household
+// reads, writes and scenario forks never carry multi-MB binary payloads.
+// Each row holds the exact uploaded bytes, the sanitized filename, when
+// it was saved, and a version counting up from one. Triggers prune
+// versions outside the 750-version rolling window on insert while
+// refusing updates, truncates, and deletes inside it.
+export const portfolioFiles = pgTable("portfolio_files", {
+  content: bytea().notNull(),
+  fileName: text("file_name").notNull(),
+  savedAt: timestamp("saved_at", { withTimezone: true }).notNull().defaultNow(),
+  version: integer().primaryKey().notNull(),
+});

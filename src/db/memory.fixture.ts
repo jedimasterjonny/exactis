@@ -5,7 +5,7 @@ import { migrate } from "drizzle-orm/pglite/migrator";
 
 import type { Database } from "@/db/client";
 
-import { householdVersions } from "@/db/schema";
+import { householdVersions, portfolioFiles } from "@/db/schema";
 
 // A store in memory, for tests: a Postgres in the process, standing in
 // for the one the client opens. Booting and migrating one costs about a
@@ -32,6 +32,7 @@ export function inMemory(): Memory {
       await db.transaction(async (tx) => {
         await tx.execute(sql`SET LOCAL session_replication_role = replica`);
         await tx.delete(householdVersions);
+        await tx.delete(portfolioFiles);
       });
     },
     ready: async (): Promise<void> => {

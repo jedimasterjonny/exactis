@@ -214,9 +214,9 @@ if (!argv.includes("--reset")) {
   // The role is made where the parent does not hold it, as while
   // production, which is to run from the parent, is not yet set up: then
   // the reset carries the parent's role and its grants, and only the
-  // password is set. ponytail: the grants here name the one table; a
-  // table a migration adds needs its grant added here too until the parent
-  // holds the role.
+  // password is set. ponytail: the grants here name each table; a table a
+  // migration adds needs its grant added here too until the parent holds
+  // the role.
   stdout.write(`Putting ${appRole} back…\n`);
   try {
     const asOwner = neon(ownerUrl.href);
@@ -229,6 +229,9 @@ if (!argv.includes("--reset")) {
     await asOwner.query(`GRANT USAGE ON SCHEMA public TO ${appRole}`);
     await asOwner.query(
       `GRANT SELECT, INSERT, DELETE ON household_versions TO ${appRole}`,
+    );
+    await asOwner.query(
+      `DO $$ BEGIN IF to_regclass('public.portfolio_files') IS NOT NULL THEN GRANT SELECT, INSERT, DELETE ON portfolio_files TO ${appRole}; END IF; END $$;`,
     );
     stdout.write(`Checking as ${appRole}…\n`);
     const [row] = await neon(
