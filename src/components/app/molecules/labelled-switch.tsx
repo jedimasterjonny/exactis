@@ -57,12 +57,12 @@ export function LabelledSwitch({
   return (
     <label
       className={cn(
-        "flex h-8 items-center gap-2 label pointer-coarse:min-h-11",
+        "flex min-h-8 items-center gap-2 label pointer-coarse:min-h-11",
         tones[tone].label,
         className,
       )}
     >
-      <Icon aria-hidden className="size-3.5" />
+      <Icon aria-hidden className="size-3.5 shrink-0" />
       <span className="flex-1">{children}</span>
       <Switch
         checked={isChecked}

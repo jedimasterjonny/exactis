@@ -19,7 +19,7 @@ export function ThemeToggle(): JSX.Element {
   const isDark = isClient && theme === "dark";
   return (
     <LabelledSwitch
-      className="max-md:h-11"
+      className="max-md:min-h-11"
       icon={isDark ? Moon : Sun}
       isChecked={isDark}
       onCheckedChange={(isChecked) => {
