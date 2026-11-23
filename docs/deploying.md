@@ -45,6 +45,7 @@ role made in Neon's Console, CLI or API joins `neon_superuser`, as its
 CREATE ROLE exactis_app WITH LOGIN PASSWORD '<password>';
 GRANT USAGE ON SCHEMA public TO exactis_app;
 GRANT SELECT, INSERT, DELETE ON household_versions TO exactis_app;
+GRANT SELECT, INSERT, DELETE ON portfolio_files TO exactis_app;
 ```
 
 The app's `DATABASE_URL` is the branch owner's pooled URL with `exactis_app` and
