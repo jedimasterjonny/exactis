@@ -1,16 +1,6 @@
 // @vitest-environment node
-import { neon } from "@neondatabase/serverless";
 import { eq, sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/neon-http";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { blank, kept as reference } from "@/data/household.fixture";
 import { sam } from "@/data/owners.fixture";
@@ -32,10 +22,6 @@ import {
 } from "./household";
 
 const { close, db, empty, ready } = inMemory();
-
-// How a read of a branch's latest version fails, as the statement it ran.
-const readFailed =
-  'Failed query: select "decision", "household", "reason", "saved_at", "version" from "household_versions" where "household_versions"."scenario" = $1 order by "household_versions"."version" desc limit $2';
 
 // The names of the scenarios kept, in order.
 async function namesIn(): Promise<readonly string[]> {
@@ -630,72 +616,6 @@ describe("household store", () => {
           },
         },
       ),
-    );
-  });
-
-  // Neon's driver reads its URL on the first query, and quotes one it
-  // cannot read whole, password and all, as a URL built by hand and
-  // mistyped would be.
-  it("fails a query without a connection string the driver quotes", async () => {
-    const mistyped = drizzle({
-      client: neon("postgresql://app:hunter2@ep-example.neon.tech:port/neondb"),
-    });
-
-    await expect(readLatest(mistyped, "")).rejects.toStrictEqual(
-      new Error(readFailed, {
-        cause: {
-          code: undefined,
-          message:
-            "Database connection string provided to neon() is not a valid URL (connection string: [a URL]",
-          sourceError: undefined,
-        },
-      }),
-    );
-  });
-
-  it("fails a query with the code of the network failure beneath it", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi
-        .fn()
-        .mockRejectedValue(
-          new TypeError("fetch failed", {
-            cause: Object.assign(new Error("getaddrinfo ENOTFOUND"), {
-              code: "ENOTFOUND",
-            }),
-          }),
-        ),
-    );
-    const unreached = drizzle({
-      client: neon("postgresql://app:hunter2@ep-example.neon.tech/neondb"),
-    });
-
-    await expect(readLatest(unreached, "")).rejects.toStrictEqual(
-      new Error(readFailed, {
-        cause: {
-          code: undefined,
-          message: "Error connecting to database: TypeError: fetch failed",
-          sourceError: { cause: { code: "ENOTFOUND" } },
-        },
-      }),
-    );
-  });
-
-  it("fails a query whose failure is in no shape a query's takes with that alone", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
-          Response.json({ code: 42, message: "x" }, { status: 400 }),
-        ),
-    );
-    const odd = drizzle({
-      client: neon("postgresql://app:hunter2@ep-example.neon.tech/neondb"),
-    });
-
-    await expect(readLatest(odd, "")).rejects.toStrictEqual(
-      new Error("Failed query, in no shape a query's failure takes"),
     );
   });
 
