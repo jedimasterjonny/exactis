@@ -53,6 +53,14 @@ export async function getPortfolio(): Promise<null | OwnedPortfolio> {
   return { savedOn: dayOf(row.savedAt), snapshot, version: row.version };
 }
 
+// The household's latest stored .portfolio file as exact raw bytes, or
+// null before one is uploaded. Uncached and session-checked, for the
+// authenticated download route; readable while a scenario is open.
+export async function readStoredPortfolio(): Promise<null | StoredPortfolio> {
+  await requireSession();
+  return readLatestPortfolio(getDb());
+}
+
 // Validates and stores an uploaded binary .portfolio file as the next
 // household version after afterVersion. Refused while a scenario is
 // open, when the bytes are not a readable binary .portfolio file, or
