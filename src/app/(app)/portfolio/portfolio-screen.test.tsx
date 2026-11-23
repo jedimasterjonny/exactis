@@ -592,4 +592,203 @@ describe("PortfolioScreen", () => {
       "outline",
     );
   });
+
+  it("enables the Transactions inactive toggle when opening a retired cash account, handles toggling off end-to-end, and resets on file switch", async () => {
+    const fileWithInactive = portfolioFile([
+      [1, 66],
+      [
+        2,
+        [
+          [1, "sec-world"],
+          [3, "Global Equity Index"],
+          [4, "GBP"],
+          [16, [[2, 12_500_000_000]]],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-sold"],
+          [3, "Cleared Equity Fund"],
+          [4, "GBP"],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-isa"],
+          [2, "Northstar ISA Cash"],
+          [3, "GBP"],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-old"],
+          [2, "Closed Cash"],
+          [3, "GBP"],
+          [5, 1],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-isa"],
+          [2, "Northstar ISA"],
+          [5, "cash-isa"],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-1"],
+          [2, 6],
+          [3, "cash-isa"],
+          [9, [[1, 1_789_000_000]]],
+          [10, "GBP"],
+          [11, 200_000],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-2"],
+          [2, 0],
+          [3, "cash-isa"],
+          [4, "port-isa"],
+          [9, [[1, 1_789_100_000]]],
+          [10, "GBP"],
+          [11, 125_000],
+          [12, 1_000_000_000],
+          [14, "sec-world"],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-3"],
+          [2, 6],
+          [3, "cash-old"],
+          [9, [[1, 1_789_200_000]]],
+          [10, "GBP"],
+          [11, 50_000],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+
+    render(
+      <PortfolioScreen
+        initialTab="Accounts"
+        isInScenario={false}
+        today="2026-09-25"
+      />,
+      { wrapper: Toaster },
+    );
+
+    openPortfolio(fileWithInactive, "first.portfolio");
+    const retiredAccountsSwitch = await screen.findByRole("switch", {
+      name: "Show retired accounts",
+    });
+    fireEvent.click(retiredAccountsSwitch);
+    fireEvent.click(screen.getByRole("button", { name: "Closed Cash" }));
+
+    const txPanel = screen.getByRole("tabpanel");
+    expect(screen.getByRole("tab", { name: "Transactions" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+
+    const inactiveSwitch = within(txPanel).getByRole("switch", {
+      name: "Show retired & zero-share in filters",
+    });
+    expect(inactiveSwitch).toBeChecked();
+    expect(
+      within(txPanel).getByRole("combobox", { name: "Account" }),
+    ).toHaveValue("cash-old");
+    expect(within(txPanel).getByText("1 transaction")).toBeInTheDocument();
+
+    // Select the zero-share security alongside the retired cash account, then switch OFF;
+    // both hidden selections clear and all historical transactions remain visible.
+    fireEvent.change(
+      within(txPanel).getByRole("combobox", { name: "Security" }),
+      { target: { value: "sec-sold" } },
+    );
+    fireEvent.click(inactiveSwitch);
+
+    expect(inactiveSwitch).not.toBeChecked();
+    expect(
+      within(txPanel).getByRole("combobox", { name: "Account" }),
+    ).toHaveValue("");
+    expect(
+      within(txPanel).getByRole("combobox", { name: "Security" }),
+    ).toHaveValue("");
+    expect(within(txPanel).getByText("3 transactions")).toBeInTheDocument();
+    expect(
+      within(txPanel).queryByRole("option", { name: "Closed Cash (retired)" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(txPanel).queryByRole("option", {
+        name: "Cleared Equity Fund (0 shares)",
+      }),
+    ).not.toBeInTheDocument();
+
+    // Toggling ON, selecting active filters, and toggling OFF keeps active filters selected.
+    fireEvent.click(inactiveSwitch);
+    expect(inactiveSwitch).toBeChecked();
+    fireEvent.change(
+      within(txPanel).getByRole("combobox", { name: "Account" }),
+      { target: { value: "cash-isa" } },
+    );
+    fireEvent.change(
+      within(txPanel).getByRole("combobox", { name: "Security" }),
+      { target: { value: "sec-world" } },
+    );
+    fireEvent.click(inactiveSwitch);
+
+    expect(inactiveSwitch).not.toBeChecked();
+    expect(
+      within(txPanel).getByRole("combobox", { name: "Account" }),
+    ).toHaveValue("cash-isa");
+    expect(
+      within(txPanel).getByRole("combobox", { name: "Security" }),
+    ).toHaveValue("sec-world");
+
+    // Switching files resets the Transactions inactive toggle back to OFF.
+    fireEvent.click(inactiveSwitch);
+    expect(inactiveSwitch).toBeChecked();
+
+    openPortfolio(fileWithInactive, "second.portfolio");
+    expect(
+      await screen.findByText("second.portfolio · GBP"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("tabpanel")).getByRole("switch", {
+        name: "Show retired & zero-share in filters",
+      }),
+    ).not.toBeChecked();
+  });
+
+  it("keeps newly added preview securities selectable in Transactions filters without enabling the inactive toggle", async () => {
+    render(<PortfolioScreen isInScenario={false} today="2026-09-25" />, {
+      wrapper: Toaster,
+    });
+
+    openPortfolio(gbpFile, "northstar.portfolio");
+    await screen.findByText("northstar.portfolio · GBP");
+
+    fireEvent.click(screen.getByRole("button", { name: "Add security" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Security name" }), {
+      target: { value: "Preview Gilts" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add preview" }));
+
+    fireEvent.click(screen.getByRole("tab", { name: "Transactions" }));
+    const txPanel = screen.getByRole("tabpanel");
+
+    expect(within(txPanel).queryByRole("switch")).not.toBeInTheDocument();
+    expect(
+      within(txPanel).getByRole("option", { name: "Preview Gilts" }),
+    ).toBeInTheDocument();
+  });
 });

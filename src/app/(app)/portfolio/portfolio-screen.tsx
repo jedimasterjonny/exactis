@@ -86,6 +86,8 @@ export function PortfolioScreen({
     "" | TransactionType
   >("");
   const [transactionsSecurityId, setTransactionsSecurityId] = useState("");
+  const [isShowingInactiveTransactions, setIsShowingInactiveTransactions] =
+    useState(false);
   const [addingAccount, setAddingAccount] = useState<AccountKind | null>(null);
   const [isAddingSecurity, setIsAddingSecurity] = useState(false);
   const [isAddingTransaction, setIsAddingTransaction] = useState(false);
@@ -166,13 +168,6 @@ export function PortfolioScreen({
     setDraftTransactions([]);
   }
 
-  function openCashInTransactions(accountId: string): void {
-    setTransactionsAccountId(accountId);
-    setTransactionsType("");
-    setTransactionsSecurityId("");
-    setActiveTab("Transactions");
-  }
-
   function openFile(opened: PortfolioSnapshot): void {
     setSnapshot(opened);
     setFileKey((current) => current + 1);
@@ -185,6 +180,7 @@ export function PortfolioScreen({
     setTransactionsAccountId("");
     setTransactionsType("");
     setTransactionsSecurityId("");
+    setIsShowingInactiveTransactions(false);
     setAddingAccount(null);
     setIsAddingSecurity(false);
     setIsAddingTransaction(false);
@@ -283,6 +279,20 @@ export function PortfolioScreen({
       title: "Transaction added to preview",
       type: "info",
     });
+  }
+
+  function openCashInTransactions(accountId: string): void {
+    if (
+      cashAccounts.some(
+        (account) => account.id === accountId && account.isRetired,
+      )
+    ) {
+      setIsShowingInactiveTransactions(true);
+    }
+    setTransactionsAccountId(accountId);
+    setTransactionsType("");
+    setTransactionsSecurityId("");
+    setActiveTab("Transactions");
   }
 
   return (
@@ -385,6 +395,7 @@ export function PortfolioScreen({
                 cashAccounts={cashAccounts}
                 holdings={holdings}
                 isReadOnly={isInScenario}
+                isShowingInactive={isShowingInactiveTransactions}
                 key={fileKey}
                 label={subsectionLabel(portfolio, 3)}
                 onAccountChange={setTransactionsAccountId}
@@ -392,6 +403,7 @@ export function PortfolioScreen({
                   setIsAddingTransaction(true);
                 }}
                 onSecurityChange={setTransactionsSecurityId}
+                onShowingInactiveChange={setIsShowingInactiveTransactions}
                 onTypeChange={setTransactionsType}
                 readOnlyId={isInScenario ? scenarioNoteId : undefined}
                 securitiesAccounts={securitiesAccounts}
