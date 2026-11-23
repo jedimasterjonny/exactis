@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 
 import { balancesSheet } from "@/data/balances-sheet";
 import { stamped } from "@/data/shapes";
+import { attachment } from "@/lib/attachment";
 import { today } from "@/lib/months";
 import { readShown } from "@/store/household";
 
@@ -52,13 +53,4 @@ export async function GET(request: NextRequest): Promise<Response> {
       "content-disposition": attachment(`exactis-${branch}-${today()}.json`),
     },
   });
-}
-
-// A download named as given, encoded as RFC 8187 has it.
-function attachment(name: string): string {
-  const encoded = encodeURIComponent(name).replace(
-    /[!'()*]/g,
-    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
-  );
-  return `attachment; filename*=UTF-8''${encoded}`;
 }
