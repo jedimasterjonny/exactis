@@ -19,6 +19,7 @@ import type { Month } from "@/data/schedule";
 import type { Database } from "@/db/client";
 
 import { stamped } from "@/data/shapes";
+import { queried } from "@/db/queried";
 import { householdVersions } from "@/db/schema";
 import { Refusal } from "@/lib/answer";
 import { monthsBetween } from "@/lib/months";
@@ -58,33 +59,6 @@ export interface Version {
   readonly household: unknown;
   readonly version: number;
 }
-
-// What a failed query keeps: the statement, its values left as
-// placeholders, the driver's code, its words with anything shaped as a
-// URL taken out, and the code of the network failure beneath them where
-// there is one, an address not found or a connection timed out. The rest
-// is dropped, since a failure is written to the server's log: Drizzle's
-// error carries the values bound to the statement, which are the whole
-// household on a save and a scenario's name as its cookie gave it on a
-// read, the driver's error what it was parsing when it failed, and the
-// driver's words quote a connection string it cannot read whole,
-// password and all.
-const failure = z.object({
-  cause: z.object({
-    code: z.string().optional(),
-    message: z.string().transform((words) =>
-      words
-        .split(/(\s+)/u)
-        .map((word) => (word.includes("://") ? "[a URL]" : word))
-        .join(""),
-    ),
-    sourceError: z
-      .object({ cause: z.object({ code: z.string() }) })
-      .optional()
-      .catch(undefined),
-  }),
-  query: z.string(),
-});
 
 // The highest next id as the store hands it back: the one row an
 // aggregate makes, holding a whole number.
@@ -455,21 +429,6 @@ export async function readLatest(
   scenario: string,
 ): Promise<null | Version> {
   return readEnd(db, scenario, desc);
-}
-
-// A query run, and when it fails, failed again with only what a failure
-// keeps, or, for a failure in no shape a query's takes, with only that.
-async function queried<TResult>(query: PromiseLike<TResult>): Promise<TResult> {
-  try {
-    return await query;
-  } catch (error) {
-    const kept = failure.safeParse(error);
-    throw kept.success
-      ? new Error(`Failed query: ${kept.data.query}`, {
-          cause: kept.data.cause,
-        })
-      : new Error("Failed query, in no shape a query's failure takes");
-  }
 }
 
 // The version at one end of the branch, the versions ordered as given,
