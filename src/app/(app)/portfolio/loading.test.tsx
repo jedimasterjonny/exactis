@@ -4,13 +4,13 @@ import { describe, expect, it } from "vitest";
 import Loading from "./loading";
 
 describe("Loading", () => {
-  it("shows the Portfolio screen header while the session answers", () => {
+  it("shows the Portfolio screen header while the store answers", () => {
     render(<Loading />);
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Portfolio",
     );
     expect(screen.getByText("Sect. IX · Portfolio")).toHaveClass("label");
-    expect(screen.getByText("Opening portfolio…")).toBeInTheDocument();
+    expect(screen.getByText("Reading the store…")).toBeInTheDocument();
   });
 });

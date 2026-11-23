@@ -5,9 +5,12 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+import type { OwnedPortfolio } from "@/store/portfolio";
 
 import { Toaster } from "@/components/kit/toast";
+import { readPortfolioSnapshot } from "@/lib/portfolio-file";
 import {
   portfolioFile,
   samplePortfolioFile,
@@ -16,39 +19,62 @@ import { commit } from "@/test/dom";
 
 import { PortfolioScreen } from "./portfolio-screen";
 
+vi.mock("@/actions/portfolio", () => ({ uploadPortfolio: vi.fn() }));
+
 const gbpFile = samplePortfolioFile("GBP");
 const usdFile = samplePortfolioFile("USD");
 
-function openPortfolio(bytes: Uint8Array<ArrayBuffer>, name: string): void {
-  fireEvent.change(screen.getByLabelText("Portfolio Performance file"), {
-    target: { files: [new File([bytes], name)] },
-  });
+function ownedOf(
+  bytes: Uint8Array<ArrayBuffer>,
+  name: string,
+  {
+    savedOn = "2026-09-24",
+    version = 1,
+  }: { readonly savedOn?: string; readonly version?: number } = {},
+): OwnedPortfolio {
+  return { savedOn, snapshot: readPortfolioSnapshot(bytes, name), version };
 }
 
 describe("PortfolioScreen", () => {
-  it("opens on the empty state, reads a chosen file, and renders Holdings and Accounts tabs with summary readings", async () => {
-    render(<PortfolioScreen isInScenario={false} today="2026-09-25" />, {
-      wrapper: Toaster,
-    });
+  it("opens on the empty state, moves focus to h1 when the first file lands, and renders owned header actions and summary readings", () => {
+    const { rerender } = render(
+      <PortfolioScreen isInScenario={false} owned={null} today="2026-09-25" />,
+      { wrapper: Toaster },
+    );
 
     expect(screen.getByText("Sect. IX · Portfolio")).toHaveClass("label");
-    expect(screen.getByText("No file open")).toBeInTheDocument();
-    expect(screen.getByText("No portfolio file open")).toBeInTheDocument();
+    expect(screen.getByText("No file uploaded")).toBeInTheDocument();
+    expect(screen.getByText("No portfolio file uploaded")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "The file is read in your browser and never leaves this device.",
+        "Stored with the household, not in scenarios. Accepts a Portfolio Performance file saved in binary without a password, up to 4 MB.",
       ),
     ).toBeInTheDocument();
-
-    openPortfolio(gbpFile, "northstar.portfolio");
-
     expect(
-      await screen.findByText("northstar.portfolio · GBP"),
-    ).toBeInTheDocument();
+      screen.getByRole("button", { name: "Upload .portfolio file" }),
+    ).toBeEnabled();
+
+    rerender(
+      <PortfolioScreen
+        isInScenario={false}
+        owned={ownedOf(gbpFile, "northstar.portfolio")}
+        today="2026-09-25"
+      />,
+    );
+
+    expect(screen.getByRole("heading", { level: 1 })).toHaveFocus();
+    const meta = screen.getByText(
+      "northstar.portfolio · GBP · Saved 24 Sep 2026",
+    );
+    expect(meta).toHaveClass("min-w-0", "wrap-anywhere");
     expect(screen.getByText("View only")).toHaveAttribute(
       "data-variant",
       "caution",
     );
+    const download = screen.getByRole("link", { name: "Download .portfolio" });
+    expect(download).toHaveAttribute("href", "/portfolio/download");
+    expect(download).not.toHaveAttribute("download");
+    expect(screen.getByRole("button", { name: "Replace file…" })).toBeEnabled();
     expect(
       screen.getByRole("heading", { level: 2, name: /^The portfolio holds/ }),
     ).toHaveTextContent(
@@ -77,18 +103,48 @@ describe("PortfolioScreen", () => {
     expect(screen.queryByText(/^Base currency is/)).not.toBeInTheDocument();
   });
 
-  it("cross-filters Holdings when clicking a securities account in Accounts and restores focus to the Holdings panel", async () => {
-    render(
+  it("does not steal focus to h1 on initial owned mount or on version replacement", () => {
+    const { rerender } = render(
       <PortfolioScreen
-        initialTab="Accounts"
         isInScenario={false}
+        owned={ownedOf(gbpFile, "northstar.portfolio", { version: 1 })}
         today="2026-09-25"
       />,
       { wrapper: Toaster },
     );
 
-    openPortfolio(gbpFile, "northstar.portfolio");
-    await screen.findByText("northstar.portfolio · GBP");
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading).not.toHaveFocus();
+
+    const replace = screen.getByRole("button", { name: "Replace file…" });
+    replace.focus();
+    expect(replace).toHaveFocus();
+
+    rerender(
+      <PortfolioScreen
+        isInScenario={false}
+        owned={ownedOf(usdFile, "dollar.portfolio", {
+          savedOn: "2026-09-25",
+          version: 2,
+        })}
+        today="2026-09-25"
+      />,
+    );
+
+    expect(heading).not.toHaveFocus();
+    expect(replace).toHaveFocus();
+  });
+
+  it("cross-filters Holdings when clicking a securities account in Accounts and restores focus to the Holdings panel", () => {
+    render(
+      <PortfolioScreen
+        initialTab="Accounts"
+        isInScenario={false}
+        owned={ownedOf(gbpFile, "northstar.portfolio")}
+        today="2026-09-25"
+      />,
+      { wrapper: Toaster },
+    );
 
     expect(screen.getByRole("tab", { name: "Accounts" })).toHaveAttribute(
       "aria-selected",
@@ -134,13 +190,15 @@ describe("PortfolioScreen", () => {
     ).toBeInTheDocument();
   });
 
-  it("adds preview securities with auto-reveal of zero-share rows, adds preview accounts, clears preview, and resets on file switch", async () => {
-    render(<PortfolioScreen isInScenario={false} today="2026-09-25" />, {
-      wrapper: Toaster,
-    });
-
-    openPortfolio(gbpFile, "northstar.portfolio");
-    await screen.findByText("northstar.portfolio · GBP");
+  it("adds preview entries, warns in Replace ConfirmDialog, clears preview, and resets drafts when version advances", async () => {
+    const { rerender } = render(
+      <PortfolioScreen
+        isInScenario={false}
+        owned={ownedOf(gbpFile, "northstar.portfolio", { version: 1 })}
+        today="2026-09-25"
+      />,
+      { wrapper: Toaster },
+    );
 
     // Open and cancel Add security first.
     fireEvent.click(screen.getByRole("button", { name: "Add security" }));
@@ -197,6 +255,17 @@ describe("PortfolioScreen", () => {
         name: "Show zero-share securities",
       }),
     ).toBeChecked();
+
+    // Choosing a replacement file while preview entries exist warns in ConfirmDialog.
+    fireEvent.change(screen.getByLabelText("Portfolio Performance file"), {
+      target: { files: [new File([usdFile], "dollar.portfolio")] },
+    });
+    expect(
+      screen.getByRole("alertdialog", { name: "Replace portfolio file?" }),
+    ).toHaveAccessibleDescription(
+      "dollar.portfolio replaces northstar.portfolio for the household, kept as the next version. Download .portfolio first to keep a copy of the current file. Unsaved preview entries in this tab will be cleared.",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     // Add minimal USD and GBP preview securities to cover all draft currency branches.
     fireEvent.click(screen.getByRole("button", { name: "Add security" }));
@@ -319,7 +388,8 @@ describe("PortfolioScreen", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Holdings" }));
     expect(screen.queryByText("UK Gilts Preview")).not.toBeInTheDocument();
 
-    // Add one preview security again and switch to a USD-base file to verify reset and non-GBP caution.
+    // Add a preview security on v1, then advance to a v2 USD-base file:
+    // drafts from v1 are cleared, Base currency caution shows, and a fresh v2 preview starts clean.
     fireEvent.click(screen.getByRole("button", { name: "Add security" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Security name" }), {
       target: { value: "Temporary Fund" },
@@ -331,31 +401,73 @@ describe("PortfolioScreen", () => {
       ),
     ).toHaveLength(2);
 
-    openPortfolio(usdFile, "dollar.portfolio");
+    rerender(
+      <PortfolioScreen
+        isInScenario={false}
+        owned={ownedOf(usdFile, "dollar.portfolio", {
+          savedOn: "2026-09-25",
+          version: 2,
+        })}
+        today="2026-09-25"
+      />,
+    );
 
     expect(
-      await screen.findByText("dollar.portfolio · USD"),
+      screen.getByText("dollar.portfolio · USD · Saved 25 Sep 2026"),
     ).toBeInTheDocument();
     expect(screen.getByText("Base currency is USD")).toBeInTheDocument();
     expect(screen.queryByText("Temporary Fund")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Preview entries are kept in this browser tab only"),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add security" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Security name" }), {
+      target: { value: "Second Version Fund" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add preview" }));
+    expect(
+      await within(screen.getByRole("tabpanel")).findAllByText(
+        "Second Version Fund",
+      ),
+    ).toHaveLength(2);
+    expect(screen.queryByText("Temporary Fund")).not.toBeInTheDocument();
   });
 
-  it("shows the scenario caution and describes disabled add buttons on both tabs when a scenario is open", async () => {
-    render(<PortfolioScreen isInScenario today="2026-09-25" />, {
-      wrapper: Toaster,
+  it("shows distinct scenario cautions and describes disabled upload, replace, and add controls in both empty and owned states", () => {
+    const { rerender } = render(
+      <PortfolioScreen isInScenario owned={null} today="2026-09-25" />,
+      { wrapper: Toaster },
+    );
+
+    const upload = screen.getByRole("button", {
+      name: "Upload .portfolio file",
     });
+    expect(upload).toBeDisabled();
+    expect(upload).toHaveAccessibleDescription(
+      "Portfolio belongs to the household Leave the scenario to upload a portfolio file.",
+    );
 
-    openPortfolio(gbpFile, "northstar.portfolio");
+    rerender(
+      <PortfolioScreen
+        isInScenario
+        owned={ownedOf(gbpFile, "northstar.portfolio")}
+        today="2026-09-25"
+      />,
+    );
 
+    const expectedOwnedDescription =
+      "Portfolio belongs to the household Leave the scenario to replace the file or add preview entries.";
+    const replace = screen.getByRole("button", { name: "Replace file…" });
+    expect(replace).toBeDisabled();
+    expect(replace).toHaveAccessibleDescription(expectedOwnedDescription);
     expect(
-      await screen.findByText("Portfolio belongs to the household"),
-    ).toBeInTheDocument();
+      screen.getByRole("link", { name: "Download .portfolio" }),
+    ).toHaveAttribute("href", "/portfolio/download");
 
     const addSecurity = screen.getByRole("button", { name: "Add security" });
     expect(addSecurity).toBeDisabled();
-    expect(addSecurity).toHaveAccessibleDescription(
-      "Portfolio belongs to the household Leave the scenario to add preview entries.",
-    );
+    expect(addSecurity).toHaveAccessibleDescription(expectedOwnedDescription);
 
     fireEvent.click(screen.getByRole("tab", { name: "Accounts" }));
 
@@ -363,15 +475,10 @@ describe("PortfolioScreen", () => {
       name: "Add securities account",
     });
     const addCash = screen.getByRole("button", { name: "Add cash account" });
-
     expect(addSecurities).toBeDisabled();
     expect(addCash).toBeDisabled();
-    expect(addSecurities).toHaveAccessibleDescription(
-      "Portfolio belongs to the household Leave the scenario to add preview entries.",
-    );
-    expect(addCash).toHaveAccessibleDescription(
-      "Portfolio belongs to the household Leave the scenario to add preview entries.",
-    );
+    expect(addSecurities).toHaveAccessibleDescription(expectedOwnedDescription);
+    expect(addCash).toHaveAccessibleDescription(expectedOwnedDescription);
 
     fireEvent.click(screen.getByRole("tab", { name: "Transactions" }));
     const addTransaction = screen.getByRole("button", {
@@ -379,7 +486,7 @@ describe("PortfolioScreen", () => {
     });
     expect(addTransaction).toBeDisabled();
     expect(addTransaction).toHaveAccessibleDescription(
-      "Portfolio belongs to the household Leave the scenario to add preview entries.",
+      expectedOwnedDescription,
     );
   });
 
@@ -388,13 +495,11 @@ describe("PortfolioScreen", () => {
       <PortfolioScreen
         initialTab="Transactions"
         isInScenario={false}
+        owned={ownedOf(gbpFile, "northstar.portfolio")}
         today="2026-09-25"
       />,
       { wrapper: Toaster },
     );
-
-    openPortfolio(gbpFile, "northstar.portfolio");
-    await screen.findByText("northstar.portfolio · GBP");
 
     expect(screen.getByRole("tab", { name: "Transactions" })).toHaveAttribute(
       "aria-selected",
@@ -486,7 +591,7 @@ describe("PortfolioScreen", () => {
     expect(within(txPanel).queryByText("Preview buy")).not.toBeInTheDocument();
   });
 
-  it("resets Show retired accounts when switching to another file", async () => {
+  it("resets Show retired accounts when the stored file version advances", () => {
     const fileWithRetired = portfolioFile([
       [
         3,
@@ -500,32 +605,40 @@ describe("PortfolioScreen", () => {
       [12, "GBP"],
     ]);
 
-    render(
+    const { rerender } = render(
       <PortfolioScreen
         initialTab="Accounts"
         isInScenario={false}
+        owned={ownedOf(fileWithRetired, "first.portfolio", { version: 1 })}
         today="2026-09-25"
       />,
       { wrapper: Toaster },
     );
 
-    openPortfolio(fileWithRetired, "first.portfolio");
-    const toggle = await screen.findByRole("switch", {
+    const toggle = screen.getByRole("switch", {
       name: "Show retired accounts",
     });
     fireEvent.click(toggle);
     expect(toggle).toBeChecked();
 
-    openPortfolio(fileWithRetired, "second.portfolio");
+    rerender(
+      <PortfolioScreen
+        initialTab="Accounts"
+        isInScenario={false}
+        owned={ownedOf(fileWithRetired, "second.portfolio", { version: 2 })}
+        today="2026-09-25"
+      />,
+    );
+
     expect(
-      await screen.findByText("second.portfolio · GBP"),
+      screen.getByText("second.portfolio · GBP · Saved 24 Sep 2026"),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("switch", { name: "Show retired accounts" }),
     ).not.toBeChecked();
   });
 
-  it("counts retired securities with positive shares in PortfolioSummary so the summary matches HoldingsTable", async () => {
+  it("counts retired securities with positive shares in PortfolioSummary so the summary matches HoldingsTable", () => {
     const fileWithRetiredHeld = portfolioFile([
       [
         2,
@@ -574,12 +687,14 @@ describe("PortfolioScreen", () => {
       [12, "GBP"],
     ]);
 
-    render(<PortfolioScreen isInScenario={false} today="2026-09-25" />, {
-      wrapper: Toaster,
-    });
-
-    openPortfolio(fileWithRetiredHeld, "legacy.portfolio");
-    await screen.findByText("legacy.portfolio · GBP");
+    render(
+      <PortfolioScreen
+        isInScenario={false}
+        owned={ownedOf(fileWithRetiredHeld, "legacy.portfolio")}
+        today="2026-09-25"
+      />,
+      { wrapper: Toaster },
+    );
 
     expect(
       screen
@@ -593,7 +708,7 @@ describe("PortfolioScreen", () => {
     );
   });
 
-  it("enables the Transactions inactive toggle when opening a retired cash account, handles toggling off end-to-end, and resets on file switch", async () => {
+  it("enables the Transactions inactive toggle when opening a retired cash account, handles toggling off end-to-end, and resets when version advances", () => {
     const fileWithInactive = portfolioFile([
       [1, 66],
       [
@@ -677,17 +792,17 @@ describe("PortfolioScreen", () => {
       [12, "GBP"],
     ]);
 
-    render(
+    const { rerender } = render(
       <PortfolioScreen
         initialTab="Accounts"
         isInScenario={false}
+        owned={ownedOf(fileWithInactive, "first.portfolio", { version: 1 })}
         today="2026-09-25"
       />,
       { wrapper: Toaster },
     );
 
-    openPortfolio(fileWithInactive, "first.portfolio");
-    const retiredAccountsSwitch = await screen.findByRole("switch", {
+    const retiredAccountsSwitch = screen.getByRole("switch", {
       name: "Show retired accounts",
     });
     fireEvent.click(retiredAccountsSwitch);
@@ -754,14 +869,27 @@ describe("PortfolioScreen", () => {
       within(txPanel).getByRole("combobox", { name: "Security" }),
     ).toHaveValue("sec-world");
 
-    // Switching files resets the Transactions inactive toggle back to OFF.
+    // Advancing the stored version resets the Transactions inactive toggle back to OFF
+    // while keeping the Transactions tab active.
     fireEvent.click(inactiveSwitch);
     expect(inactiveSwitch).toBeChecked();
 
-    openPortfolio(fileWithInactive, "second.portfolio");
+    rerender(
+      <PortfolioScreen
+        initialTab="Accounts"
+        isInScenario={false}
+        owned={ownedOf(fileWithInactive, "second.portfolio", { version: 2 })}
+        today="2026-09-25"
+      />,
+    );
+
     expect(
-      await screen.findByText("second.portfolio · GBP"),
+      screen.getByText("second.portfolio · GBP · Saved 24 Sep 2026"),
     ).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Transactions" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     expect(
       within(screen.getByRole("tabpanel")).getByRole("switch", {
         name: "Show retired & zero-share in filters",
@@ -769,13 +897,15 @@ describe("PortfolioScreen", () => {
     ).not.toBeChecked();
   });
 
-  it("keeps newly added preview securities selectable in Transactions filters without enabling the inactive toggle", async () => {
-    render(<PortfolioScreen isInScenario={false} today="2026-09-25" />, {
-      wrapper: Toaster,
-    });
-
-    openPortfolio(gbpFile, "northstar.portfolio");
-    await screen.findByText("northstar.portfolio · GBP");
+  it("keeps newly added preview securities selectable in Transactions filters without enabling the inactive toggle", () => {
+    render(
+      <PortfolioScreen
+        isInScenario={false}
+        owned={ownedOf(gbpFile, "northstar.portfolio")}
+        today="2026-09-25"
+      />,
+      { wrapper: Toaster },
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Add security" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Security name" }), {

@@ -39,8 +39,9 @@ in Postgres on Neon and the app on Vercel.
   as Portfolio Performance says, to invest.
 - Cogitator — what to buy and sell next in an account, towards that target
   allocation.
-- Portfolio — a browser-side view of a binary Portfolio Performance file, its
-  holdings, paired securities and cash accounts, and transactions.
+- Portfolio — the household's stored binary Portfolio Performance file, its
+  holdings, paired securities and cash accounts, and transactions, with upload,
+  replacement and byte-for-byte download for desktop round-tripping.
 
 A scenario is a what-if copy of the household, or of another scenario. Every
 screen, and export and import, works on whichever is open. Compare sets one
@@ -93,7 +94,11 @@ The household is a `jsonb` document in one Postgres table, a row per version,
 read through Drizzle over Neon's HTTP driver. A save inserts the next version in
 one statement, and is refused if what it was made from has changed since, or if
 it breaks a rule, most of them in `src/data/household.ts`. Triggers refuse any
-update or truncate, and any delete but a scenario's.
+update or truncate, and any delete but a scenario's. A second table,
+`portfolio_files`, keeps up to the latest 750 binary versions of the household's
+`.portfolio` file outside the JSONB household document, pruning older ones on
+insert while triggers refuse update, truncate and deletion within the kept
+window.
 
 Changing the household's shape needs no migration. A change older versions
 cannot be read under appends a step to `src/data/shapes.ts`, which carries them
