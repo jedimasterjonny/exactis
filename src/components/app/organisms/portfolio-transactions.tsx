@@ -2,7 +2,7 @@
 
 import type { JSX } from "react";
 
-import { ArrowLeftRight, Plus } from "lucide-react";
+import { ArrowLeftRight, Eye, Plus } from "lucide-react";
 import { useState } from "react";
 
 import type {
@@ -15,6 +15,7 @@ import type {
 import type { Option, OptionGroup } from "@/lib/options";
 
 import { EmptyState } from "@/components/app/molecules/empty-state";
+import { LabelledSwitch } from "@/components/app/molecules/labelled-switch";
 import { SelectField } from "@/components/app/molecules/select-field";
 import { SectionCard } from "@/components/app/organisms/section-card";
 import { TransactionsTable } from "@/components/app/organisms/transactions-table";
@@ -28,10 +29,12 @@ interface PortfolioTransactionsProps {
   readonly cashAccounts: readonly CashAccount[];
   readonly holdings: readonly Holding[];
   readonly isReadOnly?: boolean;
+  readonly isShowingInactive: boolean;
   readonly label: string;
   readonly onAccountChange: (accountId: string) => void;
   readonly onAddTransaction: () => void;
   readonly onSecurityChange: (securityId: string) => void;
+  readonly onShowingInactiveChange: (isShowing: boolean) => void;
   readonly onTypeChange: (type: "" | TransactionType) => void;
   readonly readOnlyId?: string | undefined;
   readonly securitiesAccounts: readonly SecuritiesAccount[];
@@ -44,18 +47,23 @@ const pageSize = 50;
 
 // The Portfolio screen's Transactions tab: three controlled filters
 // (grouped Account select by UUID, grouped Type select, Security
-// select), TransactionsTable paginated 50 rows at a time without
-// effect-derived state, an outline Add transaction action, and a footer
-// reporting how many rows are shown with a "Show 50 more" trigger.
+// select), a controlled toggle hiding retired accounts and zero-share
+// securities from the filter dropdowns by default (and clearing hidden
+// selections when switched off), TransactionsTable paginated 50 rows
+// at a time without effect-derived state, an outline Add transaction
+// action, and a footer reporting how many rows are shown with a
+// "Show 50 more" trigger.
 export function PortfolioTransactions({
   accountId,
   cashAccounts,
   holdings,
   isReadOnly = false,
+  isShowingInactive,
   label,
   onAccountChange,
   onAddTransaction,
   onSecurityChange,
+  onShowingInactiveChange,
   onTypeChange,
   readOnlyId,
   securitiesAccounts,
@@ -63,48 +71,49 @@ export function PortfolioTransactions({
   transactions,
   type,
 }: PortfolioTransactionsProps): JSX.Element {
-  const accountGroups: readonly OptionGroup[] = [
-    ...(securitiesAccounts.length > 0
-      ? [
-          {
-            label: "Securities accounts",
-            options: securitiesAccounts.map((account) => ({
-              label: accountOptionLabel(account),
-              value: account.id,
-            })),
-          },
-        ]
-      : []),
-    ...(cashAccounts.length > 0
-      ? [
-          {
-            label: "Cash accounts",
-            options: cashAccounts.map((account) => ({
-              label: accountOptionLabel(account),
-              value: account.id,
-            })),
-          },
-        ]
-      : []),
-  ];
+  const retiredAccountIds = new Set([
+    ...securitiesAccounts
+      .filter((account) => account.isRetired)
+      .map((account) => account.id),
+    ...cashAccounts
+      .filter((account) => account.isRetired)
+      .map((account) => account.id),
+  ]);
+  const zeroShareSecurityIds = new Set(
+    holdings.filter(isZeroShareOption).map((holding) => holding.id),
+  );
+  const hasRetiredAccounts = retiredAccountIds.size > 0;
+  const hasZeroShareSecurities = zeroShareSecurityIds.size > 0;
+  const hasInactiveOptions = hasRetiredAccounts || hasZeroShareSecurities;
+
+  const visibleSecurities = isShowingInactive
+    ? securitiesAccounts
+    : securitiesAccounts.filter((account) => !account.isRetired);
+  const visibleCash = isShowingInactive
+    ? cashAccounts
+    : cashAccounts.filter((account) => !account.isRetired);
+
+  const accountGroups = accountGroupsOf(visibleSecurities, visibleCash);
   const validAccountIds = new Set([
-    ...securitiesAccounts.map((account) => account.id),
-    ...cashAccounts.map((account) => account.id),
+    ...visibleSecurities.map((account) => account.id),
+    ...visibleCash.map((account) => account.id),
   ]);
   const effectiveAccountId = validAccountIds.has(accountId) ? accountId : "";
 
-  const sortedHoldings = holdings.toSorted((one, other) =>
-    one.name.localeCompare(other.name),
-  );
-  const effectiveSecurityId = sortedHoldings.some(
+  const visibleHoldings = (
+    isShowingInactive
+      ? holdings
+      : holdings.filter((holding) => !isZeroShareOption(holding))
+  ).toSorted((one, other) => one.name.localeCompare(other.name));
+  const effectiveSecurityId = visibleHoldings.some(
     (holding) => holding.id === securityId,
   )
     ? securityId
     : "";
   const securityOptions: readonly Option<string>[] = [
     { label: "All securities", value: "" },
-    ...sortedHoldings.map((holding) => ({
-      label: holding.name,
+    ...visibleHoldings.map((holding) => ({
+      label: securityOptionLabel(holding),
       value: holding.id,
     })),
   ];
@@ -115,7 +124,9 @@ export function PortfolioTransactions({
     type,
   });
   const hasActiveFilters =
-    effectiveAccountId !== "" || effectiveSecurityId !== "" || type !== "";
+    transactions.length > 0 &&
+    (effectiveAccountId !== "" || effectiveSecurityId !== "" || type !== "");
+  const isShowingClearButton = hasActiveFilters && filtered.length > 0;
 
   const filterKey = `${effectiveAccountId}\0${type}\0${effectiveSecurityId}`;
 
@@ -123,6 +134,16 @@ export function PortfolioTransactions({
     onAccountChange("");
     onTypeChange("");
     onSecurityChange("");
+  }
+
+  function handleShowingInactiveChange(isChecked: boolean): void {
+    onShowingInactiveChange(isChecked);
+    if (retiredAccountIds.has(accountId)) {
+      onAccountChange("");
+    }
+    if (zeroShareSecurityIds.has(securityId)) {
+      onSecurityChange("");
+    }
   }
 
   return (
@@ -170,11 +191,25 @@ export function PortfolioTransactions({
                 />
               </div>
             </div>
-            {hasActiveFilters && filtered.length > 0 && (
-              <div>
-                <Button onClick={clearFilters} size="sm" variant="outline">
-                  Clear filters
-                </Button>
+            {(hasInactiveOptions || isShowingClearButton) && (
+              <div className="flex flex-wrap items-center gap-4">
+                {hasInactiveOptions && (
+                  <LabelledSwitch
+                    icon={Eye}
+                    isChecked={isShowingInactive}
+                    onCheckedChange={handleShowingInactiveChange}
+                  >
+                    {inactiveToggleLabel(
+                      hasRetiredAccounts,
+                      hasZeroShareSecurities,
+                    )}
+                  </LabelledSwitch>
+                )}
+                {isShowingClearButton && (
+                  <Button onClick={clearFilters} size="sm" variant="outline">
+                    Clear filters
+                  </Button>
+                )}
               </div>
             )}
           </div>
@@ -193,11 +228,70 @@ export function PortfolioTransactions({
   );
 }
 
+function accountGroupsOf(
+  securitiesAccounts: readonly SecuritiesAccount[],
+  cashAccounts: readonly CashAccount[],
+): readonly OptionGroup[] {
+  return [
+    ...(securitiesAccounts.length > 0
+      ? [
+          {
+            label: "Securities accounts",
+            options: securitiesAccounts.map((account) => ({
+              label: accountOptionLabel(account),
+              value: account.id,
+            })),
+          },
+        ]
+      : []),
+    ...(cashAccounts.length > 0
+      ? [
+          {
+            label: "Cash accounts",
+            options: cashAccounts.map((account) => ({
+              label: accountOptionLabel(account),
+              value: account.id,
+            })),
+          },
+        ]
+      : []),
+  ];
+}
+
 function accountOptionLabel(account: {
   readonly isRetired: boolean;
   readonly name: string;
 }): string {
-  return account.isRetired ? `${account.name} (retired)` : account.name;
+  return account.isRetired ? `${account.name} (retired)`.trim() : account.name;
+}
+
+function inactiveToggleLabel(
+  hasRetiredAccounts: boolean,
+  hasZeroShareSecurities: boolean,
+): string {
+  if (hasRetiredAccounts && hasZeroShareSecurities) {
+    return "Show retired & zero-share in filters";
+  }
+  return hasRetiredAccounts
+    ? "Show retired accounts in filters"
+    : "Show zero-share securities in filters";
+}
+
+function isZeroShareOption(holding: {
+  readonly isDraft?: true;
+  readonly shares: number;
+}): boolean {
+  return holding.isDraft !== true && holding.shares <= 0;
+}
+
+function securityOptionLabel(holding: {
+  readonly isDraft?: true;
+  readonly name: string;
+  readonly shares: number;
+}): string {
+  return isZeroShareOption(holding)
+    ? `${holding.name} (0 shares)`.trim()
+    : holding.name;
 }
 
 // Keyed on the active filter combination so pagination resets to 50
