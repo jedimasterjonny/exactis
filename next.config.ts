@@ -67,6 +67,12 @@ const nextConfig: NextConfig = {
     // endpoint this enables, and switching it off leaves that server with
     // nothing to find.
     mcpServer: true,
+    // Raises the default 1 MB Server Action payload limit so uploading a
+    // .portfolio file up to maxPortfolioBytes (4 MB) fits with ~500 KB
+    // headroom for multipart boundaries and Flight metadata while staying
+    // within Vercel Hobby's 4.5 MB serverless payload ceiling and well
+    // below proxyClientMaxBodySize's 10 MB default.
+    serverActions: { bodySizeLimit: "4.5mb" },
     // Emits integrity="sha512-..." on the bootstrap chunks the build manifest
     // lists, which the browser verifies independently of any CSP. A client
     // component's chunk carries none, whether the HTML names it or the

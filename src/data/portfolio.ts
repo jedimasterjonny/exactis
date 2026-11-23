@@ -192,6 +192,15 @@ interface TransactionsFilter {
   readonly type: "" | TransactionType;
 }
 
+// Maximum binary .portfolio file size accepted for upload (decimal 4 MB,
+// matching macOS Finder's reported size and leaving ~500 KB headroom
+// inside Vercel Hobby's 4.5 MB serverless payload limit).
+export const maxPortfolioBytes = 4_000_000;
+
+// Refusal copy shown both on the client before opening ConfirmDialog
+// and on the server in uploadPortfolio when a file exceeds 4 MB.
+export const portfolioTooLarge = "The portfolio file is larger than 4 MB";
+
 // Human-readable names for every Portfolio Performance transaction type.
 export const transactionTypeLabels: Record<TransactionType, string> = {
   "cash-transfer": "Cash transfer",
