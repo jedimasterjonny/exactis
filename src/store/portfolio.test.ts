@@ -19,7 +19,7 @@ import { requireSession } from "@/lib/session";
 
 import type { OwnedPortfolio } from "./portfolio";
 
-import { getPortfolio, storePortfolio } from "./portfolio";
+import { getPortfolio, readStoredPortfolio, storePortfolio } from "./portfolio";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ refresh: vi.fn() }));
@@ -90,6 +90,36 @@ describe("the portfolio store", () => {
         savedOn: "2026-09-25",
         snapshot: readPortfolioSnapshot(secondBytes, "northstar-v2.portfolio"),
         version: 2,
+      });
+    });
+  });
+
+  describe("readStoredPortfolio", () => {
+    it("reads nothing without a session", async () => {
+      vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+
+      await expect(readStoredPortfolio()).rejects.toThrow("redirected");
+      expect(getDb).not.toHaveBeenCalled();
+    });
+
+    it("returns null before any portfolio file is stored", async () => {
+      expect(await readStoredPortfolio()).toBeNull();
+    });
+
+    it("returns the exact latest stored bytes even while a scenario is open", async () => {
+      const bytes = samplePortfolioFile();
+      await storePortfolio(0, {
+        content: bytes,
+        fileName: "northstar.portfolio",
+      });
+      vi.mocked(openedScenario).mockResolvedValue("Retire early");
+
+      const stored = await readStoredPortfolio();
+      expect(stored).toStrictEqual({
+        content: bytes,
+        fileName: "northstar.portfolio",
+        savedAt: expect.any(Date) as unknown,
+        version: 1,
       });
     });
   });

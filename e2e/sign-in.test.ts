@@ -22,6 +22,15 @@ describe("the production server", () => {
     expect(landing(response)).toBe("/login");
   });
 
+  it("sends an unauthenticated .portfolio download to the login screen", async () => {
+    const response = await fetch(`${origin}/portfolio/download`, {
+      redirect: "manual",
+    });
+
+    expect(response.status).toBe(307);
+    expect(landing(response)).toBe("/login");
+  });
+
   it("answers a wrong password on the login screen with the reason", async () => {
     const response = await signIn("not the password");
 
