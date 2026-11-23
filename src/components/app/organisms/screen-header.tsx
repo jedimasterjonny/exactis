@@ -29,17 +29,17 @@ export function ScreenHeader({
 }: ScreenHeaderProps): JSX.Element {
   return (
     <header className="flex flex-wrap items-end justify-between gap-4 border-b bg-card px-4 pt-6 pb-5 sm:px-8">
-      <div className="grid gap-1.5">
+      <div className="grid min-w-0 grid-cols-1 gap-1.5">
         <span className="label text-muted-foreground">{label}</span>
         <ScreenTitle>{title}</ScreenTitle>
         {children !== undefined && (
-          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-2 text-sm text-muted-foreground">
             {children}
           </div>
         )}
       </div>
       {actions !== undefined && (
-        <div className="flex items-center gap-2">{actions}</div>
+        <div className="flex flex-wrap items-center gap-2">{actions}</div>
       )}
     </header>
   );
