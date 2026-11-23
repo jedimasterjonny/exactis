@@ -62,4 +62,34 @@ describe("ScreenHeader", () => {
       screen.getByRole("button", { name: "Assumptions" }),
     ).toBeInTheDocument();
   });
+
+  // jsdom lays nothing out, so the reflow classes on the layout containers
+  // are checked directly.
+  it("allows long meta and multiple actions to shrink and wrap on narrow viewports", () => {
+    render(
+      <ScreenHeader
+        actions={
+          <>
+            <button type="button">Download</button>
+            <button type="button">Replace</button>
+          </>
+        }
+        label="Sect. IX · Portfolio"
+        title="Portfolio"
+      >
+        long-filename.portfolio
+      </ScreenHeader>,
+    );
+
+    // eslint-disable-next-line testing-library/no-node-access -- the heading column is a layout div with no accessible role of its own
+    expect(screen.getByRole("heading", { level: 1 }).parentElement).toHaveClass(
+      "min-w-0",
+      "grid-cols-1",
+    );
+    expect(screen.getByText("long-filename.portfolio")).toHaveClass("min-w-0");
+    expect(
+      // eslint-disable-next-line testing-library/no-node-access -- the actions wrapper is a layout div with no accessible role of its own
+      screen.getByRole("button", { name: "Download" }).parentElement,
+    ).toHaveClass("flex-wrap");
+  });
 });
