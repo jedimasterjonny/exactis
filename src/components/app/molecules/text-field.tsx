@@ -7,6 +7,7 @@ interface TextFieldProps {
   readonly defaultValue?: string;
   readonly hint?: string;
   readonly label: string;
+  readonly maxLength?: number | undefined;
   readonly onValueChange?: (value: string) => void;
   readonly placeholder?: string;
 }
@@ -17,6 +18,7 @@ export function TextField({
   defaultValue,
   hint,
   label,
+  maxLength,
   onValueChange,
   placeholder,
 }: TextFieldProps): JSX.Element {
@@ -24,6 +26,7 @@ export function TextField({
     <Field hint={hint} label={label}>
       <Input
         defaultValue={defaultValue}
+        maxLength={maxLength}
         onChange={(event) => {
           onValueChange?.(event.target.value);
         }}

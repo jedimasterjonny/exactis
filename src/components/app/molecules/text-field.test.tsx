@@ -25,16 +25,19 @@ describe("TextField", () => {
     expect(input).toHaveValue("Lifetime ISA");
   });
 
-  it("takes a default value and shows a hint when given one", () => {
+  it("takes a default value, maxLength, and shows a hint when given one", () => {
     render(
       <TextField
         defaultValue="Home"
         hint="As it appears on the statement"
         label="Name"
+        maxLength={200}
       />,
     );
 
-    expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("Home");
+    const input = screen.getByRole("textbox", { name: "Name" });
+    expect(input).toHaveValue("Home");
+    expect(input).toHaveAttribute("maxLength", "200");
     expect(screen.getByRole("paragraph")).toHaveTextContent(
       "As it appears on the statement",
     );

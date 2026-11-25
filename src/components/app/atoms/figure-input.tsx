@@ -24,6 +24,7 @@ type FigureInputProps = Figure & {
   readonly max?: number | undefined;
   readonly min?: number | undefined;
   readonly onCleared?: (() => void) | undefined;
+  readonly onValueChange?: ((value: null | number) => void) | undefined;
   readonly onValueCommitted?: ((value: number) => void) | undefined;
   readonly step: number;
 };
@@ -61,6 +62,7 @@ export function FigureInput({
   max,
   min,
   onCleared,
+  onValueChange,
   onValueCommitted,
   step,
   value,
@@ -74,6 +76,13 @@ export function FigureInput({
       locale="en-GB"
       max={max}
       min={min}
+      onValueChange={
+        onValueChange === undefined
+          ? undefined
+          : (next): void => {
+              onValueChange(next);
+            }
+      }
       onValueCommitted={(committed) => {
         if (committed === null) {
           onCleared?.();

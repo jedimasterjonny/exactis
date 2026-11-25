@@ -8,6 +8,7 @@ import { Button } from "@/components/kit/button";
 interface EditDialogProps {
   readonly canSave?: boolean;
   readonly children: ReactNode;
+  readonly className?: string | undefined;
   readonly confirm?: string;
   readonly eyebrow: string;
   readonly isSaving?: boolean;
@@ -15,6 +16,7 @@ interface EditDialogProps {
   readonly onDelete?: (() => void) | undefined;
   readonly onDismiss: () => void;
   readonly onSave: () => void;
+  readonly summary?: string | undefined;
   readonly title: string;
 }
 
@@ -29,12 +31,14 @@ interface EditDialogProps {
 // Save holds while the caller says the draft cannot be saved, unnamed
 // say, and spins while a save is on its way to the store, which the
 // dialog does for itself rather than every caller folding it into what
-// it says. A wide dialog fits a form of three columns.
+// it says. A wide dialog fits a form of three columns, and a caller's
+// class may widen it further where a compact multi-row list needs room.
 // A dialog given a delete handler offers a Delete as well, set apart from
 // the other two at the footer's far edge: it reports the press and no more,
 // so the caller asks through its confirm before anything goes, as it
 // would from a row's bin. Given none, as an entry of something new is,
-// it offers nothing to delete. The Delete holds while the caller says a
+// it offers nothing to delete, and may show a quiet footer summary in
+// that left slot instead. The Delete holds while the caller says a
 // save is on its way to the store, as Save does, since a deletion asked
 // for over a save in flight would race it: the save's answer could
 // report the record saved after the question had deleted it. Save sits
@@ -42,6 +46,7 @@ interface EditDialogProps {
 export function EditDialog({
   canSave = true,
   children,
+  className,
   confirm = "Save",
   eyebrow,
   isSaving = false,
@@ -49,10 +54,12 @@ export function EditDialog({
   onDelete,
   onDismiss,
   onSave,
+  summary,
   title,
 }: EditDialogProps): JSX.Element {
   return (
     <DialogFrame
+      {...(className !== undefined && { className })}
       eyebrow={eyebrow}
       footer={
         <>
@@ -67,6 +74,11 @@ export function EditDialog({
               <Trash2 aria-hidden />
               Delete
             </Button>
+          )}
+          {onDelete === undefined && summary !== undefined && (
+            <span className="mr-auto self-center text-sm text-muted-foreground">
+              {summary}
+            </span>
           )}
           <Button onClick={onDismiss} size="sm" variant="outline">
             Cancel

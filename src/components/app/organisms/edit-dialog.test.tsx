@@ -157,4 +157,46 @@ describe("EditDialog", () => {
       "true",
     );
   });
+
+  it("forwards a custom dialog className and renders a footer summary only when Delete is absent", () => {
+    const { rerender } = render(
+      <EditDialog
+        className="sm:max-w-xl"
+        eyebrow="Quotes"
+        onDismiss={vi.fn<() => void>()}
+        onSave={vi.fn<() => void>()}
+        summary="2 prices entered"
+        title="Update quotes"
+      >
+        <p>The fields</p>
+      </EditDialog>,
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "Update quotes" });
+    expect(dialog).toHaveClass("sm:max-w-xl");
+    expect(within(dialog).getByText("2 prices entered")).toHaveClass(
+      "mr-auto",
+      "text-muted-foreground",
+    );
+
+    rerender(
+      <EditDialog
+        eyebrow="Quotes"
+        onDelete={vi.fn<() => void>()}
+        onDismiss={vi.fn<() => void>()}
+        onSave={vi.fn<() => void>()}
+        summary="2 prices entered"
+        title="Update quotes"
+      >
+        <p>The fields</p>
+      </EditDialog>,
+    );
+
+    expect(
+      within(dialog).queryByText("2 prices entered"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("button", { name: "Delete" }),
+    ).toBeInTheDocument();
+  });
 });
