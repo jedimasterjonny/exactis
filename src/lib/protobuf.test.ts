@@ -11,8 +11,13 @@ import {
   messageOf,
   messagesAt,
   textAt,
+  textField,
   varintOf,
+  wholeField,
+  withMessageAt,
   withMessagesAt,
+  withoutField,
+  withReplacedMessagesAt,
   withWholeAt,
 } from "./protobuf";
 
@@ -322,5 +327,147 @@ describe("withWholeAt", () => {
 
   it("writes into no bytes", () => {
     expect(withWholeAt(raw(), 6, 5)).toStrictEqual(protobufOf([[6, 5]]));
+  });
+});
+
+describe("textField", () => {
+  it("encodes UTF-8 strings as length-delimited fields", () => {
+    expect(textField(3, "Gilts, £")).toStrictEqual(
+      protobufOf([[3, "Gilts, £"]]),
+    );
+    expect(textField(1, "")).toStrictEqual(raw(0x0a, 0x00));
+  });
+});
+
+describe("wholeField", () => {
+  it("writes a varint field including explicit zero so field presence is preserved", () => {
+    expect(wholeField(1, 0)).toStrictEqual(raw(0x08, 0x00));
+    expect(messageOf(wholeField(1, 0)).has(1)).toBe(true);
+    expect(wholeField(2, 21_345_600_000)).toStrictEqual(
+      protobufOf([[2, 21_345_600_000]]),
+    );
+    expect(wholeField(1, -1)).toStrictEqual(protobufOf([[1, -1]]));
+  });
+});
+
+describe("withMessageAt", () => {
+  it("replaces the first occurrence in place, drops duplicates, preserves fixed-width fields, and emits zero-length messages", () => {
+    const fixed64 = raw(0x09, 1, 2, 3, 4, 5, 6, 7, 8);
+    const written = joined([
+      fixed64,
+      protobufOf([
+        [7, [[1, 100]]],
+        [3, "keep"],
+        [7, [[1, 200]]],
+      ]),
+    ]);
+
+    const replaced = withMessageAt(written, 7, protobufOf([[1, 300]]));
+    expect(replaced).toStrictEqual(
+      joined([
+        fixed64,
+        protobufOf([
+          [7, [[1, 300]]],
+          [3, "keep"],
+        ]),
+      ]),
+    );
+
+    const zeroLength = withMessageAt(protobufOf([[1, "a"]]), 7, raw());
+    expect(zeroLength).toStrictEqual(
+      joined([protobufOf([[1, "a"]]), raw(0x3a, 0x00)]),
+    );
+    expect(messageOf(zeroLength).has(7)).toBe(true);
+  });
+});
+
+describe("withoutField", () => {
+  it("removes every occurrence of the target field while preserving other fields byte for byte", () => {
+    const fixed32 = raw(0x15, 9, 8, 7, 6);
+    const written = joined([
+      protobufOf([[16, [[2, 500]]]]),
+      fixed32,
+      protobufOf([
+        [3, "Security"],
+        [16, [[2, 600]]],
+      ]),
+    ]);
+
+    expect(withoutField(written, 16)).toStrictEqual(
+      joined([fixed32, protobufOf([[3, "Security"]])]),
+    );
+    expect(withoutField(fixed32, 16)).toStrictEqual(fixed32);
+  });
+});
+
+describe("withReplacedMessagesAt", () => {
+  it("replaces repeated messages in the first slot while keeping untouched entries and other fields byte for byte", () => {
+    const fixed64 = raw(0x09, 1, 2, 3, 4, 5, 6, 7, 8);
+    const firstPrice = protobufOf([
+      [1, 10],
+      [2, 500],
+      [99, "extra"],
+    ]);
+    const secondPrice = protobufOf([
+      [1, 20],
+      [2, 600],
+    ]);
+    const insertedPrice = protobufOf([
+      [1, 15],
+      [2, 550],
+    ]);
+    const written = joined([
+      fixed64,
+      protobufOf([
+        [13, firstPrice],
+        [3, "between"],
+        [13, secondPrice],
+      ]),
+    ]);
+
+    const updated = withReplacedMessagesAt(written, 13, (existing) => [
+      ...existing,
+      insertedPrice,
+    ]);
+    expect(updated).toStrictEqual(
+      joined([
+        fixed64,
+        protobufOf([
+          [13, firstPrice],
+          [13, secondPrice],
+          [13, insertedPrice],
+          [3, "between"],
+        ]),
+      ]),
+    );
+
+    // Appends at the end when the field was previously absent.
+    const appended = withReplacedMessagesAt(
+      protobufOf([[3, "only"]]),
+      13,
+      (existing) => {
+        expect(existing).toStrictEqual([]);
+        return [insertedPrice];
+      },
+    );
+    expect(appended).toStrictEqual(
+      protobufOf([
+        [3, "only"],
+        [13, insertedPrice],
+      ]),
+    );
+
+    // Removes all occurrences when replace returns an empty list.
+    expect(withReplacedMessagesAt(written, 13, () => [])).toStrictEqual(
+      joined([fixed64, protobufOf([[3, "between"]])]),
+    );
+  });
+
+  it("refuses a non-message field under the repeated number", () => {
+    expect(() =>
+      withReplacedMessagesAt(protobufOf([[13, 1]]), 13, (items) => items),
+    ).toThrow(
+      new Refusal("The data holds a number where field 13's bytes are read"),
+    );
   });
 });

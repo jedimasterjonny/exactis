@@ -9,15 +9,28 @@ import {
   clientOf,
   portfolioFile,
   reference,
+  samplePortfolioFile,
   taxonomyOf,
 } from "@/lib/portfolio-file.fixture";
-import { int32At, messageOf, messagesAt, textAt } from "@/lib/protobuf";
+import {
+  int32At,
+  int64At,
+  joined,
+  messageOf,
+  messagesAt,
+  textAt,
+} from "@/lib/protobuf";
+import { protobufOf } from "@/lib/protobuf.fixture";
 
 import {
+  appendAccount,
+  appendSecurity,
+  appendTransaction,
   readPortfolios,
   readPortfolioSnapshot,
   readTargets,
   reweighted,
+  updateQuotes,
 } from "./portfolio-file";
 
 // A transaction as a test writes it out: the security it is on, or
@@ -2746,5 +2759,1332 @@ describe("reweighted", () => {
     expect(() =>
       reweighted(portfolioFile(clientOf([["Asset Allocation", []]])), whole),
     ).toThrow(new Refusal("The Asset Allocation taxonomy holds no classes"));
+  });
+});
+
+function rawClientOf(file: Uint8Array): Uint8Array {
+  const data = unzipSync(file)["data.portfolio"];
+  if (data === undefined) {
+    throw new Error("missing data.portfolio");
+  }
+  return data.subarray(6);
+}
+
+// Builds a zip holding data.portfolio with unknown fields (fixed64 field 101,
+// fixed32 field 102, unknown varint field 98, extension bytes field 99) plus a
+// sibling zip entry so tests verify byte-for-byte preservation across writers.
+function richPortfolioFile(client: Written): Uint8Array<ArrayBuffer> {
+  const unknownFields = new Uint8Array([
+    0xa9, 0x06, 1, 2, 3, 4, 5, 6, 7, 8, 0xb5, 0x06, 9, 10, 11, 12,
+  ]);
+  const clientBytes = joined([
+    protobufOf(client),
+    protobufOf([
+      [98, 42],
+      [99, new Uint8Array([0xde, 0xad, 0xbe, 0xef])],
+    ]),
+    unknownFields,
+  ]);
+  return new Uint8Array(
+    zipSync({
+      "data.portfolio": joined([strToU8("PPPBV1"), clientBytes]),
+      "sibling.txt": strToU8("keep me byte-for-byte"),
+    }),
+  );
+}
+
+describe("appendAccount", () => {
+  it("appends cash and securities accounts while preserving existing bytes, unknown fields, and sibling zip parts", () => {
+    const base = richPortfolioFile([
+      [1, 66],
+      [
+        3,
+        [
+          [1, "cash-existing"],
+          [2, "Existing Cash"],
+          [3, "GBP"],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+    const originalClient = rawClientOf(base);
+
+    const cash = appendAccount(
+      base,
+      {
+        currency: "USD",
+        kind: "cash",
+        name: "  Dollar Pot  ",
+        note: "  FX reserve  ",
+      },
+      { now: new Date("2026-09-25T12:30:00.250Z"), uuid: () => "cash-new" },
+    );
+
+    expect(cash.id).toBe("cash-new");
+    const afterCashParts = unzipSync(cash.content);
+    expect(afterCashParts["sibling.txt"]).toStrictEqual(
+      strToU8("keep me byte-for-byte"),
+    );
+    const afterCashClient = rawClientOf(cash.content);
+    expect(afterCashClient.subarray(0, originalClient.length)).toStrictEqual(
+      originalClient,
+    );
+
+    const cashMsg = messagesAt(messageOf(afterCashClient), 3).at(-1);
+    expect(cashMsg).toBeDefined();
+    const cashUpdated = messagesAt(cashMsg ?? new Map(), 7)[0];
+    expect(int64At(cashUpdated ?? new Map(), 1)).toBe(1_790_339_400);
+    expect(int32At(cashUpdated ?? new Map(), 2)).toBe(250_000_000);
+
+    // Append a securities account linked to the newly added cash account, and
+    // another unlinked securities account with default clock/uuid options.
+    const linked = appendAccount(
+      cash.content,
+      {
+        kind: "securities",
+        name: "  Brokerage GIA  ",
+        note: "  Core dealing  ",
+        referenceAccountId: "cash-new",
+      },
+      { now: new Date(0), uuid: () => "port-new" },
+    );
+    expect(linked.id).toBe("port-new");
+
+    const portMsg = messagesAt(messageOf(rawClientOf(linked.content)), 4).at(
+      -1,
+    );
+    // Epoch-0 timestamp is still present on the wire as a zero-length submessage.
+    expect(portMsg?.has(7)).toBe(true);
+    expect(messagesAt(portMsg ?? new Map(), 7)).toStrictEqual([new Map()]);
+
+    const unlinked = appendAccount(linked.content, {
+      kind: "securities",
+      name: "Direct Certs",
+      note: "   ",
+    });
+    expect(unlinked.id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u,
+    );
+
+    const snapshot = readPortfolioSnapshot(unlinked.content, "test.portfolio");
+    expect(
+      snapshot.cashAccounts.map((a) => [a.id, a.name, a.currency, a.note]),
+    ).toStrictEqual([
+      ["cash-existing", "Existing Cash", "GBP", undefined],
+      ["cash-new", "Dollar Pot", "USD", "FX reserve"],
+    ]);
+    expect(
+      snapshot.securitiesAccounts.map((a) => [
+        a.id,
+        a.name,
+        a.referenceAccountId,
+        a.note,
+      ]),
+    ).toStrictEqual([
+      ["port-new", "Brokerage GIA", "cash-new", "Core dealing"],
+      [unlinked.id, "Direct Certs", undefined, undefined],
+    ]);
+
+    // Default-level zip overflow retries at level 9 cleanly.
+    const incompressible = new Uint8Array(4_010_000);
+    let seed = 0x1234_5678;
+    for (let i = 0; i < incompressible.length; i++) {
+      seed ^= seed << 13;
+      seed ^= seed >>> 17;
+      seed ^= seed << 5;
+      incompressible[i] = seed & 0xff;
+    }
+    const largeZip = new Uint8Array(
+      zipSync(
+        {
+          "blob.bin": incompressible,
+          "data.portfolio": joined([strToU8("PPPBV1"), protobufOf([[1, 66]])]),
+        },
+        { level: 0 },
+      ),
+    );
+    const rewrittenLarge = appendAccount(largeZip, {
+      currency: "GBP",
+      kind: "cash",
+      name: "Large File Cash",
+    });
+    expect(
+      readPortfolioSnapshot(rewrittenLarge.content, "large.portfolio")
+        .cashAccounts[0]?.name,
+    ).toBe("Large File Cash");
+  });
+
+  it("refuses blank names, unsupported currencies, and missing or synthetic reference accounts", () => {
+    const fileWithSyntheticCash = portfolioFile([
+      [1, 66],
+      // Cash account without field 1 id gets synthetic "account-0" in snapshot.
+      [
+        3,
+        [
+          [2, "Nameless Id Cash"],
+          [3, "GBP"],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+
+    expect(() =>
+      appendAccount(fileWithSyntheticCash, {
+        currency: "GBP",
+        kind: "cash",
+        name: "   ",
+      }),
+    ).toThrow(new Refusal("Account name cannot be blank"));
+
+    expect(() =>
+      appendAccount(fileWithSyntheticCash, {
+        currency: "GBX",
+        kind: "cash",
+        name: "Pence Cash",
+      }),
+    ).toThrow(new Refusal('Currency "GBX" is not supported'));
+
+    expect(() =>
+      appendAccount(fileWithSyntheticCash, {
+        currency: "gbp",
+        kind: "cash",
+        name: "Lower Cash",
+      }),
+    ).toThrow(new Refusal('Currency "gbp" is not supported'));
+
+    expect(() =>
+      appendAccount(fileWithSyntheticCash, {
+        kind: "securities",
+        name: "Bad Link",
+        referenceAccountId: "account-0",
+      }),
+    ).toThrow(new Refusal("The selected reference cash account was not found"));
+  });
+
+  it("refuses corrupted protobuf bytes even for cash or unlinked securities accounts", () => {
+    const corrupt = new Uint8Array(
+      zipSync({
+        "data.portfolio": new Uint8Array([
+          ...strToU8("PPPBV1"),
+          0x12, // field 2, length-delimited
+          0x10, // claims 16 bytes, truncated immediately
+          0x01,
+        ]),
+      }),
+    );
+
+    expect(() =>
+      appendAccount(corrupt, {
+        currency: "GBP",
+        kind: "cash",
+        name: "Corrupt Cash",
+      }),
+    ).toThrow(new Refusal("The data is cut short partway through a field"));
+
+    expect(() =>
+      appendAccount(corrupt, {
+        kind: "securities",
+        name: "Corrupt Securities",
+      }),
+    ).toThrow(new Refusal("The data is cut short partway through a field"));
+  });
+});
+
+describe("appendSecurity", () => {
+  it("appends a security with optional dated initial price and Asset Allocation assignment while preserving other taxonomies and bytes", () => {
+    const base = richPortfolioFile([
+      [1, 66],
+      [
+        8,
+        [
+          [1, "tax-regions"],
+          [2, "Regions"],
+          [
+            5,
+            [
+              [1, "reg-root"],
+              [3, "Regions"],
+            ],
+          ],
+        ],
+      ],
+      [
+        8,
+        [
+          [1, "tax-aa"],
+          [2, "Asset Allocation"],
+          [
+            5,
+            [
+              [1, "aa-root"],
+              [3, "Asset Allocation"],
+              [6, 10_000],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "aa-equity"],
+              [2, "aa-root"],
+              [3, "Global equity"],
+              [6, 7000],
+              [
+                9,
+                [
+                  [1, "existing-sec"],
+                  [2, 10_000],
+                  [3, 4],
+                ],
+              ],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "aa-bonds"],
+              [2, "aa-root"],
+              [3, "UK gilts"],
+              [6, 3000],
+            ],
+          ],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+
+    const added = appendSecurity(
+      base,
+      {
+        categoryId: "aa-equity",
+        currency: "GBX",
+        isin: "  GB00TEST0002  ",
+        latestPrice: 214.015,
+        name: "  UK Gilts Tracker  ",
+        note: "  Accumulating  ",
+        ticker: "  UKGT  ",
+      },
+      {
+        now: new Date("2026-09-25T10:00:00Z"),
+        today: "2026-09-25",
+        uuid: () => "sec-new",
+      },
+    );
+
+    expect(added.id).toBe("sec-new");
+    const snapshot = readPortfolioSnapshot(added.content, "sec.portfolio");
+    expect(snapshot.holdings).toStrictEqual([
+      {
+        category: "Global equity",
+        currency: "GBX",
+        gbpRate: 0.01,
+        id: "sec-new",
+        isin: "GB00TEST0002",
+        isRetired: false,
+        latestPrice: 214.015,
+        latestPriceDate: "2026-09-25",
+        name: "UK Gilts Tracker",
+        note: "Accumulating",
+        shares: 0,
+        sharesByAccount: [],
+        ticker: "UKGT",
+      },
+    ]);
+
+    // Assignment rank increments past existing max rank (4 -> 5), and Regions taxonomy stays untouched.
+    const client = messageOf(rawClientOf(added.content));
+    const aaTax = messagesAt(client, 8)[1] ?? new Map();
+    const eqClass = messagesAt(aaTax, 5)[1] ?? new Map();
+    const assignments = messagesAt(eqClass, 9);
+    expect(assignments).toHaveLength(2);
+    expect(textAt(assignments[1] ?? new Map(), 1)).toBe("sec-new");
+    expect(int32At(assignments[1] ?? new Map(), 2)).toBe(10_000);
+    expect(int32At(assignments[1] ?? new Map(), 3)).toBe(5);
+
+    // Minimal security with null price, explicit latestPriceDate=1970-01-01, and no category.
+    const minimal = appendSecurity(
+      added.content,
+      { currency: "USD", latestPrice: null, name: "Minimal US ETF" },
+      { uuid: () => "sec-min" },
+    );
+    const epochDated = appendSecurity(
+      minimal.content,
+      {
+        categoryId: "aa-bonds",
+        currency: "GBP",
+        latestPrice: 100,
+        latestPriceDate: "1970-01-01",
+        name: "Epoch Fund",
+      },
+      { uuid: () => "sec-epoch" },
+    );
+    const finalSnapshot = readPortfolioSnapshot(
+      epochDated.content,
+      "sec.portfolio",
+    );
+    expect(
+      finalSnapshot.holdings.find((h) => h.id === "sec-min")?.latestPrice,
+    ).toBeNull();
+    expect(
+      finalSnapshot.holdings.find((h) => h.id === "sec-epoch"),
+    ).toMatchObject({
+      category: "UK gilts",
+      latestPrice: 100,
+      latestPriceDate: "1970-01-01",
+    });
+
+    // Empty class assignment list starts at rank 0.
+    const bondClass = messagesAt(
+      messagesAt(messageOf(rawClientOf(epochDated.content)), 8)[1] ?? new Map(),
+      5,
+    )[2];
+    expect(
+      int32At(messagesAt(bondClass ?? new Map(), 9)[0] ?? new Map(), 3),
+    ).toBe(0);
+  });
+
+  it("refuses blank names, bad currencies, invalid dates or prices, and unknown or non-leaf Asset Allocation categories", () => {
+    const file = samplePortfolioFile();
+    expect(() =>
+      appendSecurity(file, { currency: "GBP", latestPrice: null, name: "" }),
+    ).toThrow(new Refusal("Security name cannot be blank"));
+
+    expect(() =>
+      appendSecurity(file, { currency: "123", latestPrice: null, name: "Bad" }),
+    ).toThrow(new Refusal('Currency "123" is not supported'));
+
+    expect(() =>
+      appendSecurity(file, {
+        currency: "GBP",
+        latestPrice: 0,
+        name: "Zero Price",
+      }),
+    ).toThrow(new Refusal("Latest price must be greater than zero"));
+
+    expect(() =>
+      appendSecurity(file, {
+        currency: "GBP",
+        latestPrice: 1e-10,
+        name: "Sub-unit Price",
+      }),
+    ).toThrow(new Refusal("Latest price must be greater than zero"));
+
+    expect(() =>
+      appendSecurity(file, {
+        currency: "GBP",
+        latestPrice: 100_000_000,
+        name: "Huge Price",
+      }),
+    ).toThrow(new Refusal("Latest price is out of range"));
+
+    expect(() =>
+      appendSecurity(file, {
+        currency: "GBP",
+        latestPrice: 10,
+        latestPriceDate: "2026-02-31",
+        name: "Bad Date",
+      }),
+    ).toThrow(new Refusal("Enter a valid calendar date"));
+
+    // Rejects root (non-leaf) and unknown category ids.
+    expect(() =>
+      appendSecurity(file, {
+        categoryId: "aa-root",
+        currency: "GBP",
+        latestPrice: null,
+        name: "Root Assigned",
+      }),
+    ).toThrow(new Refusal("The selected asset class was not found"));
+
+    expect(() =>
+      appendSecurity(file, {
+        categoryId: "missing",
+        currency: "GBP",
+        latestPrice: null,
+        name: "Missing Assigned",
+      }),
+    ).toThrow(new Refusal("The selected asset class was not found"));
+  });
+
+  it("updates only the first Asset Allocation taxonomy when a duplicate taxonomy shares that name", () => {
+    const duplicateTaxonomies = portfolioFile([
+      [1, 66],
+      [
+        8,
+        [
+          [1, "tax-aa-first"],
+          [2, "Asset Allocation"],
+          [5, [[1, "aa-root-1"]]],
+          [
+            5,
+            [
+              [1, "aa-equity"],
+              [2, "aa-root-1"],
+              [3, "Global equity"],
+              [6, 10_000],
+            ],
+          ],
+        ],
+      ],
+      [
+        8,
+        [
+          [1, "tax-aa-second"],
+          [2, "Asset Allocation"],
+          [5, [[1, "aa-root-2"]]],
+          [
+            5,
+            [
+              [1, "aa-equity"],
+              [2, "aa-root-2"],
+              [3, "Duplicate equity"],
+              [6, 10_000],
+            ],
+          ],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+
+    const added = appendSecurity(
+      duplicateTaxonomies,
+      {
+        categoryId: "aa-equity",
+        currency: "GBP",
+        latestPrice: null,
+        name: "First Only Fund",
+      },
+      { uuid: () => "sec-first-only" },
+    );
+
+    const taxonomies = messagesAt(messageOf(rawClientOf(added.content)), 8);
+    const firstLeaf = messagesAt(taxonomies[0] ?? new Map(), 5)[1];
+    const secondLeaf = messagesAt(taxonomies[1] ?? new Map(), 5)[1];
+    expect(messagesAt(firstLeaf ?? new Map(), 9)).toHaveLength(1);
+    expect(messagesAt(secondLeaf ?? new Map(), 9)).toHaveLength(0);
+  });
+});
+
+describe("appendTransaction", () => {
+  it("appends all 15 transaction types with cross-entry ids, fee/tax units, and clean round-trip through snapshot, targets, and portfolios", () => {
+    const base = richPortfolioFile([
+      [1, 66],
+      [
+        2,
+        [
+          [1, "sec-world"],
+          [3, "Global Equity Index"],
+          [4, "GBP"],
+          [
+            13,
+            [
+              [1, 20_718],
+              [2, 10_000_000_000],
+            ],
+          ],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-a"],
+          [2, "ISA Cash"],
+          [3, "GBP"],
+        ],
+      ],
+      // Legacy cash account omitting field 3 resolves to baseCurrency (GBP).
+      [
+        3,
+        [
+          [1, "cash-b"],
+          [2, "Reserve Cash"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-a"],
+          [2, "Northstar ISA"],
+          [5, "cash-a"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-b"],
+          [2, "Harbour GIA"],
+          [5, "cash-b"],
+        ],
+      ],
+      [
+        8,
+        [
+          [1, "tax-aa"],
+          [2, "Asset Allocation"],
+          [
+            5,
+            [
+              [1, "aa-root"],
+              [3, "Asset Allocation"],
+              [6, 10_000],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "aa-eq"],
+              [2, "aa-root"],
+              [3, "Equities"],
+              [6, 10_000],
+              [
+                9,
+                [
+                  [1, "sec-world"],
+                  [2, 10_000],
+                ],
+              ],
+            ],
+          ],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+
+    let nextId = 0;
+    const opts = {
+      now: new Date("2026-09-25T15:00:00Z"),
+      uuid: (): string => `gen-${String(++nextId)}`,
+    };
+
+    const cases = [
+      {
+        accountId: "cash-a",
+        amount: 2000,
+        currency: "GBP",
+        date: "2026-09-01",
+        fees: 0,
+        note: "Initial funding",
+        shares: 0,
+        taxes: 0,
+        type: "deposit" as const,
+      },
+      {
+        accountId: "cash-a",
+        amount: 1005.5,
+        currency: "GBP",
+        date: "2026-09-02",
+        fees: 3.5,
+        portfolioId: "port-a",
+        securityId: "sec-world",
+        shares: 10,
+        taxes: 2,
+        type: "purchase" as const,
+      },
+      {
+        accountId: "cash-a",
+        amount: 200,
+        currency: "GBP",
+        date: "2026-09-03",
+        fees: 1.5,
+        portfolioId: "port-a",
+        securityId: "sec-world",
+        shares: 2,
+        taxes: 0,
+        type: "sale" as const,
+      },
+      {
+        amount: 500,
+        currency: "GBP",
+        date: "2026-09-04",
+        fees: 2.5,
+        portfolioId: "port-a",
+        securityId: "sec-world",
+        shares: 5,
+        taxes: 0,
+        type: "inbound-delivery" as const,
+      },
+      {
+        amount: 100,
+        currency: "GBP",
+        date: "2026-09-05",
+        fees: 0,
+        portfolioId: "port-a",
+        securityId: "sec-world",
+        shares: 1,
+        taxes: 1,
+        type: "outbound-delivery" as const,
+      },
+      {
+        amount: 0,
+        currency: "GBP",
+        date: "2026-09-06",
+        fees: 0,
+        otherPortfolioId: "port-b",
+        portfolioId: "port-a",
+        securityId: "sec-world",
+        shares: 2,
+        taxes: 0,
+        type: "security-transfer" as const,
+      },
+      {
+        accountId: "cash-a",
+        amount: 100,
+        currency: "GBP",
+        date: "2026-09-07",
+        fees: 0,
+        otherAccountId: "cash-b",
+        shares: 0,
+        taxes: 0,
+        type: "cash-transfer" as const,
+      },
+      {
+        accountId: "cash-a",
+        amount: 50,
+        currency: "GBP",
+        date: "2026-09-08",
+        fees: 0,
+        shares: 0,
+        taxes: 0,
+        type: "removal" as const,
+      },
+      {
+        accountId: "cash-a",
+        amount: 25,
+        currency: "GBP",
+        date: "2026-09-09",
+        fees: 0.5,
+        securityId: "sec-world",
+        shares: 0,
+        taxes: 3.75,
+        type: "dividend" as const,
+      },
+      {
+        accountId: "cash-a",
+        amount: 4.2,
+        currency: "GBP",
+        date: "2026-09-10",
+        fees: 0,
+        shares: 0,
+        taxes: 0,
+        type: "interest" as const,
+      },
+      {
+        accountId: "cash-a",
+        amount: 1.1,
+        currency: "GBP",
+        date: "2026-09-11",
+        fees: 0,
+        shares: 0,
+        taxes: 0,
+        type: "interest-charge" as const,
+      },
+      {
+        accountId: "cash-a",
+        amount: 6,
+        currency: "GBP",
+        date: "2026-09-12",
+        fees: 0,
+        shares: 0,
+        taxes: 0,
+        type: "tax" as const,
+      },
+      {
+        accountId: "cash-a",
+        amount: 2,
+        currency: "GBP",
+        date: "2026-09-13",
+        fees: 0,
+        shares: 0,
+        taxes: 0,
+        type: "tax-refund" as const,
+      },
+      {
+        accountId: "cash-a",
+        amount: 3,
+        currency: "GBP",
+        date: "2026-09-14",
+        fees: 0,
+        shares: 0,
+        taxes: 0,
+        type: "fee" as const,
+      },
+      {
+        accountId: "cash-a",
+        amount: 1,
+        currency: "GBP",
+        date: "1970-01-01",
+        fees: 0,
+        shares: 0,
+        taxes: 0,
+        type: "fee-refund" as const,
+      },
+    ];
+
+    let file = base;
+    for (const input of cases) {
+      file = appendTransaction(file, input, opts).content;
+    }
+
+    const rawTxs = messagesAt(messageOf(rawClientOf(file)), 5);
+    expect(rawTxs).toHaveLength(15);
+
+    // Cross-entry types (purchase, sale, security-transfer, cash-transfer) carry distinct otherUuid + otherUpdatedAt.
+    const crossIndices = [1, 2, 5, 6];
+    for (const idx of crossIndices) {
+      const tx = rawTxs[idx] ?? new Map();
+      const txId = textAt(tx, 1);
+      const otherId = textAt(tx, 7);
+      expect(otherId).toBeDefined();
+      expect(otherId).not.toBe(txId);
+      expect(tx.has(8)).toBe(true);
+    }
+    // Non-cross-entry deposit omits field 7 and 8.
+    expect(rawTxs[0]?.has(7)).toBe(false);
+    expect(rawTxs[0]?.has(8)).toBe(false);
+
+    // Purchase fee & tax units carry matching field 3 currencyCode and never GROSS_VALUE.
+    const purchaseUnits = messagesAt(rawTxs[1] ?? new Map(), 15);
+    expect(
+      purchaseUnits.map((u) => [int32At(u, 1), int64At(u, 2), textAt(u, 3)]),
+    ).toStrictEqual([
+      [2, 350, "GBP"],
+      [1, 200, "GBP"],
+    ]);
+
+    // Round-trip through all three readers.
+    const snapshot = readPortfolioSnapshot(file, "all15.portfolio");
+    expect(snapshot.transactions).toHaveLength(15);
+    expect(snapshot.transactions.at(-1)?.date).toBe("1970-01-01");
+    expect(snapshot.holdings[0]?.shares).toBe(12);
+    expect(snapshot.holdings[0]?.sharesByAccount).toStrictEqual([
+      { portfolioId: "port-a", shares: 10 },
+      { portfolioId: "port-b", shares: 2 },
+    ]);
+    expect(snapshot.cashAccounts.find((a) => a.id === "cash-b")?.balance).toBe(
+      100,
+    );
+    expect(readTargets(file)[0]?.value).toBe(1200);
+    expect(readPortfolios(file)).toStrictEqual([
+      {
+        cash: 1067,
+        name: "Northstar ISA",
+        paid: [
+          { amount: 2000, on: "2026-09-01" },
+          { amount: -50, on: "2026-09-08" },
+        ],
+      },
+    ]);
+  });
+
+  it("refuses mismatched currencies, cross-currency cash transfers, synthetic/missing ids, self-transfers, and invalid costs or shares", () => {
+    const file = portfolioFile([
+      [1, 66],
+      [
+        2,
+        [
+          [1, "sec-1"],
+          [3, "Global Equity"],
+          [4, "GBP"],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-gbp"],
+          [2, "GBP Cash"],
+          [3, "GBP"],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-usd"],
+          [2, "USD Cash"],
+          [3, "USD"],
+        ],
+      ],
+      // Account with no field 1 id (synthetic fallback in snapshot) must be rejected.
+      [
+        3,
+        [
+          [2, "No Id Cash"],
+          [3, "GBP"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-1"],
+          [2, "ISA"],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+
+    const baseTx = {
+      accountId: "cash-gbp",
+      amount: 100,
+      currency: "GBP",
+      date: "2026-09-25",
+      fees: 0,
+      shares: 0,
+      taxes: 0,
+      type: "deposit" as const,
+    };
+
+    expect(() =>
+      appendTransaction(file, { ...baseTx, currency: "USD" }),
+    ).toThrow(
+      new Refusal("Transaction currency must match the cash account currency"),
+    );
+
+    expect(() =>
+      appendTransaction(file, { ...baseTx, accountId: "account-2" }),
+    ).toThrow(new Refusal("The selected cash account was not found"));
+
+    expect(() =>
+      appendTransaction(file, {
+        amount: 100,
+        currency: "GBP",
+        date: "2026-09-25",
+        fees: 0,
+        shares: 0,
+        taxes: 0,
+        type: "deposit",
+      }),
+    ).toThrow(new Refusal("The selected cash account was not found"));
+
+    expect(() =>
+      appendTransaction(file, {
+        ...baseTx,
+        otherAccountId: "cash-usd",
+        type: "cash-transfer",
+      }),
+    ).toThrow(
+      new Refusal(
+        "Cash transfers between different currencies are not supported yet",
+      ),
+    );
+
+    expect(() =>
+      appendTransaction(file, {
+        ...baseTx,
+        otherAccountId: "cash-gbp",
+        type: "cash-transfer",
+      }),
+    ).toThrow(new Refusal("Source and destination accounts must differ"));
+
+    expect(() =>
+      appendTransaction(file, { ...baseTx, type: "cash-transfer" }),
+    ).toThrow(new Refusal("The destination cash account was not found"));
+
+    expect(() =>
+      appendTransaction(file, {
+        amount: 0,
+        currency: "GBP",
+        date: "2026-09-25",
+        fees: 0,
+        otherPortfolioId: "port-1",
+        portfolioId: "port-1",
+        securityId: "sec-1",
+        shares: 1,
+        taxes: 0,
+        type: "security-transfer",
+      }),
+    ).toThrow(new Refusal("Source and destination accounts must differ"));
+
+    expect(() =>
+      appendTransaction(file, {
+        amount: 0,
+        currency: "GBP",
+        date: "2026-09-25",
+        fees: 0,
+        otherPortfolioId: "missing",
+        portfolioId: "port-1",
+        securityId: "sec-1",
+        shares: 1,
+        taxes: 0,
+        type: "security-transfer",
+      }),
+    ).toThrow(new Refusal("The destination securities account was not found"));
+
+    expect(() =>
+      appendTransaction(file, {
+        amount: 100,
+        currency: "GBP",
+        date: "2026-09-25",
+        fees: 0,
+        portfolioId: "missing",
+        securityId: "sec-1",
+        shares: 1,
+        taxes: 0,
+        type: "inbound-delivery",
+      }),
+    ).toThrow(new Refusal("The selected securities account was not found"));
+
+    expect(() =>
+      appendTransaction(file, {
+        amount: 100,
+        currency: "GBP",
+        date: "2026-09-25",
+        fees: 0,
+        portfolioId: "port-1",
+        securityId: "missing",
+        shares: 1,
+        taxes: 0,
+        type: "inbound-delivery",
+      }),
+    ).toThrow(new Refusal("The selected security was not found"));
+
+    expect(() => appendTransaction(file, { ...baseTx, amount: 0.001 })).toThrow(
+      new Refusal("Amount must be greater than zero"),
+    );
+
+    expect(() => appendTransaction(file, { ...baseTx, amount: -5 })).toThrow(
+      new Refusal("Amount is out of range"),
+    );
+
+    expect(() => appendTransaction(file, { ...baseTx, fees: 1 })).toThrow(
+      new Refusal("This transaction type does not take fees or taxes"),
+    );
+
+    expect(() => appendTransaction(file, { ...baseTx, taxes: 1 })).toThrow(
+      new Refusal("This transaction type does not take fees or taxes"),
+    );
+
+    expect(() => appendTransaction(file, { ...baseTx, shares: 1 })).toThrow(
+      new Refusal("This transaction type does not take shares"),
+    );
+
+    expect(() =>
+      appendTransaction(file, {
+        accountId: "cash-gbp",
+        amount: 10,
+        currency: "GBP",
+        date: "2026-09-25",
+        fees: 6,
+        portfolioId: "port-1",
+        securityId: "sec-1",
+        shares: 1,
+        taxes: 4.01,
+        type: "purchase",
+      }),
+    ).toThrow(
+      new Refusal("Fees and taxes cannot exceed the transaction amount"),
+    );
+
+    // A file omitting baseCurrency falls back to GBP for legacy cash accounts.
+    const noBase = portfolioFile([
+      [
+        3,
+        [
+          [1, "legacy-cash"],
+          [2, "Legacy Cash"],
+        ],
+      ],
+    ]);
+    const legacyRes = appendTransaction(noBase, {
+      ...baseTx,
+      accountId: "legacy-cash",
+    });
+    expect(
+      readPortfolioSnapshot(legacyRes.content, "legacy.portfolio")
+        .cashAccounts[0]?.balance,
+    ).toBe(100);
+  });
+});
+
+describe("updateQuotes", () => {
+  it("upserts sorted prices, preserves undated and untouched entries byte for byte, handles date=0, and clears only shadowed latest quotes", () => {
+    const undatedPrice = protobufOf([[2, 9_000_000_000]]);
+    const olderWithExtra = protobufOf([
+      [1, 20_700],
+      [2, 11_000_000_000],
+      [99, "preserve-me"],
+    ]);
+    const newerPrice = protobufOf([
+      [1, 20_720],
+      [2, 13_000_000_000],
+    ]);
+    const sameDayOld = protobufOf([
+      [1, 20_710],
+      [2, 11_500_000_000],
+    ]);
+
+    const base = richPortfolioFile([
+      [1, 66],
+      // sec-shadowed: unsorted prices, undated entry, duplicate target day, and same-day latest (must be stripped).
+      [
+        2,
+        [
+          [1, "sec-shadowed"],
+          [3, "Shadowed Fund"],
+          [4, "GBP"],
+          [13, newerPrice],
+          [13, undatedPrice],
+          [13, sameDayOld],
+          [13, olderWithExtra],
+          [
+            16,
+            [
+              [1, 20_710],
+              [2, 11_600_000_000],
+            ],
+          ],
+          [98, 777],
+        ],
+      ],
+      // sec-newer-latest: latest is strictly newer than quote date -> preserved byte for byte.
+      [
+        2,
+        [
+          [1, "sec-newer-latest"],
+          [3, "Newer Latest Fund"],
+          [4, "GBP"],
+          [
+            16,
+            [
+              [1, 20_750],
+              [2, 15_000_000_000],
+            ],
+          ],
+        ],
+      ],
+      // sec-bad-latest: undated latest or zero latest -> stripped.
+      [
+        2,
+        [
+          [1, "sec-undated-latest"],
+          [3, "Undated Latest"],
+          [4, "GBP"],
+          [16, [[2, 12_000_000_000]]],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-zero-latest"],
+          [3, "Zero Latest"],
+          [4, "GBP"],
+          [
+            16,
+            [
+              [1, 20_750],
+              [2, 0],
+            ],
+          ],
+        ],
+      ],
+      // sec-untouched + sec-no-id: kept byte for byte.
+      [
+        2,
+        [
+          [1, "sec-untouched"],
+          [3, "Untouched Fund"],
+          [4, "GBP"],
+          [99, "still-here"],
+        ],
+      ],
+      [2, [[3, "No Id Security"]]],
+      [12, "GBP"],
+    ]);
+
+    const updated = updateQuotes(
+      base,
+      {
+        date: "2026-09-17", // epoch day 20_713
+        quotes: [
+          { price: 120.25, securityId: "sec-shadowed" },
+          { price: 140, securityId: "sec-newer-latest" },
+          { price: 50, securityId: "sec-undated-latest" },
+          { price: 60, securityId: "sec-zero-latest" },
+        ],
+      },
+      { now: new Date("2026-09-17T18:00:00Z") },
+    );
+
+    expect(updated.updatedCount).toBe(4);
+    expect(unzipSync(updated.content)["sibling.txt"]).toStrictEqual(
+      strToU8("keep me byte-for-byte"),
+    );
+
+    // Replace existing same day (20_710 -> 2026-09-14) AND test date = 0 (1970-01-01).
+    const replaceSameDay = updateQuotes(updated.content, {
+      date: "2026-09-14",
+      quotes: [{ price: 118, securityId: "sec-shadowed" }],
+    });
+    const withEpochZero = updateQuotes(replaceSameDay.content, {
+      date: "1970-01-01",
+      quotes: [{ price: 10, securityId: "sec-shadowed" }],
+    });
+
+    const client = messageOf(rawClientOf(withEpochZero.content));
+    const securities = messagesAt(client, 2);
+
+    // sec-shadowed: undated entry preserved first, dated entries strictly ascending [0, 20700, 20710, 20713, 20720],
+    // unknown field 98 preserved, latest (field 16) stripped, updatedAt (field 21) written.
+    const shadowed = securities[0] ?? new Map();
+    expect(int32At(shadowed, 98)).toBe(777);
+    expect(shadowed.has(16)).toBe(false);
+    expect(shadowed.has(21)).toBe(true);
+    const shadowedPrices = messagesAt(shadowed, 13);
+    expect(
+      shadowedPrices.map((p) => [
+        p.has(1) ? int64At(p, 1) : null,
+        int64At(p, 2),
+      ]),
+    ).toStrictEqual([
+      [null, 9_000_000_000],
+      [0, 1_000_000_000],
+      [20_700, 11_000_000_000],
+      [20_710, 11_800_000_000],
+      [20_713, 12_025_000_000],
+      [20_720, 13_000_000_000],
+    ]);
+    // Untouched older entry kept its unknown field 99 byte for byte.
+    expect(textAt(shadowedPrices[2] ?? new Map(), 99)).toBe("preserve-me");
+
+    // sec-newer-latest kept its strictly newer latest (field 16).
+    expect(securities[1]?.has(16)).toBe(true);
+    // sec-undated-latest and sec-zero-latest had their shadowed latest stripped.
+    expect(securities[2]?.has(16)).toBe(false);
+    expect(securities[3]?.has(16)).toBe(false);
+    // sec-untouched preserved its unknown field 99 and had no updatedAt added.
+    expect(textAt(securities[4] ?? new Map(), 99)).toBe("still-here");
+    expect(securities[4]?.has(21)).toBe(false);
+
+    const snapshot = readPortfolioSnapshot(
+      withEpochZero.content,
+      "q.portfolio",
+    );
+    expect(
+      snapshot.holdings.find((h) => h.id === "sec-newer-latest")?.latestPrice,
+    ).toBe(150);
+    expect(
+      snapshot.holdings.find((h) => h.id === "sec-undated-latest")?.latestPrice,
+    ).toBe(50);
+  });
+
+  it("refuses empty batches, duplicate security ids, unknown or synthetic security ids, bad dates, and invalid prices", () => {
+    const file = samplePortfolioFile();
+    expect(() =>
+      updateQuotes(file, { date: "2026-09-25", quotes: [] }),
+    ).toThrow(new Refusal("Enter at least one security price"));
+
+    expect(() =>
+      updateQuotes(file, {
+        date: "2026-09-25",
+        quotes: [
+          { price: 100, securityId: "sec-world" },
+          { price: 101, securityId: "sec-world" },
+        ],
+      }),
+    ).toThrow(new Refusal("Each security can only be updated once per batch"));
+
+    expect(() =>
+      updateQuotes(file, {
+        date: "2026-09-25",
+        quotes: [{ price: 100, securityId: "missing" }],
+      }),
+    ).toThrow(new Refusal("A selected security was not found"));
+
+    expect(() =>
+      updateQuotes(file, {
+        date: "2026-02-31",
+        quotes: [{ price: 100, securityId: "sec-world" }],
+      }),
+    ).toThrow(new Refusal("Enter a valid calendar date"));
+
+    expect(() =>
+      updateQuotes(file, {
+        date: "2026-09-25",
+        quotes: [{ price: 0, securityId: "sec-world" }],
+      }),
+    ).toThrow(new Refusal("Quote price must be greater than zero"));
+  });
+
+  it("round-trips pre-1970 dates using 10-byte negative varints for transactions and quotes", () => {
+    const base = portfolioFile([
+      [1, 66],
+      [
+        2,
+        [
+          [1, "sec-historic"],
+          [3, "Historic Index"],
+          [4, "GBP"],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-gbp"],
+          [2, "Historic Cash"],
+          [3, "GBP"],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+
+    const withPreEpochTx = appendTransaction(
+      base,
+      {
+        accountId: "cash-gbp",
+        amount: 250,
+        currency: "GBP",
+        date: "1969-12-31",
+        fees: 0,
+        shares: 0,
+        taxes: 0,
+        type: "deposit",
+      },
+      { now: new Date("1969-12-31T00:00:00Z"), uuid: () => "tx-pre-1970" },
+    );
+
+    const withPreEpochQuote = updateQuotes(withPreEpochTx.content, {
+      date: "1969-12-31",
+      quotes: [{ price: 42.5, securityId: "sec-historic" }],
+    });
+    const withEpochZeroQuote = updateQuotes(withPreEpochQuote.content, {
+      date: "1970-01-01",
+      quotes: [{ price: 43, securityId: "sec-historic" }],
+    });
+
+    const client = messageOf(rawClientOf(withEpochZeroQuote.content));
+    const tx = messagesAt(client, 5)[0] ?? new Map();
+    const txTimestamp = messagesAt(tx, 9)[0] ?? new Map();
+    expect(int64At(txTimestamp, 1)).toBe(-86_400);
+
+    const sec = messagesAt(client, 2)[0] ?? new Map();
+    expect(
+      messagesAt(sec, 13).map((entry) => [
+        int64At(entry, 1),
+        int64At(entry, 2),
+      ]),
+    ).toStrictEqual([
+      [-1, 4_250_000_000],
+      [0, 4_300_000_000],
+    ]);
+
+    const preEpochSnapshot = readPortfolioSnapshot(
+      withPreEpochQuote.content,
+      "historic.portfolio",
+    );
+    expect(preEpochSnapshot.transactions[0]).toMatchObject({
+      date: "1969-12-31",
+      id: "tx-pre-1970",
+      timestamp: -86_400,
+    });
+    expect(preEpochSnapshot.holdings[0]).toMatchObject({
+      latestPrice: 42.5,
+      latestPriceDate: "1969-12-31",
+    });
+
+    const epochZeroSnapshot = readPortfolioSnapshot(
+      withEpochZeroQuote.content,
+      "historic.portfolio",
+    );
+    expect(epochZeroSnapshot.holdings[0]).toMatchObject({
+      latestPrice: 43,
+      latestPriceDate: "1970-01-01",
+    });
   });
 });
