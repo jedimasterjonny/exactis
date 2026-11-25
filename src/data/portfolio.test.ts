@@ -13,6 +13,7 @@ import {
   accountsLayoutOf,
   cashTotalsOf,
   holdingsViewOf,
+  isIsoCalendarDate,
   roundPence,
   transactionDirectionOf,
   transactionsViewOf,
@@ -94,6 +95,27 @@ const retiredSecurities: SecuritiesAccount = {
   name: "Closed Account",
   referenceAccountId: "cash-old",
 };
+
+describe("isIsoCalendarDate", () => {
+  it("accepts real four-digit Gregorian calendar dates and rejects malformed, out-of-range, and rolled-over dates", () => {
+    expect(isIsoCalendarDate("2026-09-25")).toBe(true);
+    expect(isIsoCalendarDate("1970-01-01")).toBe(true);
+    expect(isIsoCalendarDate("2024-02-29")).toBe(true);
+    expect(isIsoCalendarDate("1000-01-01")).toBe(true);
+    expect(isIsoCalendarDate("9999-12-31")).toBe(true);
+
+    expect(isIsoCalendarDate("")).toBe(false);
+    expect(isIsoCalendarDate("2026-9-5")).toBe(false);
+    expect(isIsoCalendarDate("2026/09/25")).toBe(false);
+    expect(isIsoCalendarDate("0500-01-01")).toBe(false);
+    expect(isIsoCalendarDate("0999-12-31")).toBe(false);
+    expect(isIsoCalendarDate("2026-13-01")).toBe(false);
+    expect(isIsoCalendarDate("2026-00-10")).toBe(false);
+    expect(isIsoCalendarDate("2026-02-31")).toBe(false);
+    expect(isIsoCalendarDate("2025-02-29")).toBe(false);
+    expect(isIsoCalendarDate("2026-04-31")).toBe(false);
+  });
+});
 
 describe("roundPence", () => {
   it("rounds to two decimal places and normalises minus zero", () => {

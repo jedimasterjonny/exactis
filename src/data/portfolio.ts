@@ -63,11 +63,70 @@ export interface HoldingRow {
   readonly status: HoldingStatus;
 }
 
+// Input for appending a new cash or securities account to a .portfolio file.
+export type NewPortfolioAccount =
+  | {
+      readonly currency: string;
+      readonly kind: "cash";
+      readonly name: string;
+      readonly note?: string;
+    }
+  | {
+      readonly kind: "securities";
+      readonly name: string;
+      readonly note?: string;
+      readonly referenceAccountId?: string;
+    };
+
+// Input for appending a new security (with optional initial quote and
+// Asset Allocation classification id) to a .portfolio file.
+export interface NewPortfolioSecurity {
+  readonly categoryId?: string;
+  readonly currency: string;
+  readonly isin?: string;
+  readonly latestPrice: null | number;
+  readonly latestPriceDate?: string;
+  readonly name: string;
+  readonly note?: string;
+  readonly ticker?: string;
+}
+
+// Input for appending a new transaction of any of Portfolio
+// Performance's fifteen types to a .portfolio file.
+export interface NewPortfolioTransaction {
+  readonly accountId?: string;
+  readonly amount: number;
+  readonly currency: string;
+  readonly date: string;
+  readonly fees: number;
+  readonly note?: string;
+  readonly otherAccountId?: string;
+  readonly otherPortfolioId?: string;
+  readonly portfolioId?: string;
+  readonly securityId?: string;
+  readonly shares: number;
+  readonly taxes: number;
+  readonly type: TransactionType;
+}
+
 // One leaf classification in the file's Asset Allocation taxonomy: its
 // protobuf classification id and disambiguated display name.
 export interface PortfolioCategory {
   readonly id: string;
   readonly name: string;
+}
+
+// Input for recording a batch of historical quotes dated to one ISO
+// calendar date across one or more catalogued securities.
+export interface PortfolioQuoteBatch {
+  readonly date: string;
+  readonly quotes: readonly PortfolioQuoteUpdate[];
+}
+
+// One security price entry within a batch quote update.
+export interface PortfolioQuoteUpdate {
+  readonly price: number;
+  readonly securityId: string;
 }
 
 // What reading a binary Portfolio Performance file hands the Portfolio
@@ -203,6 +262,12 @@ interface TransactionsFilter {
 // matching macOS Finder's reported size and leaving ~500 KB headroom
 // inside Vercel Hobby's 4.5 MB serverless payload limit).
 export const maxPortfolioBytes = 4_000_000;
+
+// Safe upper bounds keeping minor-unit money sums (hundredths) and
+// scaled share/price figures (hundred-millionths) well within
+// Number.MAX_SAFE_INTEGER across client inputs, Zod schemas, and writers.
+export const maxPortfolioMoney = 1_000_000_000_000;
+export const maxPortfolioScaled = 90_000_000;
 
 // Refusal copy shown both on the client before opening ConfirmDialog
 // and on the server in uploadPortfolio when a file exceeds 4 MB.
@@ -392,6 +457,23 @@ export function holdingsViewOf(
         : 0,
   }));
   return { hasForeignPrices, hasZeroShare, rows, totalGbp };
+}
+
+// Whether a string is a valid four-digit Gregorian calendar date in
+// YYYY-MM-DD form (years 1000..9999), rejecting rollovers such as
+// 2026-02-31 or out-of-range years such as 0500-01-01.
+export function isIsoCalendarDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(value)) {
+    return false;
+  }
+  const year = Number(value.slice(0, 4));
+  if (year < 1000) {
+    return false;
+  }
+  const ms = Date.parse(`${value}T00:00:00Z`);
+  return (
+    Number.isFinite(ms) && new Date(ms).toISOString().slice(0, 10) === value
+  );
 }
 
 // A bookkeeping sum rounded to the penny, with minus nothing normalised

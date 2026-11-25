@@ -1,4 +1,4 @@
-import { strFromU8 } from "fflate";
+import { strFromU8, strToU8 } from "fflate";
 
 import { Refusal } from "@/lib/answer";
 
@@ -107,6 +107,11 @@ export function textAt(message: Message, number: number): string | undefined {
   return value === undefined ? undefined : strFromU8(bytesOf(value, number));
 }
 
+// A UTF-8 string written under a number as a length-delimited field.
+export function textField(number: number, value: string): Uint8Array {
+  return delimitedOf(number, strToU8(value));
+}
+
 // A whole number as a varint, a negative one widened to ten bytes as a
 // negative int32 is written.
 export function varintOf(value: number): Uint8Array<ArrayBuffer> {
@@ -118,6 +123,36 @@ export function varintOf(value: number): Uint8Array<ArrayBuffer> {
     bytes.push(left === 0n ? low : low | 0x80);
   } while (left !== 0n);
   return new Uint8Array(bytes);
+}
+
+// A whole number written under a number as a varint field, always
+// emitted (including zero) so callers that require wire presence such
+// as epoch-day 0 keep it.
+export function wholeField(number: number, value: number): Uint8Array {
+  return joined([varintOf(number * 8), varintOf(value)]);
+}
+
+// The message with singular length-delimited field `number` replaced in
+// place (dropping duplicates) or appended at the end, always emitting
+// even a zero-length submessage and keeping every other field byte for
+// byte.
+export function withMessageAt(
+  bytes: Uint8Array,
+  number: number,
+  message: Uint8Array,
+): Uint8Array {
+  const written = delimitedOf(number, message);
+  const parts: Uint8Array[] = [];
+  let isPlaced = false;
+  for (const field of fieldsOf(bytes)) {
+    if (field.number !== number) {
+      parts.push(bytes.subarray(field.from, field.to));
+    } else if (!isPlaced) {
+      parts.push(written);
+      isPlaced = true;
+    }
+  }
+  return joined(isPlaced ? parts : [...parts, written]);
 }
 
 // The message with each message written under a number rewritten as
@@ -136,6 +171,47 @@ export function withMessagesAt(
         : bytes.subarray(field.from, field.to),
     ),
   );
+}
+
+// The message with every occurrence of field `number` removed, keeping
+// every other field byte for byte.
+export function withoutField(bytes: Uint8Array, number: number): Uint8Array {
+  const parts: Uint8Array[] = [];
+  for (const field of fieldsOf(bytes)) {
+    if (field.number !== number) {
+      parts.push(bytes.subarray(field.from, field.to));
+    }
+  }
+  return joined(parts);
+}
+
+// The message with repeated message field `number` collected as raw
+// byte slices, passed to `replace`, and written back in the slot of its
+// first occurrence (or appended at the end when absent), keeping
+// untouched messages and every other field byte for byte.
+export function withReplacedMessagesAt(
+  bytes: Uint8Array,
+  number: number,
+  replace: (messages: readonly Uint8Array[]) => readonly Uint8Array[],
+): Uint8Array {
+  const fields = [...fieldsOf(bytes)];
+  const existing = fields
+    .filter((field) => field.number === number)
+    .map((field) => bytesOf(field.value, number));
+  const replacement = replace(existing).map((message) =>
+    delimitedOf(number, message),
+  );
+  const parts: Uint8Array[] = [];
+  let isPlaced = false;
+  for (const field of fields) {
+    if (field.number !== number) {
+      parts.push(bytes.subarray(field.from, field.to));
+    } else if (!isPlaced) {
+      parts.push(...replacement);
+      isPlaced = true;
+    }
+  }
+  return joined(isPlaced ? parts : [...parts, ...replacement]);
 }
 
 // The message with the whole number given written under a number, in
