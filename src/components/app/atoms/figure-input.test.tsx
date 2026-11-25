@@ -69,6 +69,27 @@ describe("FigureInput", () => {
     expect(input).toHaveValue("2031");
   });
 
+  it("reports live parsed values through onValueChange as the user types or clears", () => {
+    const onValueChange = vi.fn<(value: null | number) => void>();
+    render(
+      <FigureInput
+        format={plain}
+        largeStep={10}
+        onValueChange={onValueChange}
+        step={1}
+        value={null}
+      />,
+    );
+
+    const input = screen.getByRole("textbox");
+
+    fireEvent.change(input, { target: { value: "42" } });
+    expect(onValueChange).toHaveBeenLastCalledWith(42);
+
+    fireEvent.change(input, { target: { value: "" } });
+    expect(onValueChange).toHaveBeenLastCalledWith(null);
+  });
+
   it("reports nothing for a figure cleared to nothing", () => {
     const onValueCommitted = vi.fn<(value: number) => void>();
     render(

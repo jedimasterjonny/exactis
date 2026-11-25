@@ -204,26 +204,34 @@ describe("PriceField", () => {
     expect(onCleared).toHaveBeenCalledOnce();
   });
 
-  it("formats GBX pence and non-ISO currency codes as plain decimals without throwing", () => {
+  it("formats GBX pence and non-ISO currency codes as plain decimals without throwing and forwards onValueChange", () => {
+    const onValueChange = vi.fn<(value: null | number) => void>();
     const { rerender } = render(
       <PriceField
         currency="GBX"
         label="Latest price (pence)"
+        onValueChange={onValueChange}
         value={214.015}
+      />,
+    );
+
+    const input = screen.getByRole("textbox", { name: "Latest price (pence)" });
+    expect(input).toHaveValue("214.015");
+
+    rerender(
+      <PriceField
+        currency="EURO"
+        label="Latest price (pence)"
+        onValueChange={onValueChange}
+        value={18.25}
       />,
     );
 
     expect(
       screen.getByRole("textbox", { name: "Latest price (pence)" }),
-    ).toHaveValue("214.015");
-
-    rerender(
-      <PriceField currency="EURO" label="Latest price (pence)" value={18.25} />,
-    );
-
-    expect(
-      screen.getByRole("textbox", { name: "Latest price (pence)" }),
     ).toHaveValue("18.25");
+    fireEvent.change(input, { target: { value: "220.5" } });
+    expect(onValueChange).toHaveBeenLastCalledWith(220.5);
   });
 });
 
@@ -342,17 +350,29 @@ describe("CurrencyField", () => {
     expect(onCleared).toHaveBeenCalledOnce();
   });
 
-  it("formats GBX and non-ISO currencies as plain decimals without throwing", () => {
+  it("formats GBX and non-ISO currencies as plain decimals and forwards error and onValueChange", () => {
+    const onValueChange = vi.fn<(value: null | number) => void>();
     render(
       <>
-        <CurrencyField currency="GBX" defaultValue={214.5} label="Pence" />
+        <CurrencyField
+          currency="GBX"
+          defaultValue={214.5}
+          error="Fees and taxes cannot exceed total paid"
+          label="Pence"
+          onValueChange={onValueChange}
+        />
         <CurrencyField currency="EURO" defaultValue={18.25} label="Custom" />
       </>,
     );
 
-    expect(screen.getByRole("textbox", { name: "Pence" })).toHaveValue(
-      "214.50",
-    );
+    const pence = screen.getByRole("textbox", { name: "Pence" });
+    expect(pence).toHaveValue("214.50");
+    expect(pence).toHaveAttribute("aria-invalid", "true");
+    expect(
+      screen.getByText("Fees and taxes cannot exceed total paid"),
+    ).toHaveClass("text-destructive");
+    fireEvent.change(pence, { target: { value: "250" } });
+    expect(onValueChange).toHaveBeenLastCalledWith(250);
     expect(screen.getByRole("textbox", { name: "Custom" })).toHaveValue(
       "18.25",
     );
@@ -360,13 +380,15 @@ describe("CurrencyField", () => {
 });
 
 describe("SharesField", () => {
-  it("accepts fractional shares up to eight decimal places and steps by 1 and 10", () => {
+  it("accepts fractional shares up to eight decimal places, forwards onValueChange, and steps by 1 and 10", () => {
+    const onValueChange = vi.fn<(value: null | number) => void>();
     const onValueCommitted = vi.fn<(value: number) => void>();
     render(
       <SharesField
         defaultValue={10}
         label="Shares"
         min={0}
+        onValueChange={onValueChange}
         onValueCommitted={onValueCommitted}
       />,
     );
@@ -378,6 +400,9 @@ describe("SharesField", () => {
     expect(input).toHaveValue("11");
     fireEvent.keyDown(input, { key: "ArrowDown", shiftKey: true });
     expect(input).toHaveValue("1");
+
+    fireEvent.change(input, { target: { value: "2.5" } });
+    expect(onValueChange).toHaveBeenLastCalledWith(2.5);
 
     commit(input, "0.12345678");
     expect(input).toHaveValue("0.12345678");

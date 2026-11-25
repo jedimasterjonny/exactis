@@ -6,10 +6,10 @@ import { Field } from "@/components/app/atoms/field";
 import { FigureInput } from "@/components/app/atoms/figure-input";
 import { currencyFormatOf, percentFormat, priceFormatOf } from "@/lib/money";
 
-type ClearableBounds = "max" | "min" | "onCleared";
+type ClearableBounds = "max" | "min" | "onCleared" | "onValueChange";
 
 type FigureFieldProps = ComponentProps<typeof FigureInput> & {
-  readonly error?: string;
+  readonly error?: string | undefined;
   readonly hint?: string | undefined;
   readonly label: string;
 };
@@ -24,6 +24,7 @@ interface Forwarded {
   readonly max?: number;
   readonly min?: number;
   readonly onCleared?: () => void;
+  readonly onValueChange?: (value: null | number) => void;
   readonly onValueCommitted?: (value: number) => void;
 }
 
@@ -79,6 +80,7 @@ export function CurrencyField({
   ...props
 }: PresetProps<ClearableBounds> & {
   readonly currency: string;
+  readonly error?: string | undefined;
   readonly hint?: string | undefined;
 }): JSX.Element {
   return (
