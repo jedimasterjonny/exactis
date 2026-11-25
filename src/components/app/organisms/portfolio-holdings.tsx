@@ -2,7 +2,7 @@
 
 import type { JSX } from "react";
 
-import { Eye, Layers, Plus } from "lucide-react";
+import { Eye, Layers, Plus, RefreshCw } from "lucide-react";
 
 import type { Holding, SecuritiesAccount } from "@/data/portfolio";
 import type { Option } from "@/lib/options";
@@ -26,6 +26,7 @@ interface PortfolioHoldingsProps {
   readonly onAccountChange: (accountId: string) => void;
   readonly onAddSecurity: () => void;
   readonly onShowingZeroSharesChange: (isShowing: boolean) => void;
+  readonly onUpdateQuotes: () => void;
   readonly readOnlyId?: string | undefined;
   readonly securitiesAccounts: readonly SecuritiesAccount[];
 }
@@ -33,9 +34,10 @@ interface PortfolioHoldingsProps {
 // The Portfolio screen's Holdings tab: a controlled Account filter
 // keyed by portfolio UUID, an optional zero-share switch whenever any
 // zero-share security exists under the current filter, HoldingsTable
-// (or a contextual EmptyState), an outline Add security action, and a
-// footer stating the filtered account subtotal and FX rate note when
-// applicable.
+// (or a contextual EmptyState), an outline Add security action beside a
+// primary Update quotes CTA whenever the file holds at least one
+// security, and a footer stating the filtered account subtotal and FX
+// rate note when applicable.
 export function PortfolioHoldings({
   accountId,
   holdings,
@@ -45,6 +47,7 @@ export function PortfolioHoldings({
   onAccountChange,
   onAddSecurity,
   onShowingZeroSharesChange,
+  onUpdateQuotes,
   readOnlyId,
   securitiesAccounts,
 }: PortfolioHoldingsProps): JSX.Element {
@@ -75,16 +78,30 @@ export function PortfolioHoldings({
   return (
     <SectionCard
       actions={
-        <Button
-          aria-describedby={isReadOnly ? readOnlyId : undefined}
-          disabled={isReadOnly}
-          onClick={onAddSecurity}
-          size="sm"
-          variant="outline"
-        >
-          <Plus aria-hidden />
-          Add security
-        </Button>
+        <>
+          <Button
+            aria-describedby={isReadOnly ? readOnlyId : undefined}
+            disabled={isReadOnly}
+            onClick={onAddSecurity}
+            size="sm"
+            variant="outline"
+          >
+            <Plus aria-hidden />
+            Add security
+          </Button>
+          {holdings.length > 0 && (
+            <Button
+              aria-describedby={isReadOnly ? readOnlyId : undefined}
+              disabled={isReadOnly}
+              onClick={onUpdateQuotes}
+              size="sm"
+              variant="default"
+            >
+              <RefreshCw aria-hidden />
+              Update quotes
+            </Button>
+          )}
+        </>
       }
       {...(hasControls && {
         controls: (

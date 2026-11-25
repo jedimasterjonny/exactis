@@ -41,7 +41,9 @@ in Postgres on Neon and the app on Vercel.
   allocation.
 - Portfolio — the household's stored binary Portfolio Performance file, its
   holdings, paired securities and cash accounts, and transactions, with upload,
-  replacement and byte-for-byte download for desktop round-tripping.
+  replacement, byte-preserving write-back for new accounts, securities,
+  transactions and batch quote updates, and byte-for-byte download for desktop
+  round-tripping.
 
 A scenario is a what-if copy of the household, or of another scenario. Every
 screen, and export and import, works on whichever is open. Compare sets one

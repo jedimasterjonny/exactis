@@ -20,6 +20,7 @@ import { ScreenTabs } from "@/components/app/molecules/screen-tabs";
 import { PortfolioAccountDialog } from "@/components/app/organisms/portfolio-account-dialog";
 import { PortfolioAccounts } from "@/components/app/organisms/portfolio-accounts";
 import { PortfolioHoldings } from "@/components/app/organisms/portfolio-holdings";
+import { PortfolioQuotesDialog } from "@/components/app/organisms/portfolio-quotes-dialog";
 import { PortfolioSecurityDialog } from "@/components/app/organisms/portfolio-security-dialog";
 import { PortfolioTransactionDialog } from "@/components/app/organisms/portfolio-transaction-dialog";
 import { PortfolioTransactions } from "@/components/app/organisms/portfolio-transactions";
@@ -219,6 +220,7 @@ function OwnedPortfolioTabs({
   const [addingAccount, setAddingAccount] = useState<AccountKind | null>(null);
   const [isAddingSecurity, setIsAddingSecurity] = useState(false);
   const [isAddingTransaction, setIsAddingTransaction] = useState(false);
+  const [isUpdatingQuotes, setIsUpdatingQuotes] = useState(false);
   const [isScenarioOpen, setIsScenarioOpen] = useState(isInScenario);
 
   if (isScenarioOpen !== isInScenario) {
@@ -227,6 +229,7 @@ function OwnedPortfolioTabs({
       setAddingAccount(null);
       setIsAddingSecurity(false);
       setIsAddingTransaction(false);
+      setIsUpdatingQuotes(false);
     }
   }
 
@@ -303,6 +306,9 @@ function OwnedPortfolioTabs({
                   setIsAddingSecurity(true);
                 }}
                 onShowingZeroSharesChange={setIsShowingZeroShares}
+                onUpdateQuotes={() => {
+                  setIsUpdatingQuotes(true);
+                }}
                 readOnlyId={isInScenario ? scenarioNoteId : undefined}
                 securitiesAccounts={snapshot.securitiesAccounts}
               />
@@ -391,6 +397,19 @@ function OwnedPortfolioTabs({
           }}
           onSaved={handleTransactionSaved}
           securitiesAccounts={snapshot.securitiesAccounts}
+          today={today}
+          version={version}
+        />
+      )}
+      {!isInScenario && isUpdatingQuotes && (
+        <PortfolioQuotesDialog
+          holdings={snapshot.holdings}
+          onDismiss={() => {
+            setIsUpdatingQuotes(false);
+          }}
+          onSaved={() => {
+            setIsUpdatingQuotes(false);
+          }}
           today={today}
           version={version}
         />
