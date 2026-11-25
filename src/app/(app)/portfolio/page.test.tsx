@@ -13,7 +13,12 @@ import { getPortfolio } from "@/store/portfolio";
 
 import Portfolio, { metadata } from "./page";
 
-vi.mock("@/actions/portfolio", () => ({ uploadPortfolio: vi.fn() }));
+vi.mock("@/actions/portfolio", () => ({
+  addPortfolioAccount: vi.fn(),
+  addPortfolioSecurity: vi.fn(),
+  addPortfolioTransaction: vi.fn(),
+  uploadPortfolio: vi.fn(),
+}));
 vi.mock("@/store/household", () => ({ getOpened: vi.fn() }));
 vi.mock("@/store/portfolio", () => ({ getPortfolio: vi.fn() }));
 

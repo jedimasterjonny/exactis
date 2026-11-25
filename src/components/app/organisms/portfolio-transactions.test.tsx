@@ -318,19 +318,7 @@ describe("PortfolioTransactions", () => {
     ).toBeInTheDocument();
   });
 
-  it("keeps draft securities and retired held securities visible by default, adapts toggle copy, and omits the switch when everything is active", () => {
-    const draftSecurity: Holding = {
-      currency: "GBP",
-      gbpRate: 1,
-      id: "sec-draft",
-      isDraft: true,
-      isRetired: false,
-      latestPrice: 100,
-      latestPriceDate: null,
-      name: "Draft Sterling Bond",
-      shares: 0,
-      sharesByAccount: [],
-    };
+  it("keeps retired held securities visible by default, adapts toggle copy, promotes Add transaction to default variant, and omits the switch when everything is active", () => {
     const retiredHeldSecurity: Holding = {
       currency: "GBP",
       gbpRate: 1,
@@ -345,19 +333,21 @@ describe("PortfolioTransactions", () => {
 
     const { rerender } = renderTransactions({
       cashAccounts: [activeCashAccount],
-      holdings: [...activeHoldings, draftSecurity, retiredHeldSecurity],
+      holdings: [...activeHoldings, retiredHeldSecurity],
       securitiesAccounts: [activeSecuritiesAccount],
     });
 
-    // Neither draft (0-share) nor retired-but-held securities trigger the inactive toggle.
+    // Retired-but-held securities do not trigger the inactive toggle.
     expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add transaction" })).toHaveClass(
+      "bg-primary",
+    );
     expect(
       within(screen.getByRole("combobox", { name: "Security" }))
         .getAllByRole("option")
         .map((option) => option.textContent),
     ).toStrictEqual([
       "All securities",
-      "Draft Sterling Bond",
       "Global Equity Index",
       "Legacy Income Trust",
       "UK Gilts Fund",

@@ -136,7 +136,7 @@ describe("PortfolioUpload", () => {
     expect(uploadPortfolio).not.toHaveBeenCalled();
   });
 
-  it("asks before replacing with incoming/current names, same-name copy, and preview warning, and sends on confirm", async () => {
+  it("asks before replacing with incoming/current names and same-name copy, sends on confirm, and notifies onReplaced", async () => {
     vi.mocked(uploadPortfolio).mockResolvedValue(
       saved({
         fileName: "updated.portfolio",
@@ -144,13 +144,18 @@ describe("PortfolioUpload", () => {
         version: 2,
       }),
     );
+    const onReplaced = vi.fn<() => void>();
 
     const { rerender } = render(
-      <PortfolioUpload currentFileName="northstar.portfolio" version={1} />,
+      <PortfolioUpload
+        currentFileName="northstar.portfolio"
+        onReplaced={onReplaced}
+        version={1}
+      />,
       { wrapper: Toaster },
     );
 
-    // Different filename without preview entries.
+    // Different filename.
     const different = new File([sampleBytes], "updated.portfolio");
     choose([different]);
     expect(replaceDialog()).toHaveAccessibleDescription(
@@ -162,18 +167,18 @@ describe("PortfolioUpload", () => {
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(uploadPortfolio).not.toHaveBeenCalled();
 
-    // Same filename with unsaved preview entries.
+    // Same filename.
     rerender(
       <PortfolioUpload
         currentFileName="northstar.portfolio"
-        hasPreview
+        onReplaced={onReplaced}
         version={1}
       />,
     );
     const same = new File([sampleBytes], "northstar.portfolio");
     choose([same]);
     expect(replaceDialog()).toHaveAccessibleDescription(
-      "This replaces northstar.portfolio for the household, kept as the next version. Download .portfolio first to keep a copy of the current file. Unsaved preview entries in this tab will be cleared.",
+      "This replaces northstar.portfolio for the household, kept as the next version. Download .portfolio first to keep a copy of the current file.",
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Replace" }));
@@ -185,6 +190,7 @@ describe("PortfolioUpload", () => {
     const formData = vi.mocked(uploadPortfolio).mock.calls[0]?.[0];
     expect(formData?.get("afterVersion")).toBe("1");
     expect(formData?.get("file")).toBe(same);
+    expect(onReplaced).toHaveBeenCalledOnce();
     await waitFor(() => {
       expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     });
@@ -231,6 +237,9 @@ describe("PortfolioUpload", () => {
 
     await toasted("Portfolio file not replaced", "Network offline");
     expect(replaceDialog()).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Replace" })).toBeEnabled();
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Replace" }));
 

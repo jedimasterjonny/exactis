@@ -5,7 +5,6 @@ import { cn } from "cn";
 import type { PortfolioTransaction, TransactionType } from "@/data/portfolio";
 
 import { FoldedCell } from "@/components/app/organisms/folded-cell";
-import { Badge } from "@/components/kit/badge";
 import {
   Table,
   TableBody,
@@ -51,8 +50,8 @@ const costPrefixes: Record<TransactionType, "" | "after " | "incl. "> = {
 // The Portfolio screen's transactions table: newest-first rows folding
 // below 56rem into FoldedCell so mobile screens read type, security,
 // signed amount, date, accounts, share count, fee/tax breakdown and
-// notes without sideways scroll. Badges appear strictly for browser
-// Preview drafts; cash inflows carry the calm positive tone.
+// notes without sideways scroll. Cash inflows carry the calm positive
+// tone.
 export function TransactionsTable({
   transactions,
 }: TransactionsTableProps): JSX.Element {
@@ -104,20 +103,12 @@ export function TransactionsTable({
                 {transaction.note !== undefined && (
                   <span>{transaction.note}</span>
                 )}
-                {transaction.isDraft === true && (
-                  <span className="text-caution">Preview</span>
-                )}
               </FoldedCell>
               <TableCell className="figure whitespace-nowrap folded:hidden">
                 {dateText}
               </TableCell>
               <TableCell className="whitespace-nowrap folded:hidden">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span>{typeLabel}</span>
-                  {transaction.isDraft === true && (
-                    <Badge variant="caution">Preview</Badge>
-                  )}
-                </div>
+                {typeLabel}
               </TableCell>
               <TableCell
                 className={cn(

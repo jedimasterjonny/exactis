@@ -5,18 +5,10 @@ import type { JSX } from "react";
 import { Briefcase, Download } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
+import type { AccountKind } from "@/components/app/organisms/portfolio-account-dialog";
 import type {
-  AccountKind,
-  NewPortfolioAccount,
-} from "@/components/app/organisms/portfolio-account-dialog";
-import type { NewPortfolioSecurity } from "@/components/app/organisms/portfolio-security-dialog";
-import type { NewPortfolioTransaction } from "@/components/app/organisms/portfolio-transaction-dialog";
-import type {
-  CashAccount,
-  Holding,
+  NewPortfolioTransaction,
   PortfolioSnapshot,
-  PortfolioTransaction,
-  SecuritiesAccount,
   TransactionType,
 } from "@/data/portfolio";
 import type { OwnedPortfolio } from "@/store/portfolio";
@@ -34,10 +26,8 @@ import { PortfolioTransactions } from "@/components/app/organisms/portfolio-tran
 import { PortfolioUpload } from "@/components/app/organisms/portfolio-upload";
 import { SectionCard } from "@/components/app/organisms/section-card";
 import { Screen } from "@/components/app/templates/screen";
-import { Badge } from "@/components/kit/badge";
-import { Button, buttonVariants } from "@/components/kit/button";
+import { buttonVariants } from "@/components/kit/button";
 import { CardContent, CardFooter } from "@/components/kit/card";
-import { toast } from "@/components/kit/toast";
 import { counted } from "@/lib/count";
 import { formatGbp } from "@/lib/money";
 import { formatDay } from "@/lib/months";
@@ -45,15 +35,12 @@ import { portfolio, sectionLabel, subsectionLabel } from "@/lib/nav";
 
 interface OwnedPortfolioTabsProps {
   readonly activeTab: PortfolioTab;
-  readonly drafts: PreviewEntries;
   readonly isInScenario: boolean;
   readonly onActiveTabChange: (tab: PortfolioTab) => void;
-  readonly onUpdateDrafts: (
-    update: (current: PreviewEntries) => PreviewEntries,
-  ) => void;
   readonly scenarioNoteId: string;
   readonly snapshot: PortfolioSnapshot;
   readonly today: string;
+  readonly version: number;
 }
 
 interface PortfolioScreenProps {
@@ -65,40 +52,23 @@ interface PortfolioScreenProps {
 
 type PortfolioTab = "Accounts" | "Holdings" | "Transactions";
 
-interface PreviewDrafts {
-  readonly cash: readonly CashAccount[];
-  readonly forVersion: number;
-  readonly holdings: readonly Holding[];
-  readonly securities: readonly SecuritiesAccount[];
-  readonly transactions: readonly PortfolioTransaction[];
-}
-
-type PreviewEntries = Omit<PreviewDrafts, "forVersion">;
-
-const emptyDrafts: PreviewEntries = {
-  cash: [],
-  holdings: [],
-  securities: [],
-  transactions: [],
-};
-
 // The Portfolio screen backed by the household's versioned binary
 // Portfolio Performance (.portfolio) file stored in Postgres. Before a
 // file is uploaded it renders a single primary upload CTA (locked while
 // a scenario is open). Once stored it renders the server-parsed
 // snapshot with Download .portfolio and confirm-guarded Replace file…
 // actions in the header, moves focus to h1 on the empty-to-owned
-// transition so focus never drops to document.body, and keeps preview
-// drafts tagged with forVersion so PortfolioUpload stays mounted across
-// replacements while the version-keyed tabs/filters subtree resets
-// cleanly.
+// transition so focus never drops to document.body, and keys the
+// tabs/filters subtree on replaceCount and fileName so single-entry
+// write-backs preserve filters and open stale-refresh dialogs while
+// whole-file replacements reset view state cleanly.
 export function PortfolioScreen({
   initialTab,
   isInScenario,
   owned,
   today,
 }: PortfolioScreenProps): JSX.Element {
-  const [drafts, setDrafts] = useState<null | PreviewDrafts>(null);
+  const [replaceCount, setReplaceCount] = useState(0);
   const [activeTab, setActiveTab] = useState<PortfolioTab>(() =>
     initialTabOf(initialTab),
   );
@@ -137,13 +107,6 @@ export function PortfolioScreen({
   }
 
   const { savedOn, snapshot, version } = owned;
-  const activeDrafts =
-    drafts !== null && drafts.forVersion === version ? drafts : emptyDrafts;
-  const hasPreview =
-    activeDrafts.securities.length > 0 ||
-    activeDrafts.cash.length > 0 ||
-    activeDrafts.holdings.length > 0 ||
-    activeDrafts.transactions.length > 0;
   const snapshotActiveSecurities = snapshot.securitiesAccounts.filter(
     (account) => !account.isRetired,
   );
@@ -153,23 +116,6 @@ export function PortfolioScreen({
   const snapshotActiveHoldingsCount = snapshot.holdings.filter(
     (holding) => holding.shares > 0,
   ).length;
-
-  function updateDrafts(
-    update: (current: PreviewEntries) => PreviewEntries,
-  ): void {
-    setDrafts((current) => ({
-      ...update(
-        current !== null && current.forVersion === version
-          ? current
-          : emptyDrafts,
-      ),
-      forVersion: version,
-    }));
-  }
-
-  function clearPreview(): void {
-    setDrafts(null);
-  }
 
   return (
     <Screen
@@ -189,26 +135,25 @@ export function PortfolioScreen({
           <PortfolioUpload
             currentFileName={snapshot.fileName}
             describedBy={isInScenario ? scenarioNoteId : undefined}
-            hasPreview={hasPreview}
             isDisabled={isInScenario}
+            onReplaced={() => {
+              setReplaceCount((count) => count + 1);
+            }}
             version={version}
           />
         </>
       }
       label={sectionLabel(portfolio)}
       meta={
-        <>
-          <span className="min-w-0 wrap-anywhere">
-            {`${snapshot.fileName} · ${snapshot.baseCurrency} · Saved ${formatDay(savedOn)}`}
-          </span>
-          <Badge variant="caution">View only</Badge>
-        </>
+        <span className="min-w-0 wrap-anywhere">
+          {`${snapshot.fileName} · ${snapshot.baseCurrency} · Saved ${formatDay(savedOn)}`}
+        </span>
       }
       title={portfolio.title}
     >
       {isInScenario && (
         <Caution id={scenarioNoteId} title="Portfolio belongs to the household">
-          Leave the scenario to replace the file or add preview entries.
+          Leave the scenario to replace the file or update the portfolio.
         </Caution>
       )}
       {snapshot.baseCurrency !== "GBP" && (
@@ -226,42 +171,18 @@ export function PortfolioScreen({
         totalCash={snapshot.totalCash}
         totalInvested={snapshot.totalInvested}
       />
-      {hasPreview && (
-        <Caution
-          action={
-            <Button onClick={clearPreview} size="sm" variant="outline">
-              Clear preview
-            </Button>
-          }
-          title="Preview entries are kept in this browser tab only"
-        >
-          Balances and holdings are not recalculated.
-        </Caution>
-      )}
-      {/* Phase 3 hook: narrow this version-keyed filter reset to whole-file
-          replacements once protobuf write-back increments version on
-          single-entry edits. */}
       <OwnedPortfolioTabs
         activeTab={activeTab}
-        drafts={activeDrafts}
         isInScenario={isInScenario}
-        key={version}
+        key={`${String(replaceCount)}:${snapshot.fileName}`}
         onActiveTabChange={setActiveTab}
-        onUpdateDrafts={updateDrafts}
         scenarioNoteId={scenarioNoteId}
         snapshot={snapshot}
         today={today}
+        version={version}
       />
     </Screen>
   );
-}
-
-// Known sterling factor for a preview security's quote currency.
-function draftGbpRateOf(currency: string): null | number {
-  if (currency === "GBP") {
-    return 1;
-  }
-  return currency === "GBX" ? 0.01 : null;
 }
 
 // The starting tab from an optional ?tab= query parameter.
@@ -273,20 +194,18 @@ function initialTabOf(tab: string | undefined): PortfolioTab {
   return normalized === "transactions" ? "Transactions" : "Holdings";
 }
 
-// Version-keyed tabs, filters, switches, and preview dialogs for the
-// owned portfolio file. Keying this inner component by owned.version
-// resets filters, retired/inactive switches, and open preview dialogs
-// when the stored file is replaced without unmounting PortfolioUpload
-// in ScreenHeader or losing the user's active tab.
+// Tabs, filters, switches, and write-back dialogs for the owned
+// portfolio file. Keyed on replaceCount and fileName so single-entry
+// mutations preserve filters and keep dialogs open across stale
+// refreshes, while whole-file replacements reset cleanly.
 function OwnedPortfolioTabs({
   activeTab,
-  drafts,
   isInScenario,
   onActiveTabChange,
-  onUpdateDrafts,
   scenarioNoteId,
   snapshot,
   today,
+  version,
 }: OwnedPortfolioTabsProps): JSX.Element {
   const [holdingsAccountId, setHoldingsAccountId] = useState("");
   const [isShowingZeroShares, setIsShowingZeroShares] = useState(false);
@@ -300,168 +219,56 @@ function OwnedPortfolioTabs({
   const [addingAccount, setAddingAccount] = useState<AccountKind | null>(null);
   const [isAddingSecurity, setIsAddingSecurity] = useState(false);
   const [isAddingTransaction, setIsAddingTransaction] = useState(false);
+  const [isScenarioOpen, setIsScenarioOpen] = useState(isInScenario);
 
-  const snapshotActiveCash = snapshot.cashAccounts.filter(
-    (account) => !account.isRetired,
-  );
-  const securitiesAccounts = [
-    ...snapshot.securitiesAccounts,
-    ...drafts.securities,
-  ];
-  const cashAccounts = [...snapshot.cashAccounts, ...drafts.cash];
-  const holdings = [...snapshot.holdings, ...drafts.holdings];
-  const transactions = [...drafts.transactions, ...snapshot.transactions];
-  const dialogCashAccounts = [...snapshotActiveCash, ...drafts.cash];
-
-  // Phase 3 write-back hook: replace preview-only draft state with a
-  // protobuf-mutating Server Action writing to portfolio_files.
-  function addPreviewAccount(draft: NewPortfolioAccount): void {
-    const id = crypto.randomUUID();
-    if (draft.kind === "cash") {
-      const added: CashAccount = {
-        balance: 0,
-        balanceGbp: 0,
-        currency: draft.currency,
-        id,
-        isDraft: true,
-        isRetired: false,
-        name: draft.name,
-        ...(draft.note !== undefined && { note: draft.note }),
-        transactionCount: 0,
-      };
-      onUpdateDrafts((current) => ({
-        ...current,
-        cash: [...current.cash, added],
-      }));
-    } else {
-      const added: SecuritiesAccount = {
-        holdingsCount: 0,
-        id,
-        isDraft: true,
-        isRetired: false,
-        marketValue: 0,
-        name: draft.name,
-        ...(draft.note !== undefined && { note: draft.note }),
-        ...(draft.referenceAccountId !== undefined && {
-          referenceAccountId: draft.referenceAccountId,
-        }),
-      };
-      onUpdateDrafts((current) => ({
-        ...current,
-        securities: [...current.securities, added],
-      }));
+  if (isScenarioOpen !== isInScenario) {
+    setIsScenarioOpen(isInScenario);
+    if (isInScenario) {
+      setAddingAccount(null);
+      setIsAddingSecurity(false);
+      setIsAddingTransaction(false);
     }
-    setAddingAccount(null);
-    toast.add({
-      description:
-        "Shown in this view only. Changes are not saved to the file yet.",
-      title: "Account added to preview",
-      type: "info",
-    });
   }
 
-  // Phase 3 write-back hook: replace preview-only draft state with a
-  // protobuf-mutating Server Action writing to portfolio_files.
-  function addPreviewSecurity(draft: NewPortfolioSecurity): void {
-    const category =
-      draft.categoryId === undefined
-        ? undefined
-        : snapshot.categories.find((item) => item.id === draft.categoryId)
-            ?.name;
-    const added: Holding = {
-      ...(category !== undefined && { category }),
-      currency: draft.currency,
-      gbpRate: draftGbpRateOf(draft.currency),
-      id: crypto.randomUUID(),
-      isDraft: true,
-      isRetired: false,
-      ...(draft.isin !== undefined && { isin: draft.isin }),
-      latestPrice: draft.latestPrice,
-      latestPriceDate: null,
-      name: draft.name,
-      ...(draft.note !== undefined && { note: draft.note }),
-      shares: 0,
-      sharesByAccount: [],
-      ...(draft.ticker !== undefined && { ticker: draft.ticker }),
-    };
-    onUpdateDrafts((current) => ({
-      ...current,
-      holdings: [...current.holdings, added],
-    }));
+  const activeCashAccounts = snapshot.cashAccounts.filter(
+    (account) => !account.isRetired,
+  );
+
+  function handleAccountSaved(): void {
+    setAddingAccount(null);
+  }
+
+  function handleSecuritySaved(): void {
     setHoldingsAccountId("");
     setIsShowingZeroShares(true);
     setIsAddingSecurity(false);
-    toast.add({
-      description:
-        "Shown in this view only. Changes are not saved to the file yet.",
-      title: "Security added to preview",
-      type: "info",
-    });
   }
 
-  // Phase 3 write-back hook: replace preview-only draft state with a
-  // protobuf-mutating Server Action writing to portfolio_files.
-  function addPreviewTransaction(draft: NewPortfolioTransaction): void {
-    const accountNames = new Map(
-      cashAccounts.map((account) => [account.id, account.name]),
-    );
-    const portfolioNames = new Map(
-      securitiesAccounts.map((account) => [account.id, account.name]),
-    );
-    const securityNames = new Map(
-      holdings.map((holding) => [holding.id, holding.name]),
-    );
-    const accountName =
-      draft.accountId === undefined
-        ? undefined
-        : accountNames.get(draft.accountId);
-    const otherAccountName =
-      draft.otherAccountId === undefined
-        ? undefined
-        : accountNames.get(draft.otherAccountId);
-    const portfolioName =
-      draft.portfolioId === undefined
-        ? undefined
-        : portfolioNames.get(draft.portfolioId);
-    const otherPortfolioName =
-      draft.otherPortfolioId === undefined
-        ? undefined
-        : portfolioNames.get(draft.otherPortfolioId);
-    const securityName =
-      draft.securityId === undefined
-        ? undefined
-        : securityNames.get(draft.securityId);
-
-    const added: PortfolioTransaction = {
-      ...draft,
-      ...(accountName !== undefined && { accountName }),
-      id: crypto.randomUUID(),
-      isDraft: true,
-      ...(otherAccountName !== undefined && { otherAccountName }),
-      ...(otherPortfolioName !== undefined && { otherPortfolioName }),
-      ...(portfolioName !== undefined && { portfolioName }),
-      ...(securityName !== undefined && { securityName }),
-      timestamp: Math.floor(Date.parse(`${draft.date}T00:00:00Z`) / 1000),
-    };
-    onUpdateDrafts((current) => ({
-      ...current,
-      transactions: [added, ...current.transactions],
-    }));
-    setTransactionsAccountId("");
-    setTransactionsType("");
-    setTransactionsSecurityId("");
+  function handleTransactionSaved(draft: NewPortfolioTransaction): void {
+    const isAccountMismatch =
+      transactionsAccountId !== "" &&
+      draft.accountId !== transactionsAccountId &&
+      draft.portfolioId !== transactionsAccountId &&
+      draft.otherAccountId !== transactionsAccountId &&
+      draft.otherPortfolioId !== transactionsAccountId;
+    if (isAccountMismatch) {
+      setTransactionsAccountId("");
+    }
+    if (transactionsType !== "" && draft.type !== transactionsType) {
+      setTransactionsType("");
+    }
+    if (
+      transactionsSecurityId !== "" &&
+      draft.securityId !== transactionsSecurityId
+    ) {
+      setTransactionsSecurityId("");
+    }
     setIsAddingTransaction(false);
-    toast.add({
-      description:
-        "Shown in this view only. Changes are not saved to the file yet.",
-      title: "Transaction added to preview",
-      type: "info",
-    });
   }
 
   function openCashInTransactions(accountId: string): void {
     if (
-      cashAccounts.some(
+      snapshot.cashAccounts.some(
         (account) => account.id === accountId && account.isRetired,
       )
     ) {
@@ -487,7 +294,7 @@ function OwnedPortfolioTabs({
             children: (
               <PortfolioHoldings
                 accountId={holdingsAccountId}
-                holdings={holdings}
+                holdings={snapshot.holdings}
                 isReadOnly={isInScenario}
                 isShowingZeroShares={isShowingZeroShares}
                 label={subsectionLabel(portfolio, 1)}
@@ -497,7 +304,7 @@ function OwnedPortfolioTabs({
                 }}
                 onShowingZeroSharesChange={setIsShowingZeroShares}
                 readOnlyId={isInScenario ? scenarioNoteId : undefined}
-                securitiesAccounts={securitiesAccounts}
+                securitiesAccounts={snapshot.securitiesAccounts}
               />
             ),
             label: "Holdings",
@@ -505,7 +312,7 @@ function OwnedPortfolioTabs({
           {
             children: (
               <PortfolioAccounts
-                cashAccounts={cashAccounts}
+                cashAccounts={snapshot.cashAccounts}
                 isReadOnly={isInScenario}
                 label={subsectionLabel(portfolio, 2)}
                 onAddCash={() => {
@@ -517,7 +324,7 @@ function OwnedPortfolioTabs({
                 onOpenCash={openCashInTransactions}
                 onOpenSecurities={openSecuritiesInHoldings}
                 readOnlyId={isInScenario ? scenarioNoteId : undefined}
-                securitiesAccounts={securitiesAccounts}
+                securitiesAccounts={snapshot.securitiesAccounts}
               />
             ),
             label: "Accounts",
@@ -526,8 +333,8 @@ function OwnedPortfolioTabs({
             children: (
               <PortfolioTransactions
                 accountId={transactionsAccountId}
-                cashAccounts={cashAccounts}
-                holdings={holdings}
+                cashAccounts={snapshot.cashAccounts}
+                holdings={snapshot.holdings}
                 isReadOnly={isInScenario}
                 isShowingInactive={isShowingInactiveTransactions}
                 label={subsectionLabel(portfolio, 3)}
@@ -539,9 +346,9 @@ function OwnedPortfolioTabs({
                 onShowingInactiveChange={setIsShowingInactiveTransactions}
                 onTypeChange={setTransactionsType}
                 readOnlyId={isInScenario ? scenarioNoteId : undefined}
-                securitiesAccounts={securitiesAccounts}
+                securitiesAccounts={snapshot.securitiesAccounts}
                 securityId={transactionsSecurityId}
-                transactions={transactions}
+                transactions={snapshot.transactions}
                 type={transactionsType}
               />
             ),
@@ -550,38 +357,42 @@ function OwnedPortfolioTabs({
         ]}
         value={activeTab}
       />
-      {addingAccount !== null && (
+      {!isInScenario && addingAccount !== null && (
         <PortfolioAccountDialog
-          cashAccounts={dialogCashAccounts}
+          cashAccounts={activeCashAccounts}
           defaultCurrency={snapshot.baseCurrency}
           kind={addingAccount}
-          onAdd={addPreviewAccount}
           onDismiss={() => {
             setAddingAccount(null);
           }}
+          onSaved={handleAccountSaved}
+          version={version}
         />
       )}
-      {isAddingSecurity && (
+      {!isInScenario && isAddingSecurity && (
         <PortfolioSecurityDialog
           categories={snapshot.categories}
           defaultCurrency={snapshot.baseCurrency}
-          onAdd={addPreviewSecurity}
           onDismiss={() => {
             setIsAddingSecurity(false);
           }}
+          onSaved={handleSecuritySaved}
+          today={today}
+          version={version}
         />
       )}
-      {isAddingTransaction && (
+      {!isInScenario && isAddingTransaction && (
         <PortfolioTransactionDialog
           baseCurrency={snapshot.baseCurrency}
-          cashAccounts={cashAccounts}
-          holdings={holdings}
-          onAdd={addPreviewTransaction}
+          cashAccounts={snapshot.cashAccounts}
+          holdings={snapshot.holdings}
           onDismiss={() => {
             setIsAddingTransaction(false);
           }}
-          securitiesAccounts={securitiesAccounts}
+          onSaved={handleTransactionSaved}
+          securitiesAccounts={snapshot.securitiesAccounts}
           today={today}
+          version={version}
         />
       )}
     </>

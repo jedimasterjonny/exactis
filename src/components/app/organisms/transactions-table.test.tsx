@@ -14,7 +14,6 @@ const rows: readonly PortfolioTransaction[] = [
     date: "2026-09-22",
     fees: 1.5,
     id: "tx-buy",
-    isDraft: true,
     note: "Monthly invest",
     portfolioId: "port-isa",
     portfolioName: "Northstar ISA",
@@ -110,7 +109,7 @@ const rows: readonly PortfolioTransaction[] = [
 ];
 
 describe("TransactionsTable", () => {
-  it("renders dates, types, paired or arrowed accounts, securities, shares, signed amounts, fees/taxes, notes and preview badges", () => {
+  it("renders dates, types, paired or arrowed accounts, securities, shares, signed amounts, fees/taxes, and notes", () => {
     render(<TransactionsTable transactions={rows} />);
 
     expect(
@@ -134,11 +133,6 @@ describe("TransactionsTable", () => {
     expect(first).toHaveTextContent("−£1,257.75");
     expect(first).toHaveTextContent("incl. £1.50 fee · £6.25 tax");
     expect(first).toHaveTextContent("Monthly invest");
-    expect(first).toHaveTextContent("Preview");
-    expect(screen.getAllByText("Preview")[1]).toHaveAttribute(
-      "data-variant",
-      "caution",
-    );
 
     expect(second).toHaveTextContent("Dividend");
     expect(second).toHaveTextContent("+£42.18");

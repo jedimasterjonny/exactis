@@ -30,9 +30,9 @@ interface HoldingsTableProps {
 // below 56rem into FoldedCell so mobile screens read name, sterling
 // value, share count, quote price, weight and metadata without sideways
 // scroll. Caution badges stay strictly on exceptions (Unpriced, No FX
-// rate, Preview), retired securities carry an outline Retired badge,
-// and ISIN, ticker, Asset Allocation category, multi-account count and
-// notes sit calmly in the muted subline.
+// rate), retired securities carry an outline Retired badge, and ISIN,
+// ticker, Asset Allocation category, multi-account count and notes sit
+// calmly in the muted subline.
 export function HoldingsTable({ rows }: HoldingsTableProps): JSX.Element {
   return (
     <Table>
@@ -143,11 +143,10 @@ export function HoldingsTable({ rows }: HoldingsTableProps): JSX.Element {
 }
 
 // Exception-only flags for a holding row.
-function flagsOf({ holding, status }: HoldingRow): readonly string[] {
+function flagsOf({ status }: HoldingRow): readonly string[] {
   return [
     ...(status === "unpriced" ? ["Unpriced"] : []),
     ...(status === "no-fx" ? ["No FX rate"] : []),
-    ...(holding.isDraft === true ? ["Preview"] : []),
   ];
 }
 

@@ -70,10 +70,9 @@ const jointSecurities: SecuritiesAccount = {
 const unlinkedSecurities: SecuritiesAccount = {
   holdingsCount: 0,
   id: "sec-unlinked",
-  isDraft: true,
   isRetired: false,
   marketValue: 0,
-  name: "Preview Dealing",
+  name: "Unlinked Dealing",
 };
 
 const retiredSecurities: SecuritiesAccount = {
@@ -129,7 +128,7 @@ describe("PortfolioAccounts", () => {
       "Joint Dealing£11,000.151 holdingISA Cash—Shared reference cash account",
     );
     expect(pairedRows[2]).toHaveTextContent(
-      "Preview Dealing£0.000 holdingsPreviewNo reference cash account",
+      "Unlinked Dealing£0.000 holdingsNo reference cash account",
     );
 
     const standaloneRows = within(
@@ -155,7 +154,6 @@ describe("PortfolioAccounts", () => {
       balanceGbp: null,
       currency: "USD",
       id: "cash-usd",
-      isDraft: true,
       isRetired: false,
       name: "USD Cash",
       transactionCount: 1,
@@ -175,27 +173,16 @@ describe("PortfolioAccounts", () => {
     expect(
       screen.getByText("Excludes USD cash with no GBP exchange rate"),
     ).toBeInTheDocument();
-    expect(screen.getByText("Preview")).toHaveAttribute(
-      "data-variant",
-      "caution",
-    );
   });
 
   it("shows a placeholder under securities accounts when only standalone cash accounts exist", () => {
-    renderAccounts({
-      cashAccounts: [{ ...reserveCash, isDraft: true }],
-      securitiesAccounts: [],
-    });
+    renderAccounts({ cashAccounts: [reserveCash], securitiesAccounts: [] });
 
     expect(
       within(
         screen.getByRole("group", { name: "Securities accounts" }),
       ).getByRole("listitem"),
     ).toHaveTextContent("No securities accounts");
-    expect(screen.getByText("Preview")).toHaveAttribute(
-      "data-variant",
-      "caution",
-    );
   });
 
   it("hides retired accounts until Show retired accounts is switched on", () => {
