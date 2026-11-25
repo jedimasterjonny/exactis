@@ -13,34 +13,32 @@ export interface AccountReference {
   readonly isShared: boolean;
 }
 
-// A cash account as a Portfolio Performance file holds it, or a preview
-// added in this browser tab: its UUID, name, currency code, balance in
-// that currency, sterling equivalent when a GBP rate is known (or null
-// for a non-zero balance in an unconvertible currency), optional note,
-// retired flag, transaction count, and draft marker.
+// A cash account as a Portfolio Performance file holds it: its UUID,
+// name, currency code, balance in that currency, sterling equivalent
+// when a GBP rate is known (or null for a non-zero balance in an
+// unconvertible currency), optional note, retired flag, and transaction
+// count.
 export interface CashAccount {
   readonly balance: number;
   readonly balanceGbp: null | number;
   readonly currency: string;
   readonly id: string;
-  readonly isDraft?: true;
   readonly isRetired: boolean;
   readonly name: string;
   readonly note?: string;
   readonly transactionCount: number;
 }
 
-// A security in the file's catalogue (or a browser-only preview): its
-// UUID, name, quote currency, latest known GBP conversion rate, latest
-// positive quote price and date, optional ISIN, ticker, Asset Allocation
-// category and note, retired flag, active total share count, per-account
-// active share breakdown, and draft marker.
+// A security in the file's catalogue: its UUID, name, quote currency,
+// latest known GBP conversion rate, latest positive quote price and
+// date, optional ISIN, ticker, Asset Allocation category and note,
+// retired flag, active total share count, and per-account active share
+// breakdown.
 export interface Holding {
   readonly category?: string;
   readonly currency: string;
   readonly gbpRate: null | number;
   readonly id: string;
-  readonly isDraft?: true;
   readonly isin?: string;
   readonly isRetired: boolean;
   readonly latestPrice: null | number;
@@ -150,11 +148,10 @@ export interface PortfolioSnapshot {
   readonly transactions: readonly PortfolioTransaction[];
 }
 
-// One transaction as a Portfolio Performance file holds it, or a preview
-// added in this browser tab: its UUID, type, ISO date and epoch-second
-// timestamp, currency, positive amount, fee and tax totals, share count,
-// optional resolved account/portfolio/security references, note, and
-// draft marker.
+// One transaction as a Portfolio Performance file holds it: its UUID,
+// type, ISO date and epoch-second timestamp, currency, positive amount,
+// fee and tax totals, share count, optional resolved account/portfolio/
+// security references, and note.
 export interface PortfolioTransaction {
   readonly accountId?: string;
   readonly accountName?: string;
@@ -163,7 +160,6 @@ export interface PortfolioTransaction {
   readonly date: string;
   readonly fees: number;
   readonly id: string;
-  readonly isDraft?: true;
   readonly note?: string;
   readonly otherAccountId?: string;
   readonly otherAccountName?: string;
@@ -179,15 +175,13 @@ export interface PortfolioTransaction {
   readonly type: TransactionType;
 }
 
-// A securities account as a Portfolio Performance file holds it, or a
-// preview added in this browser tab: its UUID, name, count of held
-// securities, sterling market value to two decimal places, optional
-// note, retired flag, optional reference cash account UUID, and draft
-// marker.
+// A securities account as a Portfolio Performance file holds it: its
+// UUID, name, count of held securities, sterling market value to two
+// decimal places, optional note, retired flag, and optional reference
+// cash account UUID.
 export interface SecuritiesAccount {
   readonly holdingsCount: number;
   readonly id: string;
-  readonly isDraft?: true;
   readonly isRetired: boolean;
   readonly marketValue: number;
   readonly name: string;

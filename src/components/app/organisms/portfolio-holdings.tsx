@@ -185,7 +185,7 @@ function HoldingsEmpty({
   }
   return (
     <EmptyState
-      description="Add a security to preview how it appears in the catalogue."
+      description="Add a security to start building the catalogue."
       icon={Layers}
       title="No securities in this file"
     />

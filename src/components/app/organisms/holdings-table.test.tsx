@@ -69,17 +69,16 @@ const noFxRow: HoldingRow = {
   status: "no-fx",
 };
 
-const previewZeroRow: HoldingRow = {
+const zeroRow: HoldingRow = {
   accountCount: 0,
   holding: {
     currency: "GBP",
     gbpRate: 1,
     id: "sec-4",
-    isDraft: true,
     isRetired: false,
     latestPrice: 50,
     latestPriceDate: null,
-    name: "Preview Gilts",
+    name: "Dormant Gilts",
     shares: 0,
     sharesByAccount: [],
   },
@@ -112,13 +111,7 @@ describe("HoldingsTable", () => {
   it("renders security metadata, GBX pence prices with quote dates, sterling values, shares, and exception or retired badges", () => {
     render(
       <HoldingsTable
-        rows={[
-          valuedRow,
-          unpricedRow,
-          noFxRow,
-          previewZeroRow,
-          retiredSingleShareRow,
-        ]}
+        rows={[valuedRow, unpricedRow, noFxRow, zeroRow, retiredSingleShareRow]}
       />,
     );
 
@@ -137,7 +130,6 @@ describe("HoldingsTable", () => {
     expect(first).toHaveTextContent("22 Sep 2026");
     expect(first).toHaveTextContent("£2,140.15");
     expect(first).toHaveTextContent("100.00%");
-    expect(first).not.toHaveTextContent("Preview");
     expect(first).not.toHaveTextContent("Retired");
     expect(first).not.toHaveTextContent("Unpriced");
     expect(first).not.toHaveTextContent("No FX rate");
@@ -149,10 +141,9 @@ describe("HoldingsTable", () => {
     expect(third).toHaveTextContent("Tokyo Tracker");
     expect(third).toHaveTextContent("No FX rate");
 
-    expect(fourth).toHaveTextContent("Preview Gilts");
+    expect(fourth).toHaveTextContent("Dormant Gilts");
     expect(fourth).toHaveTextContent("£0.00");
     expect(fourth).toHaveTextContent("0.00%");
-    expect(fourth).toHaveTextContent("Preview");
 
     expect(fifth).toHaveTextContent("Legacy Income Trust");
     expect(fifth).toHaveTextContent("1 share @ £75.00 · 3.39%");

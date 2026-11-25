@@ -21,8 +21,8 @@ interface ChosenFile {
 interface PortfolioUploadProps {
   readonly currentFileName?: string | undefined;
   readonly describedBy?: string | undefined;
-  readonly hasPreview?: boolean;
   readonly isDisabled?: boolean;
+  readonly onReplaced?: (() => void) | undefined;
   readonly version: number;
 }
 
@@ -39,8 +39,8 @@ interface PortfolioUploadProps {
 export function PortfolioUpload({
   currentFileName,
   describedBy,
-  hasPreview = false,
   isDisabled = false,
+  onReplaced,
   version,
 }: PortfolioUploadProps): JSX.Element {
   const pickerRef = useRef<HTMLInputElement>(null);
@@ -74,7 +74,12 @@ export function PortfolioUpload({
         failure: isReplacing
           ? "Portfolio file not replaced"
           : "Portfolio file not uploaded",
-        onAccepted: close,
+        onAccepted: () => {
+          close();
+          if (isReplacing) {
+            onReplaced?.();
+          }
+        },
         success: () =>
           isReplacing
             ? {
@@ -148,7 +153,7 @@ export function PortfolioUpload({
           title="Replace portfolio file?"
         >
           <span className="wrap-anywhere">
-            {replaceMessage(pending.file.name, pending.current, hasPreview)}
+            {replaceMessage(pending.file.name, pending.current)}
           </span>
         </ConfirmDialog>
       )}
@@ -156,14 +161,7 @@ export function PortfolioUpload({
   );
 }
 
-function replaceMessage(
-  incoming: string,
-  current: string,
-  hasPreview: boolean,
-): string {
+function replaceMessage(incoming: string, current: string): string {
   const subject = incoming === current ? "This" : incoming;
-  const preview = hasPreview
-    ? " Unsaved preview entries in this tab will be cleared."
-    : "";
-  return `${subject} replaces ${current} for the household, kept as the next version. Download .portfolio first to keep a copy of the current file.${preview}`;
+  return `${subject} replaces ${current} for the household, kept as the next version. Download .portfolio first to keep a copy of the current file.`;
 }

@@ -4,37 +4,25 @@ import type { JSX } from "react";
 
 import { useState } from "react";
 
-import type { CashAccount } from "@/data/portfolio";
+import type { CashAccount, NewPortfolioAccount } from "@/data/portfolio";
 import type { Option } from "@/lib/options";
 
+import { addPortfolioAccount } from "@/actions/portfolio";
 import { FieldRow } from "@/components/app/atoms/field-row";
-import { Note } from "@/components/app/atoms/note";
 import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
 import { EditDialog } from "@/components/app/organisms/edit-dialog";
+import { useSender } from "@/hooks/use-sender";
 
 export type AccountKind = "cash" | "securities";
-
-export type NewPortfolioAccount =
-  | {
-      readonly currency: string;
-      readonly kind: "cash";
-      readonly name: string;
-      readonly note?: string;
-    }
-  | {
-      readonly kind: "securities";
-      readonly name: string;
-      readonly note?: string;
-      readonly referenceAccountId?: string;
-    };
 
 interface PortfolioAccountDialogProps {
   readonly cashAccounts: readonly CashAccount[];
   readonly defaultCurrency: string;
   readonly kind: AccountKind;
-  readonly onAdd: (draft: NewPortfolioAccount) => void;
   readonly onDismiss: () => void;
+  readonly onSaved: (draft: NewPortfolioAccount) => void;
+  readonly version: number;
 }
 
 const accountKindOptions: readonly Option<AccountKind>[] = [
@@ -51,18 +39,19 @@ const currencyOptions: readonly Option<Currency>[] = currencies.map((code) => ({
   value: code,
 }));
 
-// The preview dialog for adding a securities or cash account to the
-// Portfolio screen. A securities account pairs with an optional
-// reference cash account (matching Portfolio Performance's PPortfolio,
-// which carries no currency of its own), while a cash account takes a
-// settlement currency. Mounted while open so uncontrolled fields start
-// fresh on every opening.
+// The dialog for appending a securities or cash account to the
+// household's stored .portfolio file. A securities account pairs with
+// an optional reference cash account (matching Portfolio Performance's
+// PPortfolio, which carries no currency of its own), while a cash
+// account takes a settlement currency. Selects are controlled so a
+// vanished reference cash account clears cleanly after a stale refresh.
 export function PortfolioAccountDialog({
   cashAccounts,
   defaultCurrency,
   kind,
-  onAdd,
   onDismiss,
+  onSaved,
+  version,
 }: PortfolioAccountDialogProps): JSX.Element {
   const [accountKind, setAccountKind] = useState<AccountKind>(kind);
   const [name, setName] = useState("");
@@ -71,6 +60,7 @@ export function PortfolioAccountDialog({
   );
   const [referenceAccountId, setReferenceAccountId] = useState("");
   const [note, setNote] = useState("");
+  const { isSending, send } = useSender();
 
   const referenceOptions: readonly Option<string>[] = [
     { label: "None", value: "" },
@@ -82,28 +72,44 @@ export function PortfolioAccountDialog({
   const selectedReference = cashAccounts.find(
     (account) => account.id === referenceAccountId,
   );
+  const effectiveReferenceId =
+    selectedReference === undefined ? "" : selectedReference.id;
 
   function save(): void {
     const trimmedName = name.trim();
     const trimmedNote = note.trim();
     const extraNote = trimmedNote === "" ? {} : { note: trimmedNote };
-    if (accountKind === "cash") {
-      onAdd({ currency, kind: "cash", name: trimmedName, ...extraNote });
-      return;
-    }
-    onAdd({
-      kind: "securities",
-      name: trimmedName,
-      ...extraNote,
-      ...(referenceAccountId !== "" && { referenceAccountId }),
+    const draft: NewPortfolioAccount =
+      accountKind === "cash"
+        ? { currency, kind: "cash", name: trimmedName, ...extraNote }
+        : {
+            kind: "securities",
+            name: trimmedName,
+            ...extraNote,
+            ...(effectiveReferenceId !== "" && {
+              referenceAccountId: effectiveReferenceId,
+            }),
+          };
+    send(async () => addPortfolioAccount(version, draft), {
+      failure: "Account not saved",
+      onAccepted: () => {
+        onSaved(draft);
+      },
+      success: () => ({
+        description:
+          draft.kind === "cash"
+            ? `${draft.name} (${draft.currency}) added to the portfolio file`
+            : `${draft.name} added to the portfolio file`,
+        title: "Account saved",
+      }),
     });
   }
 
   return (
     <EditDialog
       canSave={name.trim() !== ""}
-      confirm="Add preview"
       eyebrow="New account"
+      isSaving={isSending}
       isWide
       onDismiss={onDismiss}
       onSave={save}
@@ -112,19 +118,19 @@ export function PortfolioAccountDialog({
       <FieldRow layout="named">
         <TextField
           label="Name"
+          maxLength={200}
           onValueChange={setName}
           placeholder="Brokerage ISA, Reserve cash…"
         />
         <SelectField
-          defaultValue={accountKind}
           label="Account type"
           onValueChange={setAccountKind}
           options={accountKindOptions}
+          value={accountKind}
         />
       </FieldRow>
       {accountKind === "securities" ? (
         <SelectField
-          defaultValue={referenceAccountId}
           hint={
             selectedReference === undefined
               ? undefined
@@ -134,20 +140,18 @@ export function PortfolioAccountDialog({
           label="Reference cash account"
           onValueChange={setReferenceAccountId}
           options={referenceOptions}
+          value={effectiveReferenceId}
         />
       ) : (
         <SelectField
-          defaultValue={currency}
           key="currency"
           label="Currency"
           onValueChange={setCurrency}
           options={currencyOptions}
+          value={currency}
         />
       )}
-      <TextField label="Note" onValueChange={setNote} />
-      <Note>
-        Shown in this view only. Changes are not saved to the file yet.
-      </Note>
+      <TextField label="Note" maxLength={1000} onValueChange={setNote} />
     </EditDialog>
   );
 }

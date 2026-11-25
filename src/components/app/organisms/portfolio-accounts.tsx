@@ -119,7 +119,7 @@ export function PortfolioAccounts({
       <CardContent>
         {isEmptyFile && (
           <EmptyState
-            description="Add a securities or cash account to preview how it appears here."
+            description="Add a securities or cash account to get started."
             icon={Wallet}
             title="No accounts in this file"
           />
@@ -174,10 +174,7 @@ export function PortfolioAccounts({
                           }
                         >
                           <span>{securitiesDetail(securities)}</span>
-                          <AccountFlags
-                            isDraft={securities.isDraft === true}
-                            isRetired={securities.isRetired}
-                          />
+                          <RetiredFlag isRetired={securities.isRetired} />
                         </FoldedLines>
                       </div>
                       <div className="relative py-3 folded:pt-0 folded:pl-4">
@@ -216,10 +213,7 @@ export function PortfolioAccounts({
                         }
                       >
                         <span>{cashDetail(account)}</span>
-                        <AccountFlags
-                          isDraft={account.isDraft === true}
-                          isRetired={account.isRetired}
-                        />
+                        <RetiredFlag isRetired={account.isRetired} />
                       </FoldedLines>
                     </li>
                   ))}
@@ -256,26 +250,6 @@ export function PortfolioAccounts({
         )}
       </CardContent>
     </SectionCard>
-  );
-}
-
-// Exception-only badges rendered beneath an account's subline when it
-// is a browser-only preview or retired in Portfolio Performance.
-function AccountFlags({
-  isDraft,
-  isRetired,
-}: {
-  readonly isDraft: boolean;
-  readonly isRetired: boolean;
-}): JSX.Element | null {
-  if (!isDraft && !isRetired) {
-    return null;
-  }
-  return (
-    <span className="mt-0.5 flex flex-wrap gap-1.5">
-      {isDraft && <Badge variant="caution">Preview</Badge>}
-      {isRetired && <Badge variant="outline">Retired</Badge>}
-    </span>
   );
 }
 
@@ -372,11 +346,24 @@ function ReferenceLines({
       onOpen={onOpen}
     >
       <span>{cashDetail(reference.account)}</span>
-      <AccountFlags
-        isDraft={reference.account.isDraft === true}
-        isRetired={reference.account.isRetired}
-      />
+      <RetiredFlag isRetired={reference.account.isRetired} />
     </FoldedLines>
+  );
+}
+
+// Outline Retired badge rendered beneath a retired account's subline.
+function RetiredFlag({
+  isRetired,
+}: {
+  readonly isRetired: boolean;
+}): JSX.Element | null {
+  if (!isRetired) {
+    return null;
+  }
+  return (
+    <span className="mt-0.5 flex flex-wrap gap-1.5">
+      <Badge variant="outline">Retired</Badge>
+    </span>
   );
 }
 

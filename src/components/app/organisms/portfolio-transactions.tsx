@@ -50,7 +50,7 @@ const pageSize = 50;
 // select), a controlled toggle hiding retired accounts and zero-share
 // securities from the filter dropdowns by default (and clearing hidden
 // selections when switched off), TransactionsTable paginated 50 rows
-// at a time without effect-derived state, an outline Add transaction
+// at a time without effect-derived state, a primary Add transaction
 // action, and a footer reporting how many rows are shown with a
 // "Show 50 more" trigger.
 export function PortfolioTransactions({
@@ -154,7 +154,7 @@ export function PortfolioTransactions({
           disabled={isReadOnly}
           onClick={onAddTransaction}
           size="sm"
-          variant="outline"
+          variant="default"
         >
           <Plus aria-hidden />
           Add transaction
@@ -277,15 +277,11 @@ function inactiveToggleLabel(
     : "Show zero-share securities in filters";
 }
 
-function isZeroShareOption(holding: {
-  readonly isDraft?: true;
-  readonly shares: number;
-}): boolean {
-  return holding.isDraft !== true && holding.shares <= 0;
+function isZeroShareOption(holding: { readonly shares: number }): boolean {
+  return holding.shares <= 0;
 }
 
 function securityOptionLabel(holding: {
-  readonly isDraft?: true;
   readonly name: string;
   readonly shares: number;
 }): string {
@@ -319,7 +315,7 @@ function TransactionsPages({
             description={
               hasActiveFilters
                 ? "Try clearing one or more filters to view other entries."
-                : "Add a transaction to preview how it appears here."
+                : "Add a transaction to record activity in this file."
             }
             icon={ArrowLeftRight}
             title={
