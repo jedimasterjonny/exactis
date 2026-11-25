@@ -13,6 +13,7 @@ import {
   addPortfolioAccount,
   addPortfolioSecurity,
   addPortfolioTransaction,
+  updatePortfolioQuotes,
   uploadPortfolio,
 } from "@/actions/portfolio";
 import { Toaster } from "@/components/kit/toast";
@@ -30,6 +31,7 @@ vi.mock("@/actions/portfolio", () => ({
   addPortfolioAccount: vi.fn(),
   addPortfolioSecurity: vi.fn(),
   addPortfolioTransaction: vi.fn(),
+  updatePortfolioQuotes: vi.fn(),
   uploadPortfolio: vi.fn(),
 }));
 
@@ -545,6 +547,10 @@ describe("PortfolioScreen", () => {
     expect(addSecurity).toBeDisabled();
     expect(addSecurity).toHaveAccessibleDescription(expectedOwnedDescription);
 
+    const updateQuotes = screen.getByRole("button", { name: "Update quotes" });
+    expect(updateQuotes).toBeDisabled();
+    expect(updateQuotes).toHaveAccessibleDescription(expectedOwnedDescription);
+
     fireEvent.click(screen.getByRole("tab", { name: "Accounts" }));
     expect(
       screen.getByRole("button", { name: "Add securities account" }),
@@ -726,5 +732,81 @@ describe("PortfolioScreen", () => {
     expect(
       within(txPanel).getByRole("combobox", { name: "Account" }),
     ).toHaveValue("");
+  });
+
+  it("opens, cancels, saves, and scenario-resets Update quotes without ghost-reopening after leaving a scenario", async () => {
+    vi.mocked(updatePortfolioQuotes).mockResolvedValue(
+      saved({ savedOn: "2026-09-25", updatedCount: 1, version: 2 }),
+    );
+
+    const { rerender } = render(
+      <PortfolioScreen
+        isInScenario={false}
+        owned={ownedOf(gbpFile, "northstar.portfolio")}
+        today="2026-09-25"
+      />,
+      { wrapper: Toaster },
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Update quotes" }));
+    expect(
+      screen.getByRole("dialog", { name: "Update quotes" }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Update quotes" }),
+      ).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Update quotes" }));
+    const quotesDialog = screen.getByRole("dialog", { name: "Update quotes" });
+    commit(
+      within(quotesDialog).getByRole("textbox", {
+        name: "Global Equity Index (GBP)",
+      }),
+      "130.5",
+    );
+    fireEvent.click(within(quotesDialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(updatePortfolioQuotes).toHaveBeenCalledExactlyOnceWith(1, {
+        date: "2026-09-25",
+        quotes: [{ price: 130.5, securityId: "sec-world" }],
+      });
+    });
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Update quotes" }),
+      ).not.toBeInTheDocument();
+    });
+
+    // Entering and then leaving scenario mode closes Update quotes permanently without ghost-reopening.
+    fireEvent.click(screen.getByRole("button", { name: "Update quotes" }));
+    expect(
+      screen.getByRole("dialog", { name: "Update quotes" }),
+    ).toBeInTheDocument();
+
+    rerender(
+      <PortfolioScreen
+        isInScenario
+        owned={ownedOf(gbpFile, "northstar.portfolio")}
+        today="2026-09-25"
+      />,
+    );
+    expect(
+      screen.queryByRole("dialog", { name: "Update quotes" }),
+    ).not.toBeInTheDocument();
+
+    rerender(
+      <PortfolioScreen
+        isInScenario={false}
+        owned={ownedOf(gbpFile, "northstar.portfolio")}
+        today="2026-09-25"
+      />,
+    );
+    expect(
+      screen.queryByRole("dialog", { name: "Update quotes" }),
+    ).not.toBeInTheDocument();
   });
 });

@@ -72,6 +72,7 @@ function renderHoldings(
       onAccountChange={vi.fn<(accountId: string) => void>()}
       onAddSecurity={vi.fn<() => void>()}
       onShowingZeroSharesChange={vi.fn<(isShowing: boolean) => void>()}
+      onUpdateQuotes={vi.fn<() => void>()}
       securitiesAccounts={[isa, emptyDealing]}
       {...props}
     />,
@@ -79,15 +80,17 @@ function renderHoldings(
 }
 
 describe("PortfolioHoldings", () => {
-  it("renders holdings with Account filter, zero-share toggle, and FX pricing note when foreign securities are shown", () => {
+  it("renders holdings with Account filter, zero-share toggle, primary Update quotes action, and FX pricing note when foreign securities are shown", () => {
     const onAccountChange = vi.fn<(accountId: string) => void>();
     const onShowingZeroSharesChange = vi.fn<(isShowing: boolean) => void>();
     const onAddSecurity = vi.fn<() => void>();
+    const onUpdateQuotes = vi.fn<() => void>();
 
     renderHoldings({
       onAccountChange,
       onAddSecurity,
       onShowingZeroSharesChange,
+      onUpdateQuotes,
     });
 
     expect(screen.getAllByText("Global Equity Index")).toHaveLength(2);
@@ -111,6 +114,11 @@ describe("PortfolioHoldings", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Add security" }));
     expect(onAddSecurity).toHaveBeenCalledOnce();
+
+    const updateQuotes = screen.getByRole("button", { name: "Update quotes" });
+    expect(updateQuotes).toHaveClass("bg-primary");
+    fireEvent.click(updateQuotes);
+    expect(onUpdateQuotes).toHaveBeenCalledOnce();
   });
 
   it("shows a filtered account subtotal in the footer and omits the FX note when only GBP/GBX securities are shown", () => {
@@ -146,11 +154,15 @@ describe("PortfolioHoldings", () => {
         onAccountChange={vi.fn<(accountId: string) => void>()}
         onAddSecurity={vi.fn<() => void>()}
         onShowingZeroSharesChange={vi.fn<(isShowing: boolean) => void>()}
+        onUpdateQuotes={vi.fn<() => void>()}
         securitiesAccounts={[]}
       />,
     );
 
     expect(screen.getByText("No active holdings")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Update quotes" }),
+    ).toBeInTheDocument();
 
     rerender(
       <PortfolioHoldings
@@ -161,19 +173,25 @@ describe("PortfolioHoldings", () => {
         onAccountChange={vi.fn<(accountId: string) => void>()}
         onAddSecurity={vi.fn<() => void>()}
         onShowingZeroSharesChange={vi.fn<(isShowing: boolean) => void>()}
+        onUpdateQuotes={vi.fn<() => void>()}
         securitiesAccounts={[]}
       />,
     );
 
     expect(screen.getByText("No securities in this file")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Update quotes" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
     expect(screen.queryByRole("switch")).not.toBeInTheDocument();
   });
 
-  it("disables Add security with an accessible description when read-only", () => {
+  it("disables Add security and Update quotes with an accessible description when read-only", () => {
     render(
       <>
-        <p id="scenario-lock">Leave the scenario to add preview entries.</p>
+        <p id="scenario-lock">
+          Leave the scenario to replace the file or update the portfolio.
+        </p>
         <PortfolioHoldings
           accountId=""
           holdings={[gbpFund]}
@@ -183,6 +201,7 @@ describe("PortfolioHoldings", () => {
           onAccountChange={vi.fn<(accountId: string) => void>()}
           onAddSecurity={vi.fn<() => void>()}
           onShowingZeroSharesChange={vi.fn<(isShowing: boolean) => void>()}
+          onUpdateQuotes={vi.fn<() => void>()}
           readOnlyId="scenario-lock"
           securitiesAccounts={[isa]}
         />
@@ -192,7 +211,13 @@ describe("PortfolioHoldings", () => {
     const addSecurity = screen.getByRole("button", { name: "Add security" });
     expect(addSecurity).toBeDisabled();
     expect(addSecurity).toHaveAccessibleDescription(
-      "Leave the scenario to add preview entries.",
+      "Leave the scenario to replace the file or update the portfolio.",
+    );
+
+    const updateQuotes = screen.getByRole("button", { name: "Update quotes" });
+    expect(updateQuotes).toBeDisabled();
+    expect(updateQuotes).toHaveAccessibleDescription(
+      "Leave the scenario to replace the file or update the portfolio.",
     );
   });
 });

@@ -17,6 +17,7 @@ vi.mock("@/actions/portfolio", () => ({
   addPortfolioAccount: vi.fn(),
   addPortfolioSecurity: vi.fn(),
   addPortfolioTransaction: vi.fn(),
+  updatePortfolioQuotes: vi.fn(),
   uploadPortfolio: vi.fn(),
 }));
 vi.mock("@/store/household", () => ({ getOpened: vi.fn() }));
@@ -72,6 +73,7 @@ describe("Portfolio", () => {
       "true",
     );
     expect(screen.getByRole("button", { name: "Add security" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Update quotes" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Replace file…" })).toBeEnabled();
 
     unmount();
@@ -84,7 +86,7 @@ describe("Portfolio", () => {
     );
   });
 
-  it("locks replacement and preview additions when a scenario is open", async () => {
+  it("locks replacement and write-back actions when a scenario is open", async () => {
     vi.setSystemTime(new Date("2026-09-25T12:00:00Z"));
     vi.mocked(getOpened).mockResolvedValue({
       isKept: true,
@@ -105,5 +107,8 @@ describe("Portfolio", () => {
       screen.getByRole("button", { name: "Replace file…" }),
     ).toBeDisabled();
     expect(screen.getByRole("button", { name: "Add security" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Update quotes" }),
+    ).toBeDisabled();
   });
 });
