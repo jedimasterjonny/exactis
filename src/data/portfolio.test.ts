@@ -11,9 +11,14 @@ import type {
 
 import {
   accountsLayoutOf,
+  afterVersionSchema,
   cashTotalsOf,
   holdingsViewOf,
   isIsoCalendarDate,
+  newPortfolioAccountSchema,
+  newPortfolioSecuritySchema,
+  newPortfolioTransactionSchema,
+  portfolioQuoteBatchSchema,
   roundPence,
   transactionDirectionOf,
   transactionsViewOf,
@@ -638,5 +643,231 @@ describe("transactionsViewOf", () => {
         type: "dividend",
       }),
     ).toStrictEqual([]);
+  });
+});
+
+describe("portfolio write-back schemas", () => {
+  it("validates afterVersionSchema bounds for mutations", () => {
+    expect(afterVersionSchema.parse(1)).toBe(1);
+    expect(afterVersionSchema.parse(2_147_483_646)).toBe(2_147_483_646);
+    expect(afterVersionSchema.safeParse(0).success).toBe(false);
+    expect(afterVersionSchema.safeParse(-1).success).toBe(false);
+    expect(afterVersionSchema.safeParse(1.5).success).toBe(false);
+    expect(afterVersionSchema.safeParse(2_147_483_647).success).toBe(false);
+  });
+
+  it("validates newPortfolioAccountSchema including currency, single-line text, and note caps", () => {
+    expect(
+      newPortfolioAccountSchema.parse({
+        currency: "CHF",
+        kind: "cash",
+        name: "  Swiss Reserve  ",
+        note: "  Line 1\nLine 2  ",
+      }),
+    ).toStrictEqual({
+      currency: "CHF",
+      kind: "cash",
+      name: "Swiss Reserve",
+      note: "Line 1\nLine 2",
+    });
+    expect(
+      newPortfolioAccountSchema.parse({
+        kind: "securities",
+        name: "Harbour GIA",
+        referenceAccountId: "cash-isa",
+      }),
+    ).toStrictEqual({
+      kind: "securities",
+      name: "Harbour GIA",
+      referenceAccountId: "cash-isa",
+    });
+
+    expect(
+      newPortfolioAccountSchema.safeParse({
+        currency: "GBX",
+        kind: "cash",
+        name: "Pence Cash",
+      }).success,
+    ).toBe(false);
+    expect(
+      newPortfolioAccountSchema.safeParse({
+        currency: "GBP",
+        kind: "cash",
+        name: "Line\nbreak",
+      }).success,
+    ).toBe(false);
+    expect(
+      newPortfolioAccountSchema.safeParse({
+        currency: "GBP",
+        kind: "cash",
+        name: "a".repeat(201),
+      }).success,
+    ).toBe(false);
+    expect(
+      newPortfolioAccountSchema.safeParse({
+        currency: "GBP",
+        kind: "cash",
+        name: "Ok",
+        note: "a".repeat(1001),
+      }).success,
+    ).toBe(false);
+  });
+
+  it("validates newPortfolioSecuritySchema including GBX, ceilings, and integer-unit positivity", () => {
+    expect(
+      newPortfolioSecuritySchema.parse({
+        categoryId: "aa-equity",
+        currency: "GBX",
+        isin: " GB00TEST0001 ",
+        latestPrice: 214.015,
+        latestPriceDate: "2026-09-25",
+        name: "UK Gilts",
+        ticker: " UKGT ",
+      }),
+    ).toStrictEqual({
+      categoryId: "aa-equity",
+      currency: "GBX",
+      isin: "GB00TEST0001",
+      latestPrice: 214.015,
+      latestPriceDate: "2026-09-25",
+      name: "UK Gilts",
+      ticker: "UKGT",
+    });
+    expect(
+      newPortfolioSecuritySchema.parse({
+        currency: "JPY",
+        latestPrice: null,
+        name: "Nikkei ETF",
+      }),
+    ).toStrictEqual({ currency: "JPY", latestPrice: null, name: "Nikkei ETF" });
+
+    expect(
+      newPortfolioSecuritySchema.safeParse({
+        currency: "GBP",
+        latestPrice: 1e-10,
+        name: "Tiny",
+      }).success,
+    ).toBe(false);
+    expect(
+      newPortfolioSecuritySchema.safeParse({
+        currency: "GBP",
+        latestPrice: 90_000_001,
+        name: "Huge",
+      }).success,
+    ).toBe(false);
+    expect(
+      newPortfolioSecuritySchema.safeParse({
+        currency: "GBP",
+        isin: "X".repeat(33),
+        latestPrice: null,
+        name: "Long ISIN",
+      }).success,
+    ).toBe(false);
+    expect(
+      newPortfolioSecuritySchema.safeParse({
+        currency: "GBP",
+        latestPrice: 10,
+        latestPriceDate: "2026-02-31",
+        name: "Bad Date",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("validates newPortfolioTransactionSchema across amount/share refinements, dates, and GBX rejection", () => {
+    const validDeposit = {
+      accountId: "cash-isa",
+      amount: 100,
+      currency: "GBP",
+      date: "2026-09-25",
+      fees: 0,
+      shares: 0,
+      taxes: 0,
+      type: "deposit",
+    } as const;
+    expect(newPortfolioTransactionSchema.parse(validDeposit)).toStrictEqual(
+      validDeposit,
+    );
+    expect(
+      newPortfolioTransactionSchema.parse({
+        amount: 0,
+        currency: "GBP",
+        date: "2026-09-25",
+        fees: 0,
+        otherPortfolioId: "port-2",
+        portfolioId: "port-1",
+        securityId: "sec-1",
+        shares: 2.5,
+        taxes: 0,
+        type: "security-transfer",
+      }).amount,
+    ).toBe(0);
+
+    expect(
+      newPortfolioTransactionSchema.safeParse({
+        ...validDeposit,
+        amount: 0.001,
+      }).success,
+    ).toBe(false);
+    expect(
+      newPortfolioTransactionSchema.safeParse({
+        ...validDeposit,
+        currency: "GBX",
+      }).success,
+    ).toBe(false);
+    expect(
+      newPortfolioTransactionSchema.safeParse({
+        ...validDeposit,
+        date: "2026-02-31",
+      }).success,
+    ).toBe(false);
+    expect(
+      newPortfolioTransactionSchema.safeParse({
+        ...validDeposit,
+        portfolioId: "port-1",
+        securityId: "sec-1",
+        shares: 1e-10,
+        type: "purchase",
+      }).success,
+    ).toBe(false);
+    expect(
+      newPortfolioTransactionSchema.safeParse({
+        ...validDeposit,
+        amount: 1_000_000_000_001,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("validates portfolioQuoteBatchSchema for size bounds, uniqueness, dates, and positive prices", () => {
+    expect(
+      portfolioQuoteBatchSchema.parse({
+        date: "2026-09-25",
+        quotes: [{ price: 125.5, securityId: "sec-1" }],
+      }),
+    ).toStrictEqual({
+      date: "2026-09-25",
+      quotes: [{ price: 125.5, securityId: "sec-1" }],
+    });
+    expect(
+      portfolioQuoteBatchSchema.safeParse({ date: "2026-09-25", quotes: [] })
+        .success,
+    ).toBe(false);
+    expect(
+      portfolioQuoteBatchSchema.safeParse({
+        date: "2026-09-25",
+        quotes: [
+          { price: 10, securityId: "sec-1" },
+          { price: 11, securityId: "sec-1" },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      portfolioQuoteBatchSchema.safeParse({
+        date: "2026-09-25",
+        quotes: Array.from({ length: 1001 }, (_, i) => ({
+          price: 10,
+          securityId: `sec-${String(i)}`,
+        })),
+      }).success,
+    ).toBe(false);
   });
 });

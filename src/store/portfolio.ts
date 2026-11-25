@@ -33,12 +33,74 @@ export interface SavedPortfolio {
   readonly version: number;
 }
 
+// Common metadata returned by every successful portfolio write-back
+// mutation alongside its action-specific payload.
+export type SavedPortfolioMutation<TResult extends Record<string, unknown>> =
+  TResult & { readonly savedOn: string; readonly version: number };
+
+// What an in-place mutation of the stored .portfolio file returns to
+// amendPortfolio: the rewritten binary bytes and the action-specific
+// payload to hand back beside savedOn and version.
+interface PortfolioMutation<TResult extends Record<string, unknown>> {
+  readonly content: Uint8Array<ArrayBuffer>;
+  readonly result: TResult;
+}
+
 // Reads the latest stored .portfolio row at most once per RSC request.
 // Kept separate from storePortfolio so a server action never reads a
 // stale request-cached row across refresh().
 const readLatest = cache(async (): Promise<null | StoredPortfolio> =>
   readLatestPortfolio(getDb()),
 );
+
+// Applies a byte-preserving mutation to the household's latest stored
+// .portfolio file after afterVersion, verifying the 4 MB ceiling and
+// round-trip readability before persisting the next version. Refused
+// while a scenario is open, before a file is uploaded, or when another
+// change landed first (calling refresh() on both success and Stale).
+export async function amendPortfolio<TResult extends Record<string, unknown>>(
+  afterVersion: number,
+  mutate: (stored: StoredPortfolio) => PortfolioMutation<TResult>,
+): Promise<Answer<SavedPortfolioMutation<TResult>>> {
+  await requireSession();
+  if ((await openedScenario()) !== null) {
+    return refused("Leave the scenario to update the portfolio file");
+  }
+  try {
+    const stored = await readLatestPortfolio(getDb());
+    if (stored === null) {
+      throw new Refusal("Upload a portfolio file before making changes");
+    }
+    if (stored.version !== afterVersion) {
+      throw new Stale(
+        "The portfolio file changed while this was being saved, so nothing was",
+      );
+    }
+    const { content, result } = mutate(stored);
+    if (content.byteLength > maxPortfolioBytes) {
+      throw new Refusal(portfolioTooLarge);
+    }
+    readPortfolioSnapshot(content, stored.fileName);
+    const kept = await keepPortfolioAfter(getDb(), afterVersion, {
+      content,
+      fileName: stored.fileName,
+    });
+    refresh();
+    return saved({
+      ...result,
+      savedOn: dayOf(kept.savedAt),
+      version: kept.version,
+    });
+  } catch (error: unknown) {
+    if (error instanceof Refusal) {
+      if (error instanceof Stale) {
+        refresh();
+      }
+      return refused(error.message);
+    }
+    throw error;
+  }
+}
 
 // The household's latest stored .portfolio file parsed on the server,
 // or null before one is uploaded. Readable while a scenario is open

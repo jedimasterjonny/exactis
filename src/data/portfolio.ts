@@ -1,3 +1,5 @@
+import * as z from "zod";
+
 import type { OptionGroup } from "@/lib/options";
 
 import { sumOf } from "@/lib/ledger";
@@ -273,6 +275,142 @@ export const maxPortfolioScaled = 90_000_000;
 // and on the server in uploadPortfolio when a file exceeds 4 MB.
 export const portfolioTooLarge = "The portfolio file is larger than 4 MB";
 
+// Single-line text with no control characters or Unicode line/paragraph
+// separators, matching src/data/schemas.ts.
+const oneLine = /^[^\p{Cc}\p{Zl}\p{Zp}]*$/u;
+
+const nameLimitMessage = "Name must be one line of up to 200 characters";
+const isinLimitMessage = "ISIN must be one line of up to 32 characters";
+const tickerLimitMessage = "Ticker must be one line of up to 32 characters";
+const noteLimitMessage = "Note must be up to 1,000 characters";
+
+const singleLineText = (max: number, message: string): z.ZodString =>
+  z.string().trim().min(1).max(max, message).regex(oneLine, message);
+
+const optionalSingleLineText = (
+  max: number,
+  message: string,
+): z.ZodExactOptional<z.ZodString> =>
+  singleLineText(max, message).exactOptional();
+
+const optionalNote = z
+  .string()
+  .trim()
+  .min(1)
+  .max(1000, noteLimitMessage)
+  .exactOptional();
+const requiredId = z.string().trim().min(1).max(200).regex(oneLine);
+const optionalId = requiredId.exactOptional();
+
+const securityCurrency = z.string().regex(/^[A-Z]{3}$/u);
+const cashCurrency = securityCurrency.refine(
+  (code) => code !== "GBX",
+  "Pence (GBX) is only valid for securities",
+);
+const isoDate = z
+  .string()
+  .refine(isIsoCalendarDate, "Enter a valid calendar date");
+
+const nonNegativeMoney = z.number().min(0).max(maxPortfolioMoney);
+const nonNegativeScaled = z.number().min(0).max(maxPortfolioScaled);
+const positiveScaled = nonNegativeScaled.refine(
+  (value) => Math.round(value * 1e8) >= 1,
+  "Must be greater than zero",
+);
+
+const transactionTypeValues: readonly [TransactionType, ...TransactionType[]] =
+  [
+    "cash-transfer",
+    "deposit",
+    "dividend",
+    "fee",
+    "fee-refund",
+    "inbound-delivery",
+    "interest",
+    "interest-charge",
+    "outbound-delivery",
+    "purchase",
+    "removal",
+    "sale",
+    "security-transfer",
+    "tax",
+    "tax-refund",
+  ];
+
+// Optimistic version for in-place portfolio file mutations: 1 up to
+// Postgres int4 max minus 1 so version + 1 always fits.
+export const afterVersionSchema = z.number().int().min(1).max(2_147_483_646);
+
+// Server-side validation schema for appending a cash or securities account.
+export const newPortfolioAccountSchema = z.discriminatedUnion("kind", [
+  z.object({
+    currency: cashCurrency,
+    kind: z.literal("cash"),
+    name: singleLineText(200, nameLimitMessage),
+    note: optionalNote,
+  }),
+  z.object({
+    kind: z.literal("securities"),
+    name: singleLineText(200, nameLimitMessage),
+    note: optionalNote,
+    referenceAccountId: optionalId,
+  }),
+]) satisfies z.ZodType<NewPortfolioAccount>;
+
+// Server-side validation schema for appending a security to the catalogue.
+export const newPortfolioSecuritySchema = z.object({
+  categoryId: optionalId,
+  currency: securityCurrency,
+  isin: optionalSingleLineText(32, isinLimitMessage),
+  latestPrice: positiveScaled.nullable(),
+  latestPriceDate: isoDate.exactOptional(),
+  name: singleLineText(200, nameLimitMessage),
+  note: optionalNote,
+  ticker: optionalSingleLineText(32, tickerLimitMessage),
+}) satisfies z.ZodType<NewPortfolioSecurity>;
+
+// Server-side validation schema for appending any of Portfolio
+// Performance's fifteen transaction types.
+export const newPortfolioTransactionSchema = z
+  .object({
+    accountId: optionalId,
+    amount: nonNegativeMoney,
+    currency: cashCurrency,
+    date: isoDate,
+    fees: nonNegativeMoney,
+    note: optionalNote,
+    otherAccountId: optionalId,
+    otherPortfolioId: optionalId,
+    portfolioId: optionalId,
+    securityId: optionalId,
+    shares: nonNegativeScaled,
+    taxes: nonNegativeMoney,
+    type: z.enum(transactionTypeValues),
+  })
+  .refine(
+    (tx) => tx.type === "security-transfer" || Math.round(tx.amount * 100) >= 1,
+    "Amount must be greater than zero",
+  )
+  .refine(
+    (tx) => !hasShareMovement(tx.type) || Math.round(tx.shares * 1e8) >= 1,
+    "Shares must be greater than zero",
+  ) satisfies z.ZodType<NewPortfolioTransaction>;
+
+// Server-side validation schema for a batch of dated security quotes
+// (1..1000 unique securities per save).
+export const portfolioQuoteBatchSchema = z.object({
+  date: isoDate,
+  quotes: z
+    .array(z.object({ price: positiveScaled, securityId: requiredId }))
+    .min(1, "Enter at least one security price")
+    .max(1000)
+    .refine(
+      (quotes) =>
+        new Set(quotes.map((entry) => entry.securityId)).size === quotes.length,
+      "Each security can only be updated once per batch",
+    ),
+}) satisfies z.ZodType<PortfolioQuoteBatch>;
+
 // Human-readable names for every Portfolio Performance transaction type.
 export const transactionTypeLabels: Record<TransactionType, string> = {
   "cash-transfer": "Cash transfer",
@@ -545,6 +683,16 @@ function compareHoldingRows(one: HoldingRow, other: HoldingRow): number {
   return valueDiff === 0
     ? one.holding.name.localeCompare(other.holding.name)
     : valueDiff;
+}
+
+function hasShareMovement(type: TransactionType): boolean {
+  return (
+    type === "purchase" ||
+    type === "sale" ||
+    type === "inbound-delivery" ||
+    type === "outbound-delivery" ||
+    type === "security-transfer"
+  );
 }
 
 // One security's share count, account count and sterling valuation
