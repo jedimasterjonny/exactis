@@ -4,6 +4,7 @@ import type { JSX } from "react";
 
 import { useState } from "react";
 
+import type { PortfolioCategory } from "@/data/portfolio";
 import type { Option } from "@/lib/options";
 
 import { FieldRow } from "@/components/app/atoms/field-row";
@@ -14,7 +15,7 @@ import { TextField } from "@/components/app/molecules/text-field";
 import { EditDialog } from "@/components/app/organisms/edit-dialog";
 
 export interface NewPortfolioSecurity {
-  readonly category?: string;
+  readonly categoryId?: string;
   readonly currency: string;
   readonly isin?: string;
   readonly latestPrice: null | number;
@@ -24,7 +25,7 @@ export interface NewPortfolioSecurity {
 }
 
 interface PortfolioSecurityDialogProps {
-  readonly categories: readonly string[];
+  readonly categories: readonly PortfolioCategory[];
   readonly defaultCurrency?: string;
   readonly onAdd: (draft: NewPortfolioSecurity) => void;
   readonly onDismiss: () => void;
@@ -55,13 +56,13 @@ export function PortfolioSecurityDialog({
   );
   const [isin, setIsin] = useState("");
   const [ticker, setTicker] = useState("");
-  const [category, setCategory] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [latestPrice, setLatestPrice] = useState<null | number>(null);
   const [note, setNote] = useState("");
 
   const categoryOptions: readonly Option<string>[] = [
     { label: "Unassigned", value: "" },
-    ...categories.map((item) => ({ label: item, value: item })),
+    ...categories.map((item) => ({ label: item.name, value: item.id })),
   ];
 
   function save(): void {
@@ -69,7 +70,7 @@ export function PortfolioSecurityDialog({
     const trimmedTicker = ticker.trim();
     const trimmedNote = note.trim();
     onAdd({
-      ...(category !== "" && { category }),
+      ...(categoryId !== "" && { categoryId }),
       currency,
       ...(trimmedIsin !== "" && { isin: trimmedIsin }),
       latestPrice: latestPrice !== null && latestPrice > 0 ? latestPrice : null,
@@ -114,9 +115,9 @@ export function PortfolioSecurityDialog({
           placeholder="GEIDX"
         />
         <SelectField
-          defaultValue={category}
+          defaultValue={categoryId}
           label="Asset class"
-          onValueChange={setCategory}
+          onValueChange={setCategoryId}
           options={categoryOptions}
         />
       </FieldRow>

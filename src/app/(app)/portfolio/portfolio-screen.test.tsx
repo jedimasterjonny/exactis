@@ -227,7 +227,7 @@ describe("PortfolioScreen", () => {
       target: { value: "UKGP" },
     });
     fireEvent.change(screen.getByRole("combobox", { name: "Asset class" }), {
-      target: { value: "Global equity" },
+      target: { value: "aa-equity" },
     });
     commit(
       screen.getByRole("textbox", { name: "Latest price (pence)" }),
