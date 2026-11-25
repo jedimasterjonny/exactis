@@ -723,7 +723,10 @@ describe("readPortfolioSnapshot", () => {
           transactionCount: 1,
         },
       ],
-      categories: ["Global equity", "UK gilts"],
+      categories: [
+        { id: "aa-dev", name: "Global equity" },
+        { id: "aa-bonds", name: "UK gilts" },
+      ],
       fileName: "household.portfolio",
       holdings: [
         {
@@ -1568,9 +1571,143 @@ describe("readPortfolioSnapshot", () => {
     ]);
 
     const snapshot = readPortfolioSnapshot(file, "tax.portfolio");
-    expect(snapshot.categories).toStrictEqual(["Alpha", "Loop", "Zebra"]);
+    expect(snapshot.categories).toStrictEqual([
+      { id: "a", name: "Alpha" },
+      { id: "loop", name: "Loop" },
+      { id: "z", name: "Zebra" },
+    ]);
     expect(String(snapshot.holdings[0]?.shares)).toBe("0.3");
     expect(snapshot.holdings[0]?.category).toBe("Alpha, Zebra");
+
+    // Duplicate leaf names disambiguate by full ancestor path beneath the root
+    // (skipping blank intermediate names), blank or duplicate ids are ignored,
+    // and identical display labels tie-break deterministically by id.
+    const disambiguated = portfolioFile([
+      [
+        2,
+        [
+          [1, "sec-both"],
+          [3, "Multi Index"],
+          [4, "GBP"],
+        ],
+      ],
+      [
+        8,
+        [
+          [2, "Asset Allocation"],
+          [
+            5,
+            [
+              [1, "root"],
+              [3, "Asset Allocation"],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "eq"],
+              [2, "root"],
+              [3, "Equity"],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "eq-unnamed"],
+              [2, "eq"],
+              [3, "   "],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "eq-dom"],
+              [2, "eq-unnamed"],
+              [3, "Domestic"],
+              [
+                9,
+                [
+                  [1, "sec-both"],
+                  [2, 5000],
+                ],
+              ],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "bd"],
+              [2, "root"],
+              [3, "Bonds"],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "bd-dom"],
+              [2, "bd"],
+              [3, "Domestic"],
+              [
+                9,
+                [
+                  [1, "sec-both"],
+                  [2, 5000],
+                ],
+              ],
+            ],
+          ],
+          // Duplicate leaf id is deduplicated cleanly.
+          [
+            5,
+            [
+              [1, "bd-dom"],
+              [2, "bd"],
+              [3, "Ignored duplicate id"],
+            ],
+          ],
+          // Blank leaf id is ignored cleanly.
+          [
+            5,
+            [
+              [1, "   "],
+              [2, "root"],
+              [3, "No id"],
+            ],
+          ],
+          // Two root-level leaves sharing the same name tie-break by id.
+          [
+            5,
+            [
+              [1, "tie-b"],
+              [2, "root"],
+              [3, "Cash"],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "tie-a"],
+              [2, "root"],
+              [3, "Cash"],
+            ],
+          ],
+        ],
+      ],
+    ]);
+
+    const disambiguatedSnapshot = readPortfolioSnapshot(
+      disambiguated,
+      "disambiguated.portfolio",
+    );
+    expect(disambiguatedSnapshot.categories).toStrictEqual([
+      { id: "bd-dom", name: "Bonds · Domestic" },
+      { id: "tie-a", name: "Cash" },
+      { id: "tie-b", name: "Cash" },
+      { id: "eq-dom", name: "Equity · Domestic" },
+    ]);
+    expect(disambiguatedSnapshot.holdings[0]?.category).toBe(
+      "Bonds · Domestic, Equity · Domestic",
+    );
 
     // Rootless and empty-root taxonomies return empty categories safely.
     const rootless = portfolioFile([

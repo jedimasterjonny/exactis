@@ -363,8 +363,13 @@ function OwnedPortfolioTabs({
   // Phase 3 write-back hook: replace preview-only draft state with a
   // protobuf-mutating Server Action writing to portfolio_files.
   function addPreviewSecurity(draft: NewPortfolioSecurity): void {
+    const category =
+      draft.categoryId === undefined
+        ? undefined
+        : snapshot.categories.find((item) => item.id === draft.categoryId)
+            ?.name;
     const added: Holding = {
-      ...(draft.category !== undefined && { category: draft.category }),
+      ...(category !== undefined && { category }),
       currency: draft.currency,
       gbpRate: draftGbpRateOf(draft.currency),
       id: crypto.randomUUID(),

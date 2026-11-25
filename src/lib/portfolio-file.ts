@@ -5,6 +5,7 @@ import { strToU8, zipSync } from "fflate";
 import type {
   CashAccount,
   Holding,
+  PortfolioCategory,
   PortfolioSnapshot,
   PortfolioTransaction,
   SecuritiesAccount,
@@ -71,6 +72,15 @@ interface Security {
   readonly price: number;
   readonly quoteDate: null | string;
   readonly ticker: string | undefined;
+}
+
+// A named leaf class reachable from the taxonomy's root alongside the
+// trimmed ancestor class names beneath the root for disambiguation.
+interface TaxonomyLeaf {
+  readonly ancestors: readonly string[];
+  readonly assignments: readonly Assignment[];
+  readonly id: string;
+  readonly name: string;
 }
 
 // A taxonomy's classes as the tree from its root: the root, and the
@@ -1088,11 +1098,13 @@ function targetsOf(
   );
 }
 
-// Optional root-reachable leaf categories and sorted security
-// assignments from the file's Asset Allocation taxonomy, returning
-// empty results rather than refusing when the taxonomy or root is absent.
+// Optional root-reachable leaf categories (with their classification
+// ids, disambiguated by ancestor path when two leaves share a name) and
+// sorted security assignments from the file's Asset Allocation taxonomy,
+// returning empty results rather than refusing when the taxonomy or root
+// is absent.
 function taxonomyInfoOf(client: Message): {
-  readonly categories: readonly string[];
+  readonly categories: readonly PortfolioCategory[];
   readonly categoryBySecurity: ReadonlyMap<string, string>;
 } {
   const found = messagesAt(client, fields.client.taxonomies).find(
@@ -1107,16 +1119,34 @@ function taxonomyInfoOf(client: Message): {
     return { categories: [], categoryBySecurity: new Map() };
   }
   const leaves = taxonomyLeavesOf(classes, root);
-  const categories = [
-    ...new Set(leaves.map((each) => each.name.trim())),
-  ].toSorted((one, other) => one.localeCompare(other));
-  const assigned = new Map<string, Set<string>>();
+  const seenNames = new Set<string>();
+  const duplicateNames = new Set<string>();
   for (const leaf of leaves) {
-    const label = leaf.name.trim();
+    if (seenNames.has(leaf.name)) {
+      duplicateNames.add(leaf.name);
+    } else {
+      seenNames.add(leaf.name);
+    }
+  }
+  const labeled = leaves.map((leaf) => ({
+    assignments: leaf.assignments,
+    id: leaf.id,
+    name: duplicateNames.has(leaf.name)
+      ? [...leaf.ancestors, leaf.name].join(" · ")
+      : leaf.name,
+  }));
+  const categories: readonly PortfolioCategory[] = labeled
+    .map(({ id, name }) => ({ id, name }))
+    .toSorted((one, other) => {
+      const byName = one.name.localeCompare(other.name);
+      return byName !== 0 ? byName : one.id.localeCompare(other.id);
+    });
+  const assigned = new Map<string, Set<string>>();
+  for (const leaf of labeled) {
     for (const { vehicle } of leaf.assignments) {
       assigned.set(
         vehicle,
-        (assigned.get(vehicle) ?? new Set<string>()).add(label),
+        (assigned.get(vehicle) ?? new Set<string>()).add(leaf.name),
       );
     }
   }
@@ -1133,29 +1163,51 @@ function taxonomyInfoOf(client: Message): {
   };
 }
 
-// Named leaf classes reachable from a taxonomy's root, ignoring
-// orphaned subtrees and guarding against cyclic parent pointers.
+// Named leaf classes reachable from a taxonomy's root, ignoring blank
+// ids/names, duplicate ids, and orphaned subtrees, and guarding against
+// cyclic parent pointers while tracking ancestor names beneath the root.
 function taxonomyLeavesOf(
   classes: readonly Class[],
   root: Class,
-): readonly Class[] {
-  const leaves: Class[] = [];
-  const walk = (node: Class, seen: ReadonlySet<string>): void => {
+): readonly TaxonomyLeaf[] {
+  const leaves: TaxonomyLeaf[] = [];
+  const seenLeafIds = new Set<string>();
+  const walk = (
+    node: Class,
+    ancestors: readonly string[],
+    seen: ReadonlySet<string>,
+  ): void => {
     const children = classes.filter(
       (each) => each.parent === node.id && !seen.has(each.id),
     );
+    const trimmedName = node.name.trim();
     if (children.length === 0) {
-      if (node.id !== root.id && node.name.trim() !== "") {
-        leaves.push(node);
+      if (
+        node.id !== root.id &&
+        node.id.trim() !== "" &&
+        trimmedName !== "" &&
+        !seenLeafIds.has(node.id)
+      ) {
+        seenLeafIds.add(node.id);
+        leaves.push({
+          ancestors,
+          assignments: node.assignments,
+          id: node.id,
+          name: trimmedName,
+        });
       }
       return;
     }
     const nextSeen = new Set([...seen, node.id]);
+    const nextAncestors =
+      node.id === root.id || trimmedName === ""
+        ? ancestors
+        : [...ancestors, trimmedName];
     for (const child of children) {
-      walk(child, nextSeen);
+      walk(child, nextAncestors, nextSeen);
     }
   };
-  walk(root, new Set());
+  walk(root, [], new Set());
   return leaves;
 }
 

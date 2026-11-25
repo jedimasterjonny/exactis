@@ -63,6 +63,13 @@ export interface HoldingRow {
   readonly status: HoldingStatus;
 }
 
+// One leaf classification in the file's Asset Allocation taxonomy: its
+// protobuf classification id and disambiguated display name.
+export interface PortfolioCategory {
+  readonly id: string;
+  readonly name: string;
+}
+
 // What reading a binary Portfolio Performance file hands the Portfolio
 // screen: the file name and base currency, the latest quote date across
 // priced securities (or null when none have quotes), the securities and
@@ -72,7 +79,7 @@ export interface HoldingRow {
 export interface PortfolioSnapshot {
   readonly baseCurrency: string;
   readonly cashAccounts: readonly CashAccount[];
-  readonly categories: readonly string[];
+  readonly categories: readonly PortfolioCategory[];
   readonly fileName: string;
   readonly holdings: readonly Holding[];
   readonly latestQuoteDate: null | string;

@@ -12,7 +12,10 @@ describe("PortfolioSecurityDialog", () => {
     const onAdd = vi.fn<(draft: NewPortfolioSecurity) => void>();
     render(
       <PortfolioSecurityDialog
-        categories={["Global equity", "UK gilts"]}
+        categories={[
+          { id: "aa-equity", name: "Global equity" },
+          { id: "aa-bonds", name: "UK gilts" },
+        ]}
         onAdd={onAdd}
         onDismiss={vi.fn<() => void>()}
       />,
@@ -48,7 +51,7 @@ describe("PortfolioSecurityDialog", () => {
       target: { value: "  UKGF  " },
     });
     fireEvent.change(screen.getByRole("combobox", { name: "Asset class" }), {
-      target: { value: "UK gilts" },
+      target: { value: "aa-bonds" },
     });
     fireEvent.change(screen.getByRole("textbox", { name: "Note" }), {
       target: { value: "  Short duration  " },
@@ -56,7 +59,7 @@ describe("PortfolioSecurityDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add preview" }));
 
     expect(onAdd).toHaveBeenCalledWith({
-      category: "UK gilts",
+      categoryId: "aa-bonds",
       currency: "GBX",
       isin: "GB00TEST0002",
       latestPrice: 214.015,
