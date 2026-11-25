@@ -10,16 +10,21 @@ import { inMemory } from "@/db/memory.fixture";
 import { readLatestPortfolio } from "@/db/portfolio";
 import { portfolioFiles } from "@/db/schema";
 import { standUp } from "@/db/store.fixture";
-import { refused, saved } from "@/lib/answer";
+import { Refusal, refused, saved } from "@/lib/answer";
 import { dayOf } from "@/lib/months";
-import { readPortfolioSnapshot } from "@/lib/portfolio-file";
+import { appendAccount, readPortfolioSnapshot } from "@/lib/portfolio-file";
 import { samplePortfolioFile } from "@/lib/portfolio-file.fixture";
 import { openedScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
 
 import type { OwnedPortfolio } from "./portfolio";
 
-import { getPortfolio, readStoredPortfolio, storePortfolio } from "./portfolio";
+import {
+  amendPortfolio,
+  getPortfolio,
+  readStoredPortfolio,
+  storePortfolio,
+} from "./portfolio";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ refresh: vi.fn() }));
@@ -274,6 +279,165 @@ describe("the portfolio store", () => {
         }),
       ).rejects.toThrow("redirected");
       expect(await readLatestPortfolio(db)).toBeNull();
+      expect(refresh).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("amendPortfolio", () => {
+    it("reads the latest file, mutates it, verifies readability, persists the next version, and refreshes", async () => {
+      await storePortfolio(0, {
+        content: samplePortfolioFile(),
+        fileName: "northstar.portfolio",
+      });
+      vi.mocked(refresh).mockClear();
+
+      const answer = await amendPortfolio(1, (stored) => {
+        const { content, id } = appendAccount(
+          stored.content,
+          { currency: "GBP", kind: "cash", name: "Savings Pot" },
+          { uuid: () => "cash-savings" },
+        );
+        return { content, result: { id } };
+      });
+
+      const latest = await readLatestPortfolio(db);
+      expect(latest?.version).toBe(2);
+      expect(latest?.fileName).toBe("northstar.portfolio");
+      expect(answer).toStrictEqual(
+        saved({
+          id: "cash-savings",
+          savedOn: dayOf(latest?.savedAt ?? today),
+          version: 2,
+        }),
+      );
+      expect(refresh).toHaveBeenCalledOnce();
+      expect(
+        readPortfolioSnapshot(
+          latest?.content ?? new Uint8Array(),
+          "northstar.portfolio",
+        ).cashAccounts.map((a) => a.name),
+      ).toContain("Savings Pot");
+    });
+
+    it("refuses mutations without an uploaded file or while a scenario is open", async () => {
+      expect(
+        await amendPortfolio(1, () => ({
+          content: samplePortfolioFile(),
+          result: { id: "x" },
+        })),
+      ).toStrictEqual(refused("Upload a portfolio file before making changes"));
+      expect(refresh).not.toHaveBeenCalled();
+
+      vi.mocked(openedScenario).mockResolvedValue("Retire early");
+      expect(
+        await amendPortfolio(1, () => ({
+          content: samplePortfolioFile(),
+          result: { id: "x" },
+        })),
+      ).toStrictEqual(
+        refused("Leave the scenario to update the portfolio file"),
+      );
+      expect(refresh).not.toHaveBeenCalled();
+    });
+
+    it("refuses stale versions before mutation and on concurrent race after mutation, refreshing on both", async () => {
+      await storePortfolio(0, {
+        content: samplePortfolioFile(),
+        fileName: "northstar.portfolio",
+      });
+      await storePortfolio(1, {
+        content: samplePortfolioFile("EUR"),
+        fileName: "northstar-v2.portfolio",
+      });
+      vi.mocked(refresh).mockClear();
+
+      // Pre-mutation version mismatch skips mutate and refreshes immediately.
+      const mutateSpy = vi.fn();
+      expect(await amendPortfolio(1, mutateSpy)).toStrictEqual(
+        refused(
+          "The portfolio file changed while this was being saved, so nothing was",
+        ),
+      );
+      expect(mutateSpy).not.toHaveBeenCalled();
+      expect(refresh).toHaveBeenCalledTimes(1);
+
+      // Post-mutation race: enqueue another version onto PGlite before keepPortfolioAfter runs.
+      let raced: Promise<unknown> = Promise.resolve();
+      expect(
+        await amendPortfolio(2, (stored) => {
+          raced = db
+            .insert(portfolioFiles)
+            .values({
+              content: samplePortfolioFile("USD"),
+              fileName: "raced.portfolio",
+              savedAt: new Date("2026-09-25T12:00:00Z"),
+              version: 3,
+            })
+            .execute();
+          return { content: stored.content, result: { id: "late" } };
+        }),
+      ).toStrictEqual(
+        refused(
+          "The portfolio file changed while this was being saved, so nothing was",
+        ),
+      );
+      await raced;
+      expect(refresh).toHaveBeenCalledTimes(2);
+    });
+
+    it("refuses oversized mutated files, unreadable mutated bytes, and domain Refusals without refreshing", async () => {
+      await storePortfolio(0, {
+        content: samplePortfolioFile(),
+        fileName: "northstar.portfolio",
+      });
+      vi.mocked(refresh).mockClear();
+
+      expect(
+        await amendPortfolio(1, () => ({
+          content: new Uint8Array(maxPortfolioBytes + 1),
+          result: { id: "huge" },
+        })),
+      ).toStrictEqual(refused(portfolioTooLarge));
+
+      expect(
+        await amendPortfolio(1, () => ({
+          content: new Uint8Array([0x01, 0x02, 0x03]),
+          result: { id: "corrupt" },
+        })),
+      ).toStrictEqual(
+        refused(
+          "The file is not a zip, as a Portfolio Performance file saved in binary is",
+        ),
+      );
+
+      expect(
+        await amendPortfolio(1, () => {
+          throw new Refusal("Domain refusal");
+        }),
+      ).toStrictEqual(refused("Domain refusal"));
+
+      expect(refresh).not.toHaveBeenCalled();
+      expect((await readLatestPortfolio(db))?.version).toBe(1);
+    });
+
+    it("rethrows unexpected errors and writes nothing without a session", async () => {
+      vi.mocked(requireSession).mockRejectedValueOnce(new Error("redirected"));
+      await expect(
+        amendPortfolio(1, () => ({
+          content: samplePortfolioFile(),
+          result: { id: "x" },
+        })),
+      ).rejects.toThrow("redirected");
+
+      vi.mocked(getDb).mockImplementationOnce(() => {
+        throw new Error("db down");
+      });
+      await expect(
+        amendPortfolio(1, () => ({
+          content: samplePortfolioFile(),
+          result: { id: "x" },
+        })),
+      ).rejects.toThrow("db down");
       expect(refresh).not.toHaveBeenCalled();
     });
   });
