@@ -1,25 +1,19 @@
 "use client";
 
-import type { ChangeEvent, JSX } from "react";
+import type { JSX } from "react";
 
 import { cn } from "cn";
-import {
-  ChartPie,
-  ChevronDown,
-  Crosshair,
-  Download,
-  WandSparkles,
-} from "lucide-react";
+import { ChartPie, ChevronDown, Crosshair, WandSparkles } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useId, useRef, useState } from "react";
+import { useId } from "react";
 
 import type { Cma, Mapping } from "@/data/cma";
 import type { Fund } from "@/data/lifestrategy";
 import type { Allocation } from "@/data/rates";
 import type { Targets } from "@/data/targets";
 
-import { pullLifeStrategy } from "@/actions/lifestrategy";
-import { importTargets, mapByName } from "@/actions/targets";
+import { retargetFromLifeStrategy } from "@/actions/lifestrategy";
+import { mapByName } from "@/actions/targets";
 import { PortfolioSync } from "@/components/app/atoms/portfolio-sync";
 import { Caution } from "@/components/app/molecules/caution";
 import { EmptyState } from "@/components/app/molecules/empty-state";
@@ -34,13 +28,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/kit/dropdown-menu";
 import { suggestedMappings } from "@/data/class-table";
-import { range, retargeted, splitFor } from "@/data/lifestrategy";
+import { range, splitFor } from "@/data/lifestrategy";
+import { withSyncNote } from "@/data/portfolio";
 import { useSender } from "@/hooks/use-sender";
-import { acceptedOf, saved } from "@/lib/answer";
 import { formatWholePercent } from "@/lib/money";
 import { formatDay } from "@/lib/months";
 import { assumptions, portfolio, subsectionLabel } from "@/lib/nav";
-import { readPortfolios, readTargets, reweighted } from "@/lib/portfolio-file";
 
 // How the household's owned .portfolio file stands beside the open
 // branch's target allocation: none uploaded yet, present but refused to
@@ -71,13 +64,6 @@ export type PortfolioTargetStatus =
     }
   | { readonly kind: "missing" };
 
-// The file as retargeted, to be saved over the original: its name, and
-// the address its bytes are held at in this browser.
-interface Rewritten {
-  readonly name: string;
-  readonly url: string;
-}
-
 interface TargetAllocationProps {
   readonly branch: null | string;
   readonly cma: Cma | null;
@@ -96,12 +82,10 @@ interface TargetAllocationProps {
 // above the card and an on-demand sync button surface the state cleanly.
 //
 // The header also retargets the allocation from a LifeStrategy fund
-// chosen from a menu, from a file chosen on this device: what the fund
-// holds is pulled from Vanguard by the store and laid over the file's
-// categories at the split the plan holds now in the fund's own ratios,
-// or at the fund's own split for a fund holding no bonds or where the
-// plan's is the target allocation's own. Once imported, the header
-// offers the rewritten file to download under the name it was chosen by.
+// chosen from a menu: on the household branch the server rewrites the
+// owned .portfolio file's Asset Allocation weights in place and
+// auto-syncs household.targets; inside a scenario it updates only the
+// scenario's target shares until the scenario is made the household.
 //
 // While a category the CMA cannot blend has a class its name suggests,
 // the header offers to map every such category by name, saying how many
@@ -118,26 +102,29 @@ export function TargetAllocation({
 }: TargetAllocationProps): JSX.Element {
   const isInScenario = branch !== null;
   const cautionId = useId();
-  const pickerRef = useRef<HTMLInputElement>(null);
-  const fundRef = useRef<Fund>(range[0]);
-  const [rewritten, setRewritten] = useState<null | Rewritten>(null);
+  const emptyStateId = useId();
+  const footerId = useId();
   const { isSending: isMapping, send: sendMapping } = useSender();
   const { isSending: isRetargeting, send: sendRetarget } = useSender();
   const suggested =
     cma === null || targets === null
       ? 0
       : suggestedMappings(cma, targets, mappings).length;
-
-  // The address of the file last retargeted is let go when another
-  // replaces it and when the card leaves the screen.
-  useEffect(
-    (): (() => void) => () => {
-      if (rewritten !== null) {
-        URL.revokeObjectURL(rewritten.url);
-      }
-    },
-    [rewritten],
-  );
+  const caution = cautionOf({
+    cautionId,
+    isInScenario,
+    portfolioStatus,
+    targets,
+  });
+  const isRetargetDisabled = isInScenario
+    ? targets === null
+    : portfolioStatus.kind === "missing" || portfolioStatus.kind === "refused";
+  const fallbackNoteId = targets === null ? emptyStateId : footerId;
+  const retargetNoteId = caution === null ? fallbackNoteId : cautionId;
+  const version =
+    portfolioStatus.kind === "missing" || portfolioStatus.kind === "refused"
+      ? undefined
+      : portfolioStatus.version;
 
   function mapNames(): void {
     sendMapping(mapByName, {
@@ -149,59 +136,35 @@ export function TargetAllocation({
     });
   }
 
-  function pick(fund: Fund): void {
-    fundRef.current = fund;
-    pickerRef.current?.click();
-  }
-
-  function retarget(file: File, fund: Fund): void {
+  function retarget(fund: Fund): void {
     const flag = flagOf(fund, split);
     sendRetarget(
-      async () => {
-        const bytes = new Uint8Array(await file.arrayBuffer());
-        const held = readTargets(bytes);
-        const holdings = acceptedOf(await pullLifeStrategy(fund.portId));
-        const written = reweighted(bytes, retargeted(held, holdings, split));
-        const imported = await importTargets(
-          readTargets(written),
-          readPortfolios(written),
-        );
-        return imported.kind === "saved"
-          ? saved({ asOf: holdings.asOf, written })
-          : imported;
-      },
+      async () =>
+        retargetFromLifeStrategy(fund.portId, {
+          ...(version !== undefined &&
+            !isInScenario && { afterVersion: version }),
+          on: branch,
+        }),
       {
         failure: "Allocation not retargeted",
-        onAccepted: ({ written }) => {
-          setRewritten({
-            name: file.name,
-            url: URL.createObjectURL(new Blob([written])),
-          });
-        },
-        success: ({ asOf }) => ({
-          description: [
-            `${fund.name} as at ${formatDay(asOf)}, at ${splitSaid(splitFor(fund, split))}`,
-            ...(flag === undefined ? [] : [flag]),
-          ].join(". "),
+        success: (result) => ({
+          description: withSyncNote(
+            [
+              `${fund.name} as at ${formatDay(result.asOf)}, at ${splitSaid(result.split)}`,
+              ...(result.isScenarioOnly ? ["In this scenario only"] : []),
+              ...(flag === undefined ? [] : [flag]),
+            ].join(". "),
+            result.syncWarning,
+          ),
           title: "Target allocation retargeted",
         }),
       },
     );
   }
 
-  function take(event: ChangeEvent<HTMLInputElement>): void {
-    const input = event.currentTarget;
-    const file = input.files?.[0];
-    input.value = "";
-    if (file === undefined) {
-      return;
-    }
-    retarget(file, fundRef.current);
-  }
-
   return (
     <>
-      {cautionOf({ cautionId, isInScenario, portfolioStatus, targets })}
+      {caution}
       <SectionCard
         actions={
           <>
@@ -223,28 +186,19 @@ export function TargetAllocation({
                 isDisabled={portfolioStatus.blockedReason !== undefined}
               />
             )}
-            <input
-              accept=".portfolio"
-              aria-label="Portfolio Performance file"
-              className="hidden"
-              onChange={take}
-              ref={pickerRef}
-              type="file"
-            />
-            {rewritten !== null && (
-              <a
-                className={buttonVariants({ size: "sm", variant: "outline" })}
-                download={rewritten.name}
-                href={rewritten.url}
-              >
-                <Download aria-hidden />
-                Download the retargeted file
-              </a>
-            )}
             <DropdownMenu>
               <DropdownMenuTrigger
+                disabled={isRetargetDisabled}
                 render={
-                  <Button isBusy={isRetargeting} size="sm" variant="outline" />
+                  <Button
+                    aria-describedby={
+                      isRetargetDisabled ? retargetNoteId : undefined
+                    }
+                    disabled={isRetargetDisabled}
+                    isBusy={isRetargeting}
+                    size="sm"
+                    variant="outline"
+                  />
                 }
               >
                 <Crosshair aria-hidden />
@@ -259,7 +213,7 @@ export function TargetAllocation({
                       className="flex-col items-start gap-0.5"
                       key={fund.portId}
                       onClick={() => {
-                        pick(fund);
+                        retarget(fund);
                       }}
                     >
                       {fund.name}
@@ -284,7 +238,9 @@ export function TargetAllocation({
         title="Target allocation"
       >
         {targets === null ? (
-          <CardContent>{emptyStateOf(portfolioStatus, branch)}</CardContent>
+          <CardContent>
+            {emptyStateOf(portfolioStatus, branch, emptyStateId)}
+          </CardContent>
         ) : (
           <TargetTable
             categories={targets.categories}
@@ -293,7 +249,7 @@ export function TargetAllocation({
           />
         )}
         <CardFooter className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-          <p className="min-w-0 wrap-anywhere">
+          <p className="min-w-0 wrap-anywhere" id={footerId}>
             {footerCopyOf(portfolioStatus, isInScenario)}
           </p>
           <Link
@@ -387,12 +343,14 @@ function cautionOf({
 function emptyStateOf(
   status: PortfolioTargetStatus,
   branch: null | string,
+  textId: string,
 ): JSX.Element {
   if (status.kind === "missing") {
     return (
       <EmptyState
         description="Upload a binary Portfolio Performance file on Portfolio to load your target allocation."
         icon={ChartPie}
+        textId={textId}
         title="No portfolio file uploaded"
       >
         <Link className={buttonVariants({ size: "sm" })} href={portfolio.href}>
@@ -406,6 +364,7 @@ function emptyStateOf(
       <EmptyState
         description="Fix the file on Portfolio to load your target allocation."
         icon={ChartPie}
+        textId={textId}
         title="Allocation could not be read"
       >
         <Link
@@ -421,6 +380,7 @@ function emptyStateOf(
     <EmptyState
       description="Sync the Asset Allocation taxonomy from your portfolio file."
       icon={ChartPie}
+      textId={textId}
       title="No allocation synced yet"
     >
       <PortfolioSync branch={branch} variant="default" />
@@ -437,8 +397,8 @@ function flagOf(fund: Fund, split: Allocation | null): string | undefined {
     : `Holds no bonds; the plan holds ${formatWholePercent(1 - split.stocks)} now`;
 }
 
-// Footer provenance line naming the owned portfolio file and noting
-// scenario isolation when viewing a scenario branch.
+// Footer provenance line naming the owned portfolio file and describing
+// where retargeting writes.
 function footerCopyOf(
   status: PortfolioTargetStatus,
   isInScenario: boolean,
@@ -447,8 +407,8 @@ function footerCopyOf(
     return "Upload a portfolio file on Portfolio to feed the target allocation.";
   }
   return isInScenario
-    ? `Read from ${status.fileName} on Portfolio. Changes here apply to this scenario only.`
-    : `Read from ${status.fileName} on Portfolio.`;
+    ? `Read from ${status.fileName} on Portfolio. Retargeting updates this scenario only; making it the household updates the portfolio file.`
+    : `Read from ${status.fileName} on Portfolio. Retargeting updates its Asset Allocation weights in place.`;
 }
 
 // What a split reads as, "90% equity and 10% bonds".

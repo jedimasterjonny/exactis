@@ -61,9 +61,9 @@ const pulled: Kept = {
 // What the Make dialog says of every adoption, and what it adds where
 // adopting moves a share of the target allocation.
 const made =
-  "The scenario's plan, its target allocation included, replaces the household's. The household keeps its own balances, progress points and house prices, whatever the scenario holds. The BlackRock CMA, the BoE curve and the holdings imported are each the newer of the two. The scenario is kept under Made the household.";
+  "The scenario's plan, its target allocation included, replaces the household's. The household keeps its own balances, progress points and house prices, whatever the scenario holds. The BlackRock CMA, the BoE curve and the portfolio holdings are each the newer of the two. The scenario is kept under Made the household.";
 const replaced =
-  "Each import takes the targets the Portfolio Performance file holds, so the next one replaces the scenario's unless the file holds them too.";
+  "Adopting also updates the Asset Allocation target weights in the household's portfolio file to match this scenario.";
 
 // The household given, or the reference, beside the scenario given as
 // the store reads it undecided, laid over the household as its own
@@ -331,7 +331,7 @@ describe("Compare", () => {
   });
 
   // A scenario asking for equity alone.
-  it("says in the Make dialog that the next import replaces the targets where adopting moves a share", async () => {
+  it("says in the Make dialog that adopting also updates the household's portfolio file where adopting moves a share", async () => {
     vi.mocked(getCompared).mockResolvedValue(
       comparedOf({ ...kept, targets: targetsUnder("Equity") }),
     );
@@ -347,8 +347,9 @@ describe("Compare", () => {
   });
 
   // A scenario mapping the global small cap onto UK equities, its shares
-  // the household's, which the next import leaves standing.
-  it("says nothing of the next import where the scenario only remaps a category, though it lists the target allocation", async () => {
+  // the household's, which leaves the portfolio file's target weights as
+  // they are.
+  it("says nothing of updating the portfolio file where the scenario only remaps a category, though it lists the target allocation", async () => {
     vi.mocked(getCompared).mockResolvedValue(
       comparedOf({
         ...kept,

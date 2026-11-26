@@ -129,7 +129,7 @@ export function CompareScreen({
                       The scenario is laid over the household&apos;s balances,
                       progress points and house prices as they stand, as making
                       it the household today would. The BlackRock CMA, the BoE
-                      curve and the holdings imported are each the newer of the
+                      curve and the portfolio holdings are each the newer of the
                       two. The dashboard sets the scenario&apos;s own balances,
                       as they stood when it was made or as typed in it since,
                       against the household, so its differences can read

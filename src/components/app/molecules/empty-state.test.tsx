@@ -38,4 +38,28 @@ describe("EmptyState", () => {
     expect(screen.getByRole("link", { name: "Accounts" })).toBeInTheDocument();
     expect(screen.getByText(bySlot("empty"))).toHaveClass("aspect-[3/1]");
   });
+
+  it("scopes textId to the title and description header without wrapping action children", () => {
+    render(
+      <>
+        <button aria-describedby="empty-note" disabled type="button">
+          Act
+        </button>
+        <EmptyState
+          description="Sync the Asset Allocation taxonomy from your portfolio file."
+          icon={Wallet}
+          textId="empty-note"
+          title="No allocation synced yet"
+        >
+          <a href="/portfolio">Open Portfolio</a>
+        </EmptyState>
+      </>,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Act" }),
+    ).toHaveAccessibleDescription(
+      "No allocation synced yet Sync the Asset Allocation taxonomy from your portfolio file.",
+    );
+  });
 });

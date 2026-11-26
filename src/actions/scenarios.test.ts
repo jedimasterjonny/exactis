@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { sql } from "drizzle-orm";
 import { refresh } from "next/cache";
 import { describe, expect, it, vi } from "vitest";
 import * as z from "zod";
@@ -12,7 +13,9 @@ import { expenseLines } from "@/data/expenses.fixture";
 import { soundKept } from "@/data/household";
 import { blank, kept as reference, today } from "@/data/household.fixture";
 import { homePart, homeValues } from "@/data/houses.fixture";
+import { maxPortfolioBytes } from "@/data/portfolio";
 import { currentShape, stamped, upcast } from "@/data/shapes";
+import { areTargetsEquivalent } from "@/data/targets";
 import { portfolios, targets } from "@/data/targets.fixture";
 import {
   decideScenario,
@@ -21,9 +24,23 @@ import {
   readLatest,
 } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
-import { householdVersions } from "@/db/schema";
+import { keepPortfolioAfter, readLatestPortfolio } from "@/db/portfolio";
+import { householdVersions, portfolioFiles } from "@/db/schema";
 import { standUp } from "@/db/store.fixture";
 import { refused, saved } from "@/lib/answer";
+import {
+  appendAccount,
+  readPortfolioSnapshot,
+  readPortfolioTargets,
+  readTargets,
+  reweighted,
+} from "@/lib/portfolio-file";
+import {
+  clientOf,
+  portfolioFile,
+  reference as portfolioReference,
+  samplePortfolioFile,
+} from "@/lib/portfolio-file.fixture";
 import { found } from "@/lib/records";
 import { closeScenario, openedScenario, openScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
@@ -44,6 +61,10 @@ import {
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ refresh: vi.fn() }));
 vi.mock("@/db/client", () => ({ getDb: vi.fn() }));
+vi.mock(import("@/lib/portfolio-file"), async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, reweighted: vi.fn(actual.reweighted) };
+});
 vi.mock("@/lib/scenario", () => ({
   closeScenario: vi.fn(),
   openedScenario: vi.fn(),
@@ -71,7 +92,7 @@ standUp(memory, { today });
 // and as making it the household answers, and the household's accounts
 // after.
 interface Laid {
-  readonly adopted: Answer<boolean>;
+  readonly adopted: Awaited<ReturnType<typeof adoptScenario>>;
   readonly compared: Answer<readonly Named[]> | null | undefined;
   readonly held: readonly Named[];
 }
@@ -544,7 +565,7 @@ describe("adoptScenario", () => {
 
     expect(
       await adoptScenario("Retire early", await shownNow("Retire early")),
-    ).toStrictEqual(saved(true));
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: true }));
     expect(await readLatest(db, "")).toStrictEqual({
       household: stamped({
         ...planned,
@@ -603,7 +624,7 @@ describe("adoptScenario", () => {
 
     expect(
       await adoptScenario("Four-day week", await shownNow("Four-day week")),
-    ).toStrictEqual(saved(true));
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: true }));
     expect(await readLatest(db, "")).toStrictEqual({
       household: stamped({ ...scenario, targets: retargeted(since) }),
       version: 3,
@@ -638,14 +659,14 @@ describe("adoptScenario", () => {
 
     expect(
       await adoptScenario("Later pulls", await shownNow("Later pulls")),
-    ).toStrictEqual(saved(true));
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: true }));
     expect(await readLatest(db, "")).toStrictEqual({
       household: stamped(pulling(reference)),
       version: 2,
     });
     expect(
       await adoptScenario("Plan to 95", await shownNow("Plan to 95")),
-    ).toStrictEqual(saved(true));
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: true }));
     expect(await readLatest(db, "")).toStrictEqual({
       household: stamped({ ...pulling(reference), ages: { ends: 95 } }),
       version: 3,
@@ -667,7 +688,7 @@ describe("adoptScenario", () => {
 
     expect(
       await adoptScenario("Retire early", await shownNow("Retire early")),
-    ).toStrictEqual(saved(true));
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: true }));
     await expect(
       adoptScenario("Retire early", await shownNow("Retire early")),
     ).resolves.toStrictEqual(
@@ -677,7 +698,7 @@ describe("adoptScenario", () => {
 
     expect(
       await adoptScenario("Move house", await shownNow("Move house")),
-    ).toStrictEqual(saved(true));
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: true }));
     expect(await readLatest(db, "")).toMatchObject({
       household: { ages: { ends: 92 } },
       version: 3,
@@ -726,7 +747,7 @@ describe("adoptScenario", () => {
 
     expect(
       await adoptScenario("Retire early", await shownNow("Retire early")),
-    ).toStrictEqual(saved(true));
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: true }));
     expect(await readLatest(db, "")).toStrictEqual({
       household: stamped({
         ...planned,
@@ -763,7 +784,7 @@ describe("adoptScenario", () => {
 
     expect(
       await adoptScenario("Retire early", await shownNow("Retire early")),
-    ).toStrictEqual(saved(true));
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: true }));
     expect(await readLatest(db, "")).toStrictEqual({
       household: stamped({ ...reference, next: 21 }),
       version: 4,
@@ -783,7 +804,7 @@ describe("adoptScenario", () => {
 
     expect(
       await adoptScenario("Retire early", await shownNow("Retire early")),
-    ).toStrictEqual(saved(true));
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: true }));
     expect(await readLatest(db, "")).toStrictEqual({
       household: stamped({
         ...planned,
@@ -829,7 +850,7 @@ describe("adoptScenario", () => {
 
     expect(
       await adoptScenario("Retire early", await shownNow("Retire early")),
-    ).toStrictEqual(saved(true));
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: true }));
     expect(await readLatest(db, "")).toMatchObject({
       household: {
         accounts: [
@@ -886,7 +907,7 @@ describe("adoptScenario", () => {
 
     expect(
       await adoptScenario("Retire early", await shownNow("Retire early")),
-    ).toStrictEqual(saved(false));
+    ).toStrictEqual(saved({ isDecided: false, isPortfolioSynced: true }));
     expect(await readLatest(db, "")).toStrictEqual({
       household: stamped(reference),
       version: 2,
@@ -915,7 +936,7 @@ describe("adoptScenario", () => {
 
     expect(
       await adoptScenario("Retire early", await shownNow("Retire early")),
-    ).toStrictEqual(saved(false));
+    ).toStrictEqual(saved({ isDecided: false, isPortfolioSynced: true }));
     expect(await readLatest(db, "")).toStrictEqual({
       household: stamped(later),
       version: 2,
@@ -937,7 +958,7 @@ describe("adoptScenario", () => {
 
     expect(
       await adoptScenario("Retire early", await shownNow("Retire early")),
-    ).toStrictEqual(saved(true));
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: true }));
     expect(await readLatest(db, "")).toStrictEqual({
       household: stamped(longer),
       version: 1,
@@ -1008,14 +1029,18 @@ describe("adoptScenario", () => {
 
     const retiring = await shownNow("Retire early");
     const moving = await shownNow("Move house");
-    const adoptions: PromiseSettledResult<Answer<boolean>>[] =
-      await Promise.allSettled([
-        adoptScenario("Retire early", retiring),
-        adoptScenario("Move house", moving),
-      ]);
+    const adoptions: PromiseSettledResult<
+      Awaited<ReturnType<typeof adoptScenario>>
+    >[] = await Promise.allSettled([
+      adoptScenario("Retire early", retiring),
+      adoptScenario("Move house", moving),
+    ]);
 
     expect(adoptions).toStrictEqual([
-      { status: "fulfilled", value: saved(true) },
+      {
+        status: "fulfilled",
+        value: saved({ isDecided: true, isPortfolioSynced: true }),
+      },
       {
         status: "fulfilled",
         value: refused(
@@ -1044,14 +1069,14 @@ describe("adoptScenario", () => {
         await shownNow("Retire early"),
         "  Fridays are worth it ",
       ),
-    ).toStrictEqual(saved(true));
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: true }));
     expect(await readLatest(db, "Retire early")).toMatchObject({
       decided: { decision: "adopted", reason: "Fridays are worth it" },
     });
 
     expect(
       await adoptScenario("Move house", await shownNow("Move house"), "   "),
-    ).toStrictEqual(saved(true));
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: true }));
     expect(await readLatest(db, "Move house")).toMatchObject({
       decided: { decision: "adopted", reason: null },
     });
@@ -1075,7 +1100,7 @@ describe("adoptScenario", () => {
 
     expect(
       await adoptScenario("Retire early", shown, "x".repeat(200)),
-    ).toStrictEqual(saved(true));
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: true }));
   });
 
   // A page drawn before a month was closed on the household, and one
@@ -1147,6 +1172,656 @@ describe("adoptScenario", () => {
       adoptScenario("Retire early", await shownNow("Retire early")),
     ).rejects.toThrow("The store is down");
     expect(await namesIn()).toStrictEqual(["Retire early"]);
+  });
+
+  // Shares reweighted in the scenario that do not divide cleanly into
+  // hundredths of a per cent: a third split equally across the three
+  // bond categories.
+  it("reweights the stored portfolio file in place when adopting a retargeted scenario, aligning household shares to the rounded weights written", async () => {
+    const file = portfolioFile(
+      clientOf([["Asset Allocation", portfolioReference]]),
+    );
+    await keepPortfolioAfter(db, 0, {
+      content: file,
+      fileName: "plan.portfolio",
+    });
+    const asked = new Map([
+      ["Asset Allocation/Bonds/Global bonds, hedged", 1 / 9],
+      ["Asset Allocation/Bonds/Index-linked gilts", 1 / 9],
+      ["Asset Allocation/Bonds/Short-dated gilts", 1 / 9],
+      [
+        "Asset Allocation/Equity/Developed/FTSE Global All Cap ex-UK",
+        1 - 1 / 3 - 0.12 - 0.12 - 0.08,
+      ],
+    ]);
+    const retargeted = {
+      ...targets,
+      categories: targets.categories.map((category) => ({
+        ...category,
+        share: asked.get(category.id) ?? category.share,
+      })),
+    };
+    const since: Targets = {
+      categories: targets.categories.map((category) => ({
+        ...category,
+        value: category.value + 250,
+      })),
+      importedOn: "2026-09-26",
+      portfolios,
+    };
+    await keepFirst("", { ...reference, targets: since });
+    await keepFirst("Third bonds", reference);
+    await keepAfter(
+      db,
+      { scenario: "Third bonds", version: 1 },
+      { ...reference, targets: retargeted },
+    );
+
+    expect(
+      await adoptScenario("Third bonds", await shownNow("Third bonds")),
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: true }));
+
+    const stored = await readLatestPortfolio(db);
+    expect(stored?.version).toBe(2);
+    expect(stored?.fileName).toBe("plan.portfolio");
+    const expectedWritten = reweighted(
+      file,
+      new Map(retargeted.categories.map(({ id, share }) => [id, share])),
+    );
+    const expectedTargets = readTargets(expectedWritten);
+    const expectedShares = new Map(
+      expectedTargets.map(({ id, share }) => [id, share]),
+    );
+    expect(readTargets(stored?.content ?? new Uint8Array())).toStrictEqual(
+      expectedTargets,
+    );
+    expect(await latestOf("")).toMatchObject({
+      targets: {
+        ...since,
+        categories: since.categories.map((category) => ({
+          ...category,
+          share: expectedShares.get(category.id) ?? category.share,
+        })),
+      },
+    });
+  });
+
+  // Adopted before any household is kept, with an extra 0% category
+  // absent from the stored file and a 0% file category absent from the
+  // scenario.
+  it("reweights the stored portfolio file when adopting before any household exists, keeping extra 0% categories intact", async () => {
+    const file = portfolioFile(
+      clientOf([["Asset Allocation", portfolioReference]]),
+    );
+    await keepPortfolioAfter(db, 0, {
+      content: file,
+      fileName: "plan.portfolio",
+    });
+    const asked = new Map([
+      ["Asset Allocation/Bonds/Global bonds, hedged", 0.22],
+      ["Asset Allocation/Equity/Developed/FTSE Global All Cap ex-UK", 0.4],
+    ]);
+    const cashReserve = {
+      accounts: [],
+      classes: ["Bonds"],
+      id: "Asset Allocation/Bonds/Cash reserve",
+      isImplemented: false,
+      name: "Cash reserve",
+      share: 0,
+      value: 0,
+    };
+    const scenarioTargets: Targets = {
+      ...targets,
+      categories: [
+        ...targets.categories
+          .filter(
+            ({ id }) => id !== "Asset Allocation/Equity/Developed/FTSE USA",
+          )
+          .map((category) => ({
+            ...category,
+            share: asked.get(category.id) ?? category.share,
+          })),
+        cashReserve,
+      ],
+    };
+    await keepFirst("Fresh plan", { ...reference, targets: scenarioTargets });
+
+    expect(
+      await adoptScenario("Fresh plan", { household: 0, scenario: 1 }),
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: true }));
+
+    const stored = await readLatestPortfolio(db);
+    expect(stored?.version).toBe(2);
+    const expectedTargets = readTargets(
+      reweighted(
+        file,
+        new Map(scenarioTargets.categories.map(({ id, share }) => [id, share])),
+      ),
+    );
+    const expectedShares = new Map(
+      expectedTargets.map(({ id, share }) => [id, share]),
+    );
+    expect(readTargets(stored?.content ?? new Uint8Array())).toStrictEqual(
+      expectedTargets,
+    );
+    expect(await latestOf("")).toMatchObject({
+      targets: {
+        ...scenarioTargets,
+        categories: scenarioTargets.categories.map((category) => ({
+          ...category,
+          share: expectedShares.get(category.id) ?? category.share,
+        })),
+      },
+    });
+  });
+
+  it("leaves the stored portfolio file untouched when the adopted scenario keeps the same target shares", async () => {
+    const file = portfolioFile(
+      clientOf([["Asset Allocation", portfolioReference]]),
+    );
+    await keepPortfolioAfter(db, 0, {
+      content: file,
+      fileName: "plan.portfolio",
+    });
+    const withoutZeroCategory: Kept = {
+      ...reference,
+      targets: {
+        ...targets,
+        categories: targets.categories.filter(
+          ({ id }) => id !== "Asset Allocation/Equity/Developed/FTSE USA",
+        ),
+      },
+    };
+    await keepFirst("", withoutZeroCategory);
+    await keepFirst("Plan to 95", {
+      ...withoutZeroCategory,
+      ages: { ends: 95 },
+    });
+
+    expect(
+      await adoptScenario("Plan to 95", await shownNow("Plan to 95")),
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: true }));
+    expect(await readLatestPortfolio(db)).toMatchObject({
+      content: file,
+      version: 1,
+    });
+  });
+
+  it("aligns shares within 1e-9 of the stored portfolio file to exact stored floats without rewriting it so strict target equality stays true", async () => {
+    const file = portfolioFile(
+      clientOf([["Asset Allocation", portfolioReference]]),
+    );
+    await keepPortfolioAfter(db, 0, {
+      content: file,
+      fileName: "plan.portfolio",
+    });
+    const live = readPortfolioTargets(file);
+    const liveTargets: Targets = {
+      categories: live.categories,
+      importedOn: "2026-09-26",
+      portfolios: live.portfolios,
+    };
+    const [first, second, ...rest] = live.categories;
+    const perturbedTargets: Targets = {
+      ...liveTargets,
+      categories:
+        first !== undefined && second !== undefined
+          ? [
+              { ...first, share: first.share + 5e-10 },
+              { ...second, share: second.share - 5e-10 },
+              ...rest,
+            ]
+          : live.categories,
+    };
+    expect(areTargetsEquivalent(perturbedTargets, live)).toBe(false);
+
+    await keepFirst("", { ...reference, targets: liveTargets });
+    await keepFirst("Float close", { ...reference, targets: perturbedTargets });
+
+    expect(
+      await adoptScenario("Float close", await shownNow("Float close")),
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: true }));
+    expect(await readLatestPortfolio(db)).toMatchObject({
+      content: file,
+      version: 1,
+    });
+    expect(areTargetsEquivalent((await latestOf("")).targets, live)).toBe(true);
+  });
+
+  it("adopts without rewriting the portfolio file and reports isPortfolioSynced false when it has no Asset Allocation taxonomy or is missing a positive-share category", async () => {
+    const asked = new Map([
+      ["Asset Allocation/Bonds/Global bonds, hedged", 0.22],
+      ["Asset Allocation/Equity/Developed/FTSE Global All Cap ex-UK", 0.4],
+    ]);
+    const retargeted: Targets = {
+      ...targets,
+      categories: targets.categories.map((category) => ({
+        ...category,
+        share: asked.get(category.id) ?? category.share,
+      })),
+    };
+    const withoutTaxonomy = portfolioFile(clientOf([]));
+    await keepPortfolioAfter(db, 0, {
+      content: withoutTaxonomy,
+      fileName: "plain.portfolio",
+    });
+    await keepFirst("", reference);
+    await keepFirst("No taxonomy", { ...reference, targets: retargeted });
+
+    expect(
+      await adoptScenario("No taxonomy", await shownNow("No taxonomy")),
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: false }));
+    expect(await readLatestPortfolio(db)).toMatchObject({
+      content: withoutTaxonomy,
+      version: 1,
+    });
+
+    const missingCategories = samplePortfolioFile();
+    await keepPortfolioAfter(db, 1, {
+      content: missingCategories,
+      fileName: "northstar.portfolio",
+    });
+    await keepFirst("Missing category", { ...reference, targets: retargeted });
+
+    expect(
+      await adoptScenario(
+        "Missing category",
+        await shownNow("Missing category"),
+      ),
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: false }));
+    expect(await readLatestPortfolio(db)).toMatchObject({
+      content: missingCategories,
+      version: 2,
+    });
+  });
+
+  // Reweighting crossing the 4 MB ceiling is skipped without blocking
+  // adoption and reported as unsynced.
+  it("adopts without rewriting the portfolio file and reports isPortfolioSynced false when the reweighted file would exceed 4 MB", async () => {
+    const file = portfolioFile(
+      clientOf([["Asset Allocation", portfolioReference]]),
+    );
+    const asked = new Map([
+      ["Asset Allocation/Bonds/Global bonds, hedged", 0.22],
+      ["Asset Allocation/Equity/Developed/FTSE Global All Cap ex-UK", 0.4],
+    ]);
+    await keepPortfolioAfter(db, 0, {
+      content: file,
+      fileName: "large.portfolio",
+    });
+    await keepFirst("", reference);
+    await keepFirst("Large file", {
+      ...reference,
+      targets: {
+        ...targets,
+        categories: targets.categories.map((category) => ({
+          ...category,
+          share: asked.get(category.id) ?? category.share,
+        })),
+      },
+    });
+    vi.mocked(reweighted).mockClear();
+    vi.mocked(reweighted).mockReturnValueOnce(
+      new Uint8Array(maxPortfolioBytes + 1),
+    );
+
+    expect(
+      await adoptScenario("Large file", await shownNow("Large file")),
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: false }));
+    expect(reweighted).toHaveBeenCalledOnce();
+    expect((await readLatestPortfolio(db))?.version).toBe(1);
+  });
+
+  // Another portfolio edit adds a cash account before the adoption's
+  // first portfolio write lands, so the stale write retries once over
+  // the newer file and keeps both changes.
+  it("retries once on a concurrent portfolio edit and applies the adopted weights to the latest file", async () => {
+    const file = portfolioFile(
+      clientOf([["Asset Allocation", portfolioReference]]),
+    );
+    const concurrent = appendAccount(
+      file,
+      { currency: "GBP", kind: "cash", name: "Concurrent cash" },
+      { uuid: () => "cash-concurrent" },
+    );
+    const asked = new Map([
+      ["Asset Allocation/Bonds/Global bonds, hedged", 0.22],
+      ["Asset Allocation/Equity/Developed/FTSE Global All Cap ex-UK", 0.4],
+    ]);
+    await keepPortfolioAfter(db, 0, {
+      content: file,
+      fileName: "plan.portfolio",
+    });
+    await keepFirst("", reference);
+    await keepFirst("Four-day week", {
+      ...reference,
+      targets: {
+        ...targets,
+        categories: targets.categories.map((category) => ({
+          ...category,
+          share: asked.get(category.id) ?? category.share,
+        })),
+      },
+    });
+
+    const insert = db.insert.bind(db);
+    vi.spyOn(db, "insert")
+      .mockImplementationOnce((table) => insert(table))
+      .mockImplementationOnce((table) => {
+        void insert(portfolioFiles)
+          .values({
+            content: concurrent.content,
+            fileName: "plan.portfolio",
+            savedAt: today,
+            version: 2,
+          })
+          .execute();
+        return insert(table);
+      });
+
+    expect(
+      await adoptScenario("Four-day week", await shownNow("Four-day week")),
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: true }));
+
+    const stored = await readLatestPortfolio(db);
+    expect(stored?.version).toBe(3);
+    expect(
+      readPortfolioSnapshot(
+        stored?.content ?? new Uint8Array(),
+        "plan.portfolio",
+      ).cashAccounts.map(({ name }) => name),
+    ).toContain("Concurrent cash");
+    const expectedTargets = readTargets(
+      reweighted(
+        concurrent.content,
+        new Map(
+          targets.categories.map(({ id, share }) => [
+            id,
+            asked.get(id) ?? share,
+          ]),
+        ),
+      ),
+    );
+    expect(readTargets(stored?.content ?? new Uint8Array())).toStrictEqual(
+      expectedTargets,
+    );
+    expect(takeConsoleOutput()).toStrictEqual([]);
+  });
+
+  // A concurrent portfolio edit already wrote the exact adopted shares
+  // before this adoption's write lands, so the stale retry recognises
+  // convergence and answers isPortfolioSynced true without an extra
+  // write.
+  it("reports isPortfolioSynced true without an extra portfolio write when the retry finds the concurrent file already converged", async () => {
+    const file = portfolioFile(
+      clientOf([["Asset Allocation", portfolioReference]]),
+    );
+    const asked = new Map([
+      ["Asset Allocation/Bonds/Global bonds, hedged", 0.22],
+      ["Asset Allocation/Equity/Developed/FTSE Global All Cap ex-UK", 0.4],
+    ]);
+    const converged = reweighted(
+      file,
+      new Map(
+        targets.categories.map(({ id, share }) => [id, asked.get(id) ?? share]),
+      ),
+    );
+    await keepPortfolioAfter(db, 0, {
+      content: file,
+      fileName: "plan.portfolio",
+    });
+    await keepFirst("", reference);
+    await keepFirst("Four-day week", {
+      ...reference,
+      targets: {
+        ...targets,
+        categories: targets.categories.map((category) => ({
+          ...category,
+          share: asked.get(category.id) ?? category.share,
+        })),
+      },
+    });
+
+    const insert = db.insert.bind(db);
+    vi.spyOn(db, "insert")
+      .mockImplementationOnce((table) => insert(table))
+      .mockImplementationOnce((table) => {
+        void insert(portfolioFiles)
+          .values({
+            content: converged,
+            fileName: "plan.portfolio",
+            savedAt: today,
+            version: 2,
+          })
+          .execute();
+        return insert(table);
+      });
+
+    expect(
+      await adoptScenario("Four-day week", await shownNow("Four-day week")),
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: true }));
+    expect(await readLatestPortfolio(db)).toMatchObject({
+      content: converged,
+      version: 2,
+    });
+    expect(takeConsoleOutput()).toStrictEqual([]);
+  });
+
+  // A concurrent portfolio edit replaces the file with a taxonomy-less
+  // one before the adoption's write lands, so the single retry finds it
+  // incompatible and answers isPortfolioSynced false without logging.
+  it("reports isPortfolioSynced false without logging when the portfolio retry finds an incompatible file", async () => {
+    const file = portfolioFile(
+      clientOf([["Asset Allocation", portfolioReference]]),
+    );
+    const incompatible = portfolioFile(clientOf([]));
+    const asked = new Map([
+      ["Asset Allocation/Bonds/Global bonds, hedged", 0.22],
+      ["Asset Allocation/Equity/Developed/FTSE Global All Cap ex-UK", 0.4],
+    ]);
+    await keepPortfolioAfter(db, 0, {
+      content: file,
+      fileName: "plan.portfolio",
+    });
+    await keepFirst("", reference);
+    await keepFirst("Four-day week", {
+      ...reference,
+      targets: {
+        ...targets,
+        categories: targets.categories.map((category) => ({
+          ...category,
+          share: asked.get(category.id) ?? category.share,
+        })),
+      },
+    });
+
+    const insert = db.insert.bind(db);
+    vi.spyOn(db, "insert")
+      .mockImplementationOnce((table) => insert(table))
+      .mockImplementationOnce((table) => {
+        void insert(portfolioFiles)
+          .values({
+            content: incompatible,
+            fileName: "plain.portfolio",
+            savedAt: today,
+            version: 2,
+          })
+          .execute();
+        return insert(table);
+      });
+
+    expect(
+      await adoptScenario("Four-day week", await shownNow("Four-day week")),
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: false }));
+    expect(await readLatestPortfolio(db)).toMatchObject({
+      content: incompatible,
+      version: 2,
+    });
+    expect(takeConsoleOutput()).toStrictEqual([]);
+  });
+
+  // All portfolio rows vanish before the adoption's write lands, so the
+  // stale write retries and sees no stored file.
+  it("reports isPortfolioSynced false without logging when the portfolio file is gone on retry", async () => {
+    const file = portfolioFile(
+      clientOf([["Asset Allocation", portfolioReference]]),
+    );
+    const asked = new Map([
+      ["Asset Allocation/Bonds/Global bonds, hedged", 0.22],
+      ["Asset Allocation/Equity/Developed/FTSE Global All Cap ex-UK", 0.4],
+    ]);
+    await keepPortfolioAfter(db, 0, {
+      content: file,
+      fileName: "plan.portfolio",
+    });
+    await keepFirst("", reference);
+    await keepFirst("Four-day week", {
+      ...reference,
+      targets: {
+        ...targets,
+        categories: targets.categories.map((category) => ({
+          ...category,
+          share: asked.get(category.id) ?? category.share,
+        })),
+      },
+    });
+
+    const insert = db.insert.bind(db);
+    vi.spyOn(db, "insert")
+      .mockImplementationOnce((table) => insert(table))
+      .mockImplementationOnce((table) => {
+        void db
+          .execute(
+            sql`DO $$ BEGIN SET LOCAL session_replication_role = replica; DELETE FROM portfolio_files; END $$`,
+          )
+          .then(() => undefined);
+        return insert(table);
+      });
+
+    expect(
+      await adoptScenario("Four-day week", await shownNow("Four-day week")),
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: false }));
+    expect(await readLatestPortfolio(db)).toBeNull();
+    expect(takeConsoleOutput()).toStrictEqual([]);
+  });
+
+  // Two concurrent portfolio edits race both the first attempt and the
+  // single retry.
+  it("reports isPortfolioSynced false without logging when the portfolio retry also hits a stale write", async () => {
+    const file = portfolioFile(
+      clientOf([["Asset Allocation", portfolioReference]]),
+    );
+    const firstRace = appendAccount(
+      file,
+      { currency: "GBP", kind: "cash", name: "Race one" },
+      { uuid: () => "cash-race-1" },
+    );
+    const secondRace = appendAccount(
+      firstRace.content,
+      { currency: "GBP", kind: "cash", name: "Race two" },
+      { uuid: () => "cash-race-2" },
+    );
+    const asked = new Map([
+      ["Asset Allocation/Bonds/Global bonds, hedged", 0.22],
+      ["Asset Allocation/Equity/Developed/FTSE Global All Cap ex-UK", 0.4],
+    ]);
+    await keepPortfolioAfter(db, 0, {
+      content: file,
+      fileName: "plan.portfolio",
+    });
+    await keepFirst("", reference);
+    await keepFirst("Four-day week", {
+      ...reference,
+      targets: {
+        ...targets,
+        categories: targets.categories.map((category) => ({
+          ...category,
+          share: asked.get(category.id) ?? category.share,
+        })),
+      },
+    });
+
+    const insert = db.insert.bind(db);
+    vi.spyOn(db, "insert")
+      .mockImplementationOnce((table) => insert(table))
+      .mockImplementationOnce((table) => {
+        void insert(portfolioFiles)
+          .values({
+            content: firstRace.content,
+            fileName: "plan.portfolio",
+            savedAt: today,
+            version: 2,
+          })
+          .execute();
+        return insert(table);
+      })
+      .mockImplementationOnce((table) => {
+        void insert(portfolioFiles)
+          .values({
+            content: secondRace.content,
+            fileName: "plan.portfolio",
+            savedAt: today,
+            version: 3,
+          })
+          .execute();
+        return insert(table);
+      });
+
+    expect(
+      await adoptScenario("Four-day week", await shownNow("Four-day week")),
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: false }));
+    expect((await readLatestPortfolio(db))?.version).toBe(3);
+    expect(takeConsoleOutput()).toStrictEqual([]);
+  });
+
+  // The store fails on the secondary portfolio write after the
+  // household itself has committed: adoption stands, decision is kept,
+  // and the unexpected error is logged.
+  it("stands when updating the portfolio file fails unexpectedly after the household is written, logging the failure", async () => {
+    const file = portfolioFile(
+      clientOf([["Asset Allocation", portfolioReference]]),
+    );
+    const asked = new Map([
+      ["Asset Allocation/Bonds/Global bonds, hedged", 0.22],
+      ["Asset Allocation/Equity/Developed/FTSE Global All Cap ex-UK", 0.4],
+    ]);
+    await keepPortfolioAfter(db, 0, {
+      content: file,
+      fileName: "plan.portfolio",
+    });
+    await keepFirst("", reference);
+    await keepFirst("Four-day week", {
+      ...reference,
+      targets: {
+        ...targets,
+        categories: targets.categories.map((category) => ({
+          ...category,
+          share: asked.get(category.id) ?? category.share,
+        })),
+      },
+    });
+
+    const insert = db.insert.bind(db);
+    vi.spyOn(db, "insert")
+      .mockImplementationOnce((table) => insert(table))
+      .mockImplementationOnce(() => {
+        throw new Error("The portfolio store is down");
+      });
+
+    expect(
+      await adoptScenario("Four-day week", await shownNow("Four-day week")),
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: false }));
+    expect(await readLatest(db, "")).toMatchObject({ version: 2 });
+    expect(await readLatest(db, "Four-day week")).toMatchObject({
+      decided: { decision: "adopted" },
+      version: 2,
+    });
+    expect((await readLatestPortfolio(db))?.version).toBe(1);
+    expect(takeConsoleOutput()).toStrictEqual([
+      expect.stringMatching(
+        /^console\.error: A scenario was made the household, but the portfolio file's target weights could not be updated Error: The portfolio store is down/u,
+      ),
+    ]);
   });
 });
 
@@ -1345,12 +2020,12 @@ describe("a scenario made from the household or another", () => {
     await make("Variant B", "Parent");
     expect(
       await adoptScenario("Variant A", await shownNow("Variant A")),
-    ).toStrictEqual(saved(true));
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: true }));
     await save("", recording("Premium bonds", 4100));
     const after = [...held, ["Premium bonds", 4100]];
 
     expect(await laidOver("Variant B")).toStrictEqual({
-      adopted: saved(true),
+      adopted: saved({ isDecided: true, isPortfolioSynced: true }),
       compared: saved(after),
       held: after,
     });
@@ -1365,12 +2040,12 @@ describe("a scenario made from the household or another", () => {
     await make("Child", "Parent");
     expect(
       await adoptScenario("Parent", await shownNow("Parent")),
-    ).toStrictEqual(saved(true));
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: true }));
     await save("", recording("Premium bonds", 4100));
     const after = [...held, ["Premium bonds", 4100]];
 
     expect(await laidOver("Child")).toStrictEqual({
-      adopted: saved(true),
+      adopted: saved({ isDecided: true, isPortfolioSynced: true }),
       compared: saved(after),
       held: after,
     });
@@ -1392,7 +2067,7 @@ describe("a scenario made from the household or another", () => {
       });
     expect(
       await adoptScenario("Parent", await shownNow("Parent")),
-    ).toStrictEqual(saved(false));
+    ).toStrictEqual(saved({ isDecided: false, isPortfolioSynced: true }));
     expect(takeConsoleOutput()).toStrictEqual([
       expect.stringMatching(
         /^console\.error: A scenario was made the household, but its decision could not be kept/u,
@@ -1424,7 +2099,7 @@ describe("a scenario made from the household or another", () => {
     await save("Bonds sooner", opening("Bonds", 5000));
     expect(
       await adoptScenario("Bonds sooner", await shownNow("Bonds sooner")),
-    ).toStrictEqual(saved(true));
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: true }));
 
     expect(await laidOver("Four-day week")).toStrictEqual({
       adopted: refused(added),
@@ -1441,7 +2116,7 @@ describe("a scenario made from the household or another", () => {
     await save("Parent", opening("Premium bonds", 4000));
     expect(
       await adoptScenario("Parent", await shownNow("Parent")),
-    ).toStrictEqual(saved(true));
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: true }));
     await make("Child", "Parent");
 
     expect(await comparing("Child")).toStrictEqual(
@@ -1499,7 +2174,7 @@ describe("a scenario made from the household or another", () => {
     await save("Parent", opening("Premium bonds", 4000));
     expect(
       await adoptScenario("Parent", await shownNow("Parent")),
-    ).toStrictEqual(saved(true));
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: true }));
     await make("Child", "Parent");
     await save("Child", spending);
     await make("Grandchild", "Child");
@@ -1572,7 +2247,7 @@ describe("a scenario made from the household or another", () => {
       held: [...held, ["Car loan", -6000]],
     });
     expect(await laidOver("Parent")).toStrictEqual({
-      adopted: saved(true),
+      adopted: saved({ isDecided: true, isPortfolioSynced: true }),
       compared: saved(held),
       held,
     });
@@ -1587,7 +2262,7 @@ describe("a scenario made from the household or another", () => {
     await save("Parent", opening("Premium bonds", 4000));
     await make("Child", "Parent");
     expect(await adoptScenario("Child", await shownNow("Child"))).toStrictEqual(
-      saved(true),
+      saved({ isDecided: true, isPortfolioSynced: true }),
     );
 
     expect(await laidOver("Parent")).toStrictEqual({
@@ -1631,7 +2306,7 @@ describe("a scenario made from the household or another", () => {
     await save("Parent", opening("Stocks ISA", 3000));
     await make("Sibling", "Parent");
     expect(await adoptScenario("Child", await shownNow("Child"))).toStrictEqual(
-      saved(true),
+      saved({ isDecided: true, isPortfolioSynced: true }),
     );
 
     expect(await laidOver("Sibling")).toStrictEqual({
@@ -1652,7 +2327,7 @@ describe("a scenario made from the household or another", () => {
     await save("Variant B", opening("Cash ISA", 9000));
     expect(
       await adoptScenario("Variant A", await shownNow("Variant A")),
-    ).toStrictEqual(saved(true));
+    ).toStrictEqual(saved({ isDecided: true, isPortfolioSynced: true }));
     await make("Child", "Variant B");
 
     expect(await laidOver("Child")).toStrictEqual({

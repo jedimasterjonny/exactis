@@ -42,7 +42,8 @@ const longest = 200;
 // in a dialog whose title is the question, with a line on why, which
 // may be left blank, and sent against the versions the page was drawn
 // from, the Make dialog saying too, where adopting moves a share of the
-// target allocation, that the next import replaces it; or opening it,
+// target allocation, that adopting also updates the household's
+// portfolio file; or opening it,
 // for a scenario decided already, to edit a new one made from it or to
 // delete it, which takes it to the dashboard.
 // An undecided scenario offers both decisions, one decided against
@@ -83,10 +84,8 @@ export function ScenarioDecision({
       send(async () => adoptScenario(name, shown, reason), {
         failure: "Household not replaced",
         onAccepted: decided,
-        success: (isDecided) => ({
-          description: isDecided
-            ? "Edits are saved to the household"
-            : "Edits are saved to the household; the scenario's decision could not be kept, so it is left undecided",
+        success: (adopted) => ({
+          description: adoptedDescription(adopted),
           title: `${name} is the household`,
         }),
       });
@@ -174,14 +173,13 @@ export function ScenarioDecision({
           <DialogDescription className="grid gap-4" render={<div />}>
             <p>
               {asking.kind === "adopt"
-                ? "The scenario's plan, its target allocation included, replaces the household's. The household keeps its own balances, progress points and house prices, whatever the scenario holds. The BlackRock CMA, the BoE curve and the holdings imported are each the newer of the two. The scenario is kept under Made the household."
+                ? "The scenario's plan, its target allocation included, replaces the household's. The household keeps its own balances, progress points and house prices, whatever the scenario holds. The BlackRock CMA, the BoE curve and the portfolio holdings are each the newer of the two. The scenario is kept under Made the household."
                 : "The household is not touched. The scenario is kept under Decided against in the scenario menu, and can be opened again from there."}
             </p>
             {asking.kind === "adopt" && isRetargeted && (
               <p>
-                Each import takes the targets the Portfolio Performance file
-                holds, so the next one replaces the scenario&apos;s unless the
-                file holds them too.
+                Adopting also updates the Asset Allocation target weights in the
+                household&apos;s portfolio file to match this scenario.
               </p>
             )}
           </DialogDescription>
@@ -196,4 +194,27 @@ export function ScenarioDecision({
       )}
     </>
   );
+}
+
+// What the adoption toast says beneath its title, adding calm caveats
+// if either secondary write could not finish after the household was
+// replaced.
+function adoptedDescription({
+  isDecided,
+  isPortfolioSynced,
+}: {
+  readonly isDecided: boolean;
+  readonly isPortfolioSynced: boolean;
+}): string {
+  const caveats = [
+    ...(isPortfolioSynced
+      ? []
+      : ["the portfolio file's target weights could not be updated yet"]),
+    ...(isDecided
+      ? []
+      : ["the scenario's decision could not be kept, so it is left undecided"]),
+  ];
+  return caveats.length === 0
+    ? "Edits are saved to the household"
+    : `Edits are saved to the household; ${caveats.join(", and ")}`;
 }

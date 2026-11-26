@@ -12,6 +12,7 @@ import type { PortfolioFeed } from "@/data/portfolio";
 import type { Targets } from "@/data/targets";
 import type { Answer } from "@/lib/answer";
 
+import { retargetFromLifeStrategy } from "@/actions/lifestrategy";
 import { syncTargetsFromPortfolio } from "@/actions/targets";
 import { Toaster } from "@/components/kit/toast";
 import { cma, mappings } from "@/data/cma.fixture";
@@ -37,10 +38,11 @@ vi.mock("@/store/household", () => ({
 vi.mock("@/store/portfolio", () => ({ getPortfolioFeed: vi.fn() }));
 vi.mock("@/actions/cma", () => ({ pullCma: vi.fn() }));
 vi.mock("@/actions/inflation", () => ({ pullCurve: vi.fn() }));
-vi.mock("@/actions/lifestrategy", () => ({ pullLifeStrategy: vi.fn() }));
+vi.mock("@/actions/lifestrategy", () => ({
+  retargetFromLifeStrategy: vi.fn(),
+}));
 vi.mock("@/actions/owners", () => ({ saveQualifyingYears: vi.fn() }));
 vi.mock("@/actions/targets", () => ({
-  importTargets: vi.fn(),
   mapByName: vi.fn(),
   mapCategory: vi.fn(),
   syncTargetsFromPortfolio: vi.fn(),
@@ -431,7 +433,83 @@ describe("Assumptions", () => {
     expect(
       screen.getByRole("region", { name: "Target allocation" }),
     ).toHaveTextContent(
-      "Read from northstar.portfolio on Portfolio. Changes here apply to this scenario only.",
+      "Read from northstar.portfolio on Portfolio. Retargeting updates this scenario only; making it the household updates the portfolio file.",
+    );
+  });
+
+  it("wires Retarget from LifeStrategy with the portfolio version in the household and the scenario name in a kept scenario", async () => {
+    vi.mocked(retargetFromLifeStrategy).mockResolvedValue(
+      saved({
+        asOf: "2026-08-31",
+        isScenarioOnly: false,
+        savedOn: "2026-09-25",
+        split: { stocks: 0.8 },
+        version: 4,
+      }),
+    );
+
+    const { unmount } = render(await page({ tab: "target-allocation" }), {
+      wrapper: Toaster,
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retarget from LifeStrategy" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("menuitem", {
+        name: (name) => name.startsWith("LifeStrategy 80% Equity"),
+      }),
+    );
+
+    await waitFor(() => {
+      expect(retargetFromLifeStrategy).toHaveBeenCalledExactlyOnceWith("9244", {
+        afterVersion: 3,
+        on: null,
+      });
+    });
+    unmount();
+
+    vi.mocked(retargetFromLifeStrategy).mockClear();
+    vi.mocked(retargetFromLifeStrategy).mockResolvedValue(
+      saved({
+        asOf: "2026-08-31",
+        isScenarioOnly: true,
+        split: { stocks: 0.8 },
+      }),
+    );
+    vi.mocked(getOpened).mockResolvedValue({
+      isKept: true,
+      name: "Retire early",
+    });
+
+    const { unmount: unmountScenario } = render(
+      await page({ tab: "target-allocation" }),
+      { wrapper: Toaster },
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retarget from LifeStrategy" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("menuitem", {
+        name: (name) => name.startsWith("LifeStrategy 80% Equity"),
+      }),
+    );
+
+    await waitFor(() => {
+      expect(retargetFromLifeStrategy).toHaveBeenCalledExactlyOnceWith("9244", {
+        on: "Retire early",
+      });
+    });
+    unmountScenario();
+
+    vi.mocked(getOpened).mockResolvedValue({ isKept: false, name: "Dropped" });
+    render(await page({ tab: "target-allocation" }));
+
+    expect(
+      screen.getByRole("region", { name: "Target allocation" }),
+    ).toHaveTextContent(
+      "Read from northstar.portfolio on Portfolio. Retargeting updates its Asset Allocation weights in place.",
     );
   });
 

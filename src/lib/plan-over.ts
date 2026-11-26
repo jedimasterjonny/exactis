@@ -163,7 +163,7 @@ function targetsOver(
     held.categories.some(({ id, share }) => share > 0 && !ours.has(id))
   ) {
     throw new Refusal(
-      "The household's last import and the scenario's do not list the same categories with a target above 0%, so the scenario's targets cannot be laid over the household's; import from Portfolio Performance in the scenario first, then retarget it again if it was retargeted",
+      "The household's portfolio and the scenario's do not list the same categories with a target above 0%, so the scenario's targets cannot be laid over the household's; sync from Portfolio in the scenario first, then retarget it again if it was retargeted",
     );
   }
   const mapped = new Set(scenario.mappings.map(({ category }) => category));

@@ -3,9 +3,14 @@
 import { refresh } from "next/cache";
 import * as z from "zod";
 
+import type { Kept } from "@/data/household";
+import type { Targets } from "@/data/targets";
+import type { Database } from "@/db/client";
+import type { StoredPortfolio } from "@/db/portfolio";
 import type { Answer } from "@/lib/answer";
 
 import { soundKept } from "@/data/household";
+import { maxPortfolioBytes, portfolioTooLarge } from "@/data/portfolio";
 import { decisionReason, scenarioName } from "@/data/schemas";
 import { upcast } from "@/data/shapes";
 import { getDb } from "@/db/client";
@@ -17,11 +22,44 @@ import {
   readHighestNext,
   readLatest,
 } from "@/db/household";
-import { Refusal, refused, saved } from "@/lib/answer";
+import { keepPortfolioAfter, readLatestPortfolio } from "@/db/portfolio";
+import { answerOf, Refusal, refused, saved, Stale } from "@/lib/answer";
 import { forkOf, planOver } from "@/lib/plan-over";
+import {
+  readPortfolioSnapshot,
+  readTargets,
+  reweighted,
+} from "@/lib/portfolio-file";
 import { closeScenario, openedScenario, openScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
 import { readHeld } from "@/store/household";
+
+// What making a scenario the household answers with once the household
+// has been updated: whether the scenario's decision was kept, and
+// whether any needed reweighting of the household's .portfolio file
+// landed.
+interface Adopted {
+  readonly isDecided: boolean;
+  readonly isPortfolioSynced: boolean;
+}
+
+// What adopting a retargeted scenario prepares to write to the
+// household's .portfolio file alongside the rounded shares aligned onto
+// the merged household's target allocation.
+interface PortfolioReweight {
+  readonly afterVersion: number;
+  readonly content: Uint8Array<ArrayBuffer>;
+  readonly fileName: string;
+  readonly targets: Targets;
+}
+
+// How the stored .portfolio file stands beside the merged scenario's
+// target shares: already matching (with exact stored floats aligned),
+// ready to rewrite in place, or incompatible / unable to sync.
+type PortfolioReweightPlan =
+  | { readonly kind: "matched"; readonly targets: Targets }
+  | { readonly kind: "reweight"; readonly reweight: PortfolioReweight }
+  | { readonly kind: "unsynced" };
 
 // What a decision was made against: the versions of the household and
 // of the scenario the page deciding it was drawn from, the household's
@@ -40,6 +78,15 @@ const unreasoned = "A reason is one line of up to 200 characters";
 // kept by that name, or it has been dropped since the screen was drawn.
 const unkept = "No scenario is kept under that name";
 
+// Server log prefix when a secondary .portfolio reweight fails after
+// the household adoption itself has committed.
+const portfolioUnsynced =
+  "A scenario was made the household, but the portfolio file's target weights could not be updated";
+
+// How close two target shares must be to treat the stored .portfolio
+// file as already matching the adopted scenario's weights.
+const shareTolerance = 1e-9;
+
 // The versions a decision was drawn from, as a page sends them.
 const shownAt = z.object({
   household: z.number().int().nonnegative(),
@@ -55,48 +102,48 @@ const shownAt = z.object({
 
 // Keeps the scenario's plan over the household's bookkeeping as the
 // household's next version, under the household's own check that
-// nothing was saved to it since it was read, then keeps the scenario as
-// made the household, the version adopted copied as its next with the
-// decision and the reason given on it, and closes it where it is the
-// one open. So balances and progress points recorded in the household
-// while the scenario was explored, and the holdings imported from
-// Portfolio Performance since, are kept rather than rolled back, and so
-// is the newer CMA and curve of the two, wherever each was pulled, as
-// planOver says; and the scenario stays to be read back, taking no more
-// saves. It is decided against the versions of both the page deciding
-// it was drawn from, so where either has moved since, the figures the
-// page showed are not what would be written, and it is refused as stale,
-// the page drawn again from what is kept now. Both sides are read from
-// the store, so each is carried to this shape by the chain first, and
-// one a newer app kept is refused; the merge is made in memory and is
-// not. Both, and what they make, are held to every rule as any save is,
-// so one kept before a rule tightened, or a merge breaking one, is
-// refused in the rule's words. A scenario made the household already is
-// refused, since its plan laid over the household again would undo
-// every edit made there since; one decided against can be made the
-// household after all. A reason past its length or holding a line break
-// is refused, and none typed is kept as none.
+// nothing was saved to it since it was read, updates the household's
+// .portfolio file when the adopted target shares differ from it and are
+// compatible with its taxonomy, then keeps the scenario as made the
+// household, the version adopted copied as its next with the decision
+// and the reason given on it, and closes it where it is the one open.
+// So balances and progress points recorded in the household while the
+// scenario was explored, and the portfolio holdings since, are kept
+// rather than rolled back, and so is the newer CMA and curve of the
+// two, wherever each was pulled, as planOver says; and the scenario
+// stays to be read back, taking no more saves. It is decided against
+// the versions of both the page deciding it was drawn from, so where
+// either has moved since, the figures the page showed are not what
+// would be written, and it is refused as stale, the page drawn again
+// from what is kept now. Both sides are read from the store, so each is
+// carried to this shape by the chain first, and one a newer app kept is
+// refused; the merge is made in memory and is not. Both, and what they
+// make, are held to every rule as any save is, so one kept before a
+// rule tightened, or a merge breaking one, is refused in the rule's
+// words. A scenario made the household already is refused, since its
+// plan laid over the household again would undo every edit made there
+// since; one decided against can be made the household after all. A
+// reason past its length or holding a line break is refused, and none
+// typed is kept as none.
 // An account the household holds that was not in the scenario when it
-// was made, or a target allocation imported there since that lists
-// other categories with a target above 0%, is refused rather than
-// merged, as planOver says, and the scenario's first version, the copy
-// it was made from, is read for the ids of its accounts to tell the
-// account.
+// was made, or a target allocation synced there since that lists other
+// categories with a target above 0%, is refused rather than merged, as
+// planOver says, and the scenario's first version, the copy it was made
+// from, is read for the ids of its accounts to tell the account.
 // The store runs no transaction, so the household is written first, and
-// the answer says whether the decision was kept after it: a decision
-// that fails once the household is written, refused because a save
-// reached the scenario after it was read or failed outright, leaves the
-// adoption standing and the scenario undecided, holding whatever was
-// saved to it, which is answered as saved rather than as a failure that
-// would say the household was not replaced. The refusal is a race, and
-// said in the answer; any other failure is a fault the answer cannot
-// tell apart from it, so it is written to the server's log as well,
-// where a failed query keeps its statement and none of its values.
+// the answer says whether any prepared .portfolio reweight and the
+// scenario's decision were kept after it: either failing once the
+// household is written leaves the adoption standing and is answered as
+// saved rather than as a failure that would say the household was not
+// replaced. A concurrent .portfolio write is retried once against the
+// latest stored file; any non-Refusal failure on either secondary write
+// is written to the server's log as well, where a failed query keeps
+// its statement and none of its values.
 export async function adoptScenario(
   name: string,
   shown: Shown,
   reason?: string,
-): Promise<Answer<boolean>> {
+): Promise<Answer<Adopted>> {
   await requireSession();
   const scenario = scenarioName.parse(name);
   const against = shownAt.parse(shown);
@@ -121,20 +168,29 @@ export async function adoptScenario(
     refresh();
     return refused(moved);
   }
+  let reweightPlan: null | PortfolioReweightPlan = null;
   try {
     const plan = soundKept(upcast(adopted.household)).kept;
+    const merged =
+      household === null
+        ? plan
+        : planOver(
+            soundKept(upcast(household.household)).kept,
+            plan,
+            forkOf(forked.household),
+          );
+    if (merged.targets !== null) {
+      const stored = await readLatestPortfolio(db);
+      if (stored !== null) {
+        reweightPlan = preparePortfolioReweight(stored, merged.targets);
+      }
+    }
+    const alignedMerged = alignedForPlan(merged, reweightPlan);
+    const keptMerged = soundKept(alignedMerged).kept;
     await keepAfter(
       db,
       { scenario: "", version: household?.version ?? 0 },
-      soundKept(
-        household === null
-          ? plan
-          : planOver(
-              soundKept(upcast(household.household)).kept,
-              plan,
-              forkOf(forked.household),
-            ),
-      ).kept,
+      keptMerged,
     );
   } catch (error: unknown) {
     if (error instanceof Refusal) {
@@ -142,6 +198,7 @@ export async function adoptScenario(
     }
     throw error;
   }
+  const isPortfolioSynced = await syncForPlan(db, reweightPlan);
   const isDecided = await decideScenario(
     db,
     { scenario, version: adopted.version },
@@ -160,7 +217,7 @@ export async function adoptScenario(
   );
   await closeIfOpen(scenario);
   refresh();
-  return saved(isDecided);
+  return saved({ isDecided, isPortfolioSynced });
 }
 
 // How far a new scenario's own ids start above the highest next id any
@@ -307,6 +364,41 @@ export async function rejectScenario(
   return saved(undefined);
 }
 
+// Applies the aligned target shares prepared by the portfolio reweight
+// plan onto the merged household before saving.
+function alignedForPlan(
+  merged: Kept,
+  plan: null | PortfolioReweightPlan,
+): Kept {
+  if (plan === null) {
+    return merged;
+  }
+  switch (plan.kind) {
+    case "matched":
+      return { ...merged, targets: plan.targets };
+    case "reweight":
+      return { ...merged, targets: plan.reweight.targets };
+    case "unsynced":
+      return merged;
+  }
+}
+
+// Copies exact float shares from the stored or rewritten portfolio file
+// onto matching merged categories, preserving category order and extra
+// 0% categories.
+function alignTargets(
+  targets: Targets,
+  shares: ReadonlyMap<string, number>,
+): Targets {
+  return {
+    ...targets,
+    categories: targets.categories.map((category) => ({
+      ...category,
+      share: shares.get(category.id) ?? category.share,
+    })),
+  };
+}
+
 // Closes the scenario named where it is the one the request has open.
 async function closeIfOpen(name: string): Promise<void> {
   if ((await openedScenario()) === name) {
@@ -328,4 +420,132 @@ function movedSince(
   return household === shown.household
     ? null
     : "The household changed while this was being decided, so nothing was";
+}
+
+// Persists a prepared .portfolio reweight after the household commit,
+// retrying once against the latest stored file if a concurrent edit
+// landed first. Leaves the adoption standing on any remaining failure
+// and logs unexpected non-Refusal errors.
+async function persistPortfolioReweight(
+  db: Database,
+  reweight: PortfolioReweight,
+): Promise<boolean> {
+  const write = async (
+    next: PortfolioReweight,
+    canRetry: boolean,
+  ): Promise<boolean> => {
+    try {
+      await keepPortfolioAfter(db, next.afterVersion, {
+        content: next.content,
+        fileName: next.fileName,
+      });
+      return true;
+    } catch (error: unknown) {
+      if (error instanceof Stale && canRetry) {
+        const latestStored = await readLatestPortfolio(db);
+        if (latestStored === null) {
+          return false;
+        }
+        const retried = preparePortfolioReweight(latestStored, next.targets);
+        switch (retried.kind) {
+          case "matched":
+            return true;
+          case "reweight":
+            return write(retried.reweight, false);
+          case "unsynced":
+            return false;
+        }
+      }
+      throw error;
+    }
+  };
+  try {
+    return await write(reweight, true);
+  } catch (error: unknown) {
+    if (!(error instanceof Refusal)) {
+      console.error(portfolioUnsynced, error);
+    }
+    return false;
+  }
+}
+
+// Classifies how the stored .portfolio file relates to the merged
+// scenario targets: already matching within shareTolerance (copying
+// exact stored floats so strict target equality holds), ready to
+// reweight in place (aligning merged categories to the rounded weights
+// written back), or unsynced when the file cannot be read, a
+// positive-share category is absent, or rewriting fails size or
+// round-trip checks.
+function preparePortfolioReweight(
+  stored: StoredPortfolio,
+  mergedTargets: Targets,
+): PortfolioReweightPlan {
+  const storedTargets = answerOf(() => readTargets(stored.content));
+  if (storedTargets.kind === "refused") {
+    return { kind: "unsynced" };
+  }
+  const storedShares = new Map(
+    storedTargets.value.map(({ id, share }) => [id, share]),
+  );
+  if (
+    mergedTargets.categories.some(
+      ({ id, share }) => share > 0 && !storedShares.has(id),
+    )
+  ) {
+    return { kind: "unsynced" };
+  }
+  const shares = new Map(
+    mergedTargets.categories.map(({ id, share }) => [id, share]),
+  );
+  const hasShareDiff = storedTargets.value.some(
+    ({ id, share }) => Math.abs(share - (shares.get(id) ?? 0)) > shareTolerance,
+  );
+  if (!hasShareDiff) {
+    return {
+      kind: "matched",
+      targets: alignTargets(mergedTargets, storedShares),
+    };
+  }
+  const rewritten = answerOf(() => {
+    const content = reweighted(stored.content, shares);
+    if (content.byteLength > maxPortfolioBytes) {
+      throw new Refusal(portfolioTooLarge);
+    }
+    readPortfolioSnapshot(content, stored.fileName);
+    return { content, targets: readTargets(content) };
+  });
+  if (rewritten.kind === "refused") {
+    return { kind: "unsynced" };
+  }
+  const roundedShares = new Map(
+    rewritten.value.targets.map(({ id, share }) => [id, share]),
+  );
+  return {
+    kind: "reweight",
+    reweight: {
+      afterVersion: stored.version,
+      content: rewritten.value.content,
+      fileName: stored.fileName,
+      targets: alignTargets(mergedTargets, roundedShares),
+    },
+  };
+}
+
+// Completes any secondary .portfolio write required by the reweight
+// plan after the household adoption itself has committed.
+async function syncForPlan(
+  db: Database,
+  plan: null | PortfolioReweightPlan,
+): Promise<boolean> {
+  if (plan === null) {
+    return true;
+  }
+  switch (plan.kind) {
+    case "matched":
+      return true;
+    case "reweight":
+      return persistPortfolioReweight(db, plan.reweight);
+    case "unsynced":
+      return false;
+  }
 }

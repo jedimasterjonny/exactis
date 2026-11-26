@@ -7,7 +7,6 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { unzipSync } from "fflate";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Cma, Mapping } from "@/data/cma";
@@ -15,41 +14,27 @@ import type { Allocation } from "@/data/rates";
 import type { Targets } from "@/data/targets";
 import type { Answer } from "@/lib/answer";
 
-import { pullLifeStrategy } from "@/actions/lifestrategy";
-import {
-  importTargets,
-  mapByName,
-  syncTargetsFromPortfolio,
-} from "@/actions/targets";
+import { retargetFromLifeStrategy } from "@/actions/lifestrategy";
+import { mapByName, syncTargetsFromPortfolio } from "@/actions/targets";
 import { Toaster } from "@/components/kit/toast";
 import { cma, mappings } from "@/data/cma.fixture";
-import { range, retargeted } from "@/data/lifestrategy";
-import { holdings } from "@/data/lifestrategy.fixture";
 import { targets } from "@/data/targets.fixture";
 import { refused, saved } from "@/lib/answer";
-import { readTargets, reweighted } from "@/lib/portfolio-file";
-import {
-  clientOf,
-  portfolioFile,
-  reference,
-} from "@/lib/portfolio-file.fixture";
 
 import type { PortfolioTargetStatus } from "./target-allocation";
 
 import { TargetAllocation } from "./target-allocation";
 
-vi.mock("@/actions/lifestrategy", () => ({ pullLifeStrategy: vi.fn() }));
+vi.mock("@/actions/lifestrategy", () => ({
+  retargetFromLifeStrategy: vi.fn(),
+}));
 vi.mock("@/actions/targets", () => ({
-  importTargets: vi.fn(),
   mapByName: vi.fn(),
   mapCategory: vi.fn(),
   syncTargetsFromPortfolio: vi.fn(),
 }));
 
-// The reference taxonomy as Portfolio Performance saves it, and chosen
-// as a file on the device.
-const saved80 = portfolioFile(clientOf([["Asset Allocation", reference]]));
-const chosen = new File([saved80], "northstar.portfolio");
+type RetargetAnswer = Awaited<ReturnType<typeof retargetFromLifeStrategy>>;
 
 // The split the plan holds now, seven tenths in stocks.
 const split = { stocks: 0.7 };
@@ -61,38 +46,6 @@ const syncedStatus: PortfolioTargetStatus = {
   kind: "synced",
   version: 3,
 };
-
-// The file retargeted from what the fixture's LifeStrategy holds, at
-// the split, as the card writes it.
-const saved70 = reweighted(
-  saved80,
-  retargeted(readTargets(saved80), holdings, split),
-);
-
-// The files this browser has been given to hold, in turn.
-const held: Blob[] = [];
-
-// This browser's addresses for the files it holds, which jsdom has none
-// of: each file given one in turn, and let go when asked.
-class StubUrl extends URL {
-  public static override readonly createObjectURL = vi.fn(
-    (file: Blob | MediaSource) => {
-      held.push(file instanceof Blob ? file : new Blob());
-      return `blob:${String(held.length)}`;
-    },
-  );
-  public static override readonly revokeObjectURL = vi.fn();
-}
-
-// The file picker, which is not drawn, chosen from with the files
-// given, or with none as a picker closed without a choice gives.
-function choose(files: null | readonly File[]): HTMLInputElement {
-  const picker = screen.getByLabelText<HTMLInputElement>(
-    "Portfolio Performance file",
-  );
-  fireEvent.change(picker, { target: { files } });
-  return picker;
-}
 
 // The card over the props given, defaulting to synced household targets
 // with August's CMA and the reference's mappings.
@@ -124,12 +77,8 @@ function renderCard({
   );
 }
 
-// The retarget menu opened and the fund named chosen from it, then the
-// file picker chosen from with the file given.
-async function retargetWith(
-  file: File,
-  fund = "LifeStrategy 80% Equity",
-): Promise<void> {
+// Opens the retarget menu and chooses the fund named.
+async function retargetWith(fund = "LifeStrategy 80% Equity"): Promise<void> {
   fireEvent.click(
     screen.getByRole("button", { name: "Retarget from LifeStrategy" }),
   );
@@ -138,15 +87,17 @@ async function retargetWith(
       name: (name) => name.startsWith(fund),
     }),
   );
-  choose([file]);
 }
 
 describe("TargetAllocation", () => {
-  it("heads the card as the screen's third section, shows the synced provenance footer, and renders no caution or sync button when synced", () => {
+  it("heads the card as the screen's third section, shows the synced provenance footer, and renders no file picker, download link, caution, or sync button when synced", () => {
     renderCard();
 
     const card = screen.getByRole("region", { name: "Target allocation" });
     const provenance = within(card).getByRole("paragraph");
+    const retarget = within(card).getByRole("button", {
+      name: "Retarget from LifeStrategy",
+    });
 
     expect(within(card).getByText("Sect. VI.iii")).toHaveClass("label");
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
@@ -154,12 +105,15 @@ describe("TargetAllocation", () => {
       within(card).queryByRole("button", { name: "Sync from Portfolio" }),
     ).not.toBeInTheDocument();
     expect(
-      within(card).queryByRole("button", {
-        name: /from Portfolio Performance/,
-      }),
+      screen.queryByLabelText("Portfolio Performance file"),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Download the retargeted file" }),
+    ).not.toBeInTheDocument();
+    expect(retarget).toBeEnabled();
+    expect(retarget).not.toHaveAttribute("aria-describedby");
     expect(provenance).toHaveTextContent(
-      "Read from northstar.portfolio on Portfolio.",
+      "Read from northstar.portfolio on Portfolio. Retargeting updates its Asset Allocation weights in place.",
     );
     expect(provenance).toHaveClass("min-w-0", "wrap-anywhere");
     expect(
@@ -194,13 +148,20 @@ describe("TargetAllocation", () => {
     expect(
       screen.queryByRole("button", { name: "Sync from Portfolio" }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Retarget from LifeStrategy" }),
+    ).toBeEnabled();
     expect(screen.getByRole("paragraph")).toHaveTextContent(
-      "Read from northstar.portfolio on Portfolio. Changes here apply to this scenario only.",
+      "Read from northstar.portfolio on Portfolio. Retargeting updates this scenario only; making it the household updates the portfolio file.",
     );
   });
 
-  it("shows the upload empty state and footer when no portfolio file is uploaded and no targets are saved", () => {
+  it("shows the upload empty state and disables Retarget with empty-state description when no portfolio file is uploaded and no targets are saved", () => {
     renderCard({ portfolioStatus: { kind: "missing" }, targets: null });
+
+    const retarget = screen.getByRole("button", {
+      name: "Retarget from LifeStrategy",
+    });
 
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
     expect(screen.getByText("No portfolio file uploaded")).toBeInTheDocument();
@@ -218,12 +179,19 @@ describe("TargetAllocation", () => {
         .getAllByRole("link", { name: "Upload on Portfolio" })
         .map((link) => link.getAttribute("href")),
     ).toStrictEqual(["/portfolio", "/portfolio"]);
+    expect(retarget).toBeDisabled();
+    expect(retarget).toHaveAccessibleDescription(
+      "No portfolio file uploaded Upload a binary Portfolio Performance file on Portfolio to load your target allocation.",
+    );
   });
 
-  it("shows a legacy upload caution above the card when household targets exist without an uploaded file", () => {
+  it("shows a legacy upload caution above the card and ties disabled Retarget to it when household targets exist without an uploaded file", () => {
     renderCard({ portfolioStatus: { kind: "missing" } });
 
     const note = screen.getByRole("note");
+    const retarget = screen.getByRole("button", {
+      name: "Retarget from LifeStrategy",
+    });
 
     expect(note).toHaveTextContent("No portfolio file uploaded yet");
     expect(note).toHaveTextContent(
@@ -233,9 +201,16 @@ describe("TargetAllocation", () => {
       within(note).getByRole("link", { name: "Upload on Portfolio" }),
     ).toHaveAttribute("href", "/portfolio");
     expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(retarget).toBeDisabled();
+    expect(retarget).toHaveAccessibleDescription(
+      "No portfolio file uploaded yet Upload a binary Portfolio Performance file on Portfolio to keep your target allocation synced.",
+    );
   });
 
-  it("omits the legacy upload caution in a scenario when no portfolio file is uploaded", () => {
+  it("keeps Retarget enabled in a scenario with saved targets even when no portfolio file is uploaded, and omits the legacy caution", async () => {
+    vi.mocked(retargetFromLifeStrategy).mockResolvedValue(
+      saved({ asOf: "2026-08-31", isScenarioOnly: true, split }),
+    );
     renderCard({
       branch: "Retire early",
       portfolioStatus: { kind: "missing" },
@@ -243,9 +218,20 @@ describe("TargetAllocation", () => {
 
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
     expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Retarget from LifeStrategy" }),
+    ).toBeEnabled();
+
+    await retargetWith();
+
+    await waitFor(() => {
+      expect(retargetFromLifeStrategy).toHaveBeenCalledExactlyOnceWith("9244", {
+        on: "Retire early",
+      });
+    });
   });
 
-  it("shows a refused caution above the card and keeps the table when existing targets remain readable", () => {
+  it("shows a refused caution above the card, keeps the table, and ties disabled Retarget to the caution", () => {
     renderCard({
       portfolioStatus: {
         fileName: "broken.portfolio",
@@ -255,6 +241,9 @@ describe("TargetAllocation", () => {
     });
 
     const note = screen.getByRole("note");
+    const retarget = screen.getByRole("button", {
+      name: "Retarget from LifeStrategy",
+    });
 
     expect(note).toHaveTextContent("Portfolio file could not be synced");
     expect(note).toHaveTextContent(
@@ -264,9 +253,13 @@ describe("TargetAllocation", () => {
       screen.queryByRole("button", { name: "Sync from Portfolio" }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(retarget).toBeDisabled();
+    expect(retarget).toHaveAccessibleDescription(
+      "Portfolio file could not be synced The file has no Asset Allocation taxonomy, only none",
+    );
   });
 
-  it("shows the refused caution and concise unreadable empty state without repeating the reason when no targets are saved", () => {
+  it("shows the refused caution and concise unreadable empty state without repeating the reason when no targets are saved, with Retarget disabled and described by the caution", () => {
     renderCard({
       portfolioStatus: {
         fileName: "broken.portfolio",
@@ -278,6 +271,9 @@ describe("TargetAllocation", () => {
 
     const note = screen.getByRole("note");
     const card = screen.getByRole("region", { name: "Target allocation" });
+    const retarget = screen.getByRole("button", {
+      name: "Retarget from LifeStrategy",
+    });
 
     expect(note).toHaveTextContent("Portfolio file could not be synced");
     expect(note).toHaveTextContent(
@@ -304,9 +300,78 @@ describe("TargetAllocation", () => {
     expect(
       screen.queryByRole("button", { name: "Sync from Portfolio" }),
     ).not.toBeInTheDocument();
+    expect(retarget).toBeDisabled();
+    expect(retarget).toHaveAccessibleDescription(
+      "Portfolio file could not be synced The file has no Asset Allocation taxonomy, only none",
+    );
   });
 
-  it("places a single default Sync from Portfolio button in the empty state when a readable file has not been synced yet", () => {
+  it("disables Retarget with a clean accessible description in every scenario state without targets", () => {
+    const { rerender } = renderCard({
+      branch: "Retire early",
+      portfolioStatus: { kind: "missing" },
+      targets: null,
+    });
+
+    expect(
+      screen.getByRole("button", { name: "Retarget from LifeStrategy" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Retarget from LifeStrategy" }),
+    ).toHaveAccessibleDescription(
+      "No portfolio file uploaded Upload a binary Portfolio Performance file on Portfolio to load your target allocation.",
+    );
+
+    rerender(
+      <TargetAllocation
+        branch="Retire early"
+        cma={cma}
+        mappings={mappings}
+        portfolioStatus={{
+          fileName: "northstar.portfolio",
+          kind: "unsynced",
+          version: 2,
+        }}
+        split={split}
+        targets={null}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Retarget from LifeStrategy" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Retarget from LifeStrategy" }),
+    ).toHaveAccessibleDescription(
+      "No allocation synced yet Sync the Asset Allocation taxonomy from your portfolio file.",
+    );
+
+    rerender(
+      <TargetAllocation
+        branch="Retire early"
+        cma={cma}
+        mappings={mappings}
+        portfolioStatus={{
+          fileName: "broken.portfolio",
+          kind: "refused",
+          reason: "The file has no Asset Allocation taxonomy, only none",
+        }}
+        split={split}
+        targets={null}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Retarget from LifeStrategy" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Retarget from LifeStrategy" }),
+    ).toHaveAccessibleDescription(
+      "Portfolio file could not be synced The file has no Asset Allocation taxonomy, only none",
+    );
+  });
+
+  it("places a single default Sync from Portfolio button in the empty state when a readable file has not been synced yet, keeping household Retarget enabled", () => {
     renderCard({
       portfolioStatus: {
         fileName: "northstar.portfolio",
@@ -328,6 +393,9 @@ describe("TargetAllocation", () => {
     });
     expect(buttons).toHaveLength(1);
     expect(buttons[0]).toHaveClass("bg-primary");
+    expect(
+      screen.getByRole("button", { name: "Retarget from LifeStrategy" }),
+    ).toBeEnabled();
   });
 
   it("shows the household unsynced caution above the card and syncs from the header button", async () => {
@@ -415,46 +483,33 @@ describe("TargetAllocation", () => {
     );
   });
 
-  it("sends nothing when the retarget file picker closes without a file", () => {
+  it("retargets the household portfolio file in place on the server, holds busy while running, and reports the effective split", async () => {
+    const answer = Promise.withResolvers<RetargetAnswer>();
+    vi.mocked(retargetFromLifeStrategy).mockReturnValue(answer.promise);
     renderCard();
-
-    choose([]);
-    choose(null);
-
-    expect(pullLifeStrategy).not.toHaveBeenCalled();
-    expect(importTargets).not.toHaveBeenCalled();
-  });
-
-  it("offers no retargeted file to download before one is retargeted", () => {
-    renderCard({ portfolioStatus: { kind: "missing" }, targets: null });
-
-    expect(
-      screen.queryByRole("link", { name: "Download the retargeted file" }),
-    ).not.toBeInTheDocument();
-  });
-
-  // The page is drawn again from the store's targets; the file as
-  // rewritten is what is imported, and what is offered to download,
-  // under the name it was chosen by.
-  it("retargets the file chosen from what LifeStrategy holds, imports it as rewritten, and offers it to download", async () => {
-    vi.stubGlobal("URL", StubUrl);
-    const answer = Promise.withResolvers<Answer<Targets>>();
-    vi.mocked(pullLifeStrategy).mockResolvedValue(saved(holdings));
-    vi.mocked(importTargets).mockReturnValue(answer.promise);
-    const { unmount } = renderCard();
     const button = screen.getByRole("button", {
       name: "Retarget from LifeStrategy",
     });
 
-    await retargetWith(chosen);
+    await retargetWith();
 
     await waitFor(() => {
-      expect(importTargets).toHaveBeenCalledWith(readTargets(saved70), []);
+      expect(retargetFromLifeStrategy).toHaveBeenCalledExactlyOnceWith("9244", {
+        afterVersion: 3,
+        on: null,
+      });
     });
-    expect(pullLifeStrategy).toHaveBeenCalledWith("9244");
     expect(button).toHaveAttribute("aria-busy", "true");
 
-    answer.resolve(saved({ ...targets, importedOn: "2026-09-15" }));
+    answer.resolve(
+      saved({
+        asOf: "2026-08-31",
+        isScenarioOnly: false,
+        savedOn: "2026-09-15",
+        split: { stocks: 0.7 },
+        version: 4,
+      }),
+    );
 
     await waitFor(() => {
       expect(
@@ -463,68 +518,54 @@ describe("TargetAllocation", () => {
         "LifeStrategy 80% Equity as at 31 Aug 2026, at 70% equity and 30% bonds",
       );
     });
-    const link = await screen.findByRole("link", {
-      name: "Download the retargeted file",
-    });
-    const first = link.getAttribute("href") ?? "";
-    expect(first).toMatch(/^blob:/);
-    expect(link).toHaveAttribute("download", "northstar.portfolio");
-    // The zip is stamped with the moment it was written, so the parts
-    // are compared rather than the bytes.
-    expect(
-      unzipSync(
-        new Uint8Array(await (held.at(-1) ?? new Blob()).arrayBuffer()),
-      ),
-    ).toStrictEqual(unzipSync(saved70));
-    expect(StubUrl.revokeObjectURL).not.toHaveBeenCalled();
-
-    // Retargeted again, the offer is replaced and the first file let go.
-    await retargetWith(chosen);
-
-    await waitFor(() => {
-      expect(
-        screen.getByRole("link", { name: "Download the retargeted file" }),
-      ).not.toHaveAttribute("href", first);
-    });
-    const second =
-      screen
-        .getByRole("link", { name: "Download the retargeted file" })
-        .getAttribute("href") ?? "";
-    await waitFor(() => {
-      expect(StubUrl.revokeObjectURL).toHaveBeenCalledWith(first);
-    });
-    expect(StubUrl.revokeObjectURL).not.toHaveBeenCalledWith(second);
-
-    // Leaving the screen lets the last one go too.
-    unmount();
-
-    expect(StubUrl.revokeObjectURL).toHaveBeenCalledWith(second);
   });
 
-  // The plan's split being the target allocation's own, the fund is
-  // laid at its own four fifths in equities.
-  it("retargets at the fund's own split while the plan's is the target allocation's own", async () => {
-    vi.stubGlobal("URL", StubUrl);
-    vi.mocked(pullLifeStrategy).mockResolvedValue(saved(holdings));
-    vi.mocked(importTargets).mockResolvedValue(
-      saved({ ...targets, importedOn: "2026-09-15" }),
+  it("surfaces syncWarning when retargeting saves the portfolio file but household auto-sync warns", async () => {
+    vi.mocked(retargetFromLifeStrategy).mockResolvedValue(
+      saved({
+        asOf: "2026-08-31",
+        isScenarioOnly: false,
+        savedOn: "2026-09-15",
+        split: { stocks: 0.8 },
+        syncWarning:
+          "The household changed while this was being saved, so nothing was",
+        version: 4,
+      }),
     );
     renderCard({ split: null });
 
-    await retargetWith(chosen);
+    await retargetWith();
 
     await waitFor(() => {
       expect(
         screen.getByRole("dialog", { name: "Target allocation retargeted" }),
       ).toHaveAccessibleDescription(
-        "LifeStrategy 80% Equity as at 31 Aug 2026, at 80% equity and 20% bonds",
+        "LifeStrategy 80% Equity as at 31 Aug 2026, at 80% equity and 20% bonds. Targets not synced: The household changed while this was being saved, so nothing was",
       );
     });
-    expect(importTargets).toHaveBeenCalledWith(
-      readTargets(
-        reweighted(saved80, retargeted(readTargets(saved80), holdings, null)),
-      ),
-      [],
+  });
+
+  it("retargets in a scenario without sending afterVersion and notes that it applies to the scenario only", async () => {
+    vi.mocked(retargetFromLifeStrategy).mockResolvedValue(
+      saved({
+        asOf: "2026-08-31",
+        isScenarioOnly: true,
+        split: { stocks: 0.7 },
+      }),
+    );
+    renderCard({ branch: "Retire early", portfolioStatus: syncedStatus });
+
+    await retargetWith();
+
+    await waitFor(() => {
+      expect(retargetFromLifeStrategy).toHaveBeenCalledExactlyOnceWith("9244", {
+        on: "Retire early",
+      });
+    });
+    expect(
+      screen.getByRole("dialog", { name: "Target allocation retargeted" }),
+    ).toHaveAccessibleDescription(
+      "LifeStrategy 80% Equity as at 31 Aug 2026, at 70% equity and 30% bonds. In this scenario only",
     );
   });
 
@@ -585,23 +626,19 @@ describe("TargetAllocation", () => {
     ]);
   });
 
-  // LifeStrategy 100% Equity holding the fixture's four equity funds and
-  // no bonds, the file is laid all in equities whatever the plan's
-  // split, and the toast says what of it is set aside.
   it("retargets from a fund holding no bonds all in equities, and says the bonds the plan holds now", async () => {
-    vi.stubGlobal("URL", StubUrl);
-    const equities = {
-      ...holdings,
-      fund: range[1],
-      funds: holdings.funds.slice(0, 4),
-    };
-    vi.mocked(pullLifeStrategy).mockResolvedValue(saved(equities));
-    vi.mocked(importTargets).mockResolvedValue(
-      saved({ ...targets, importedOn: "2026-09-15" }),
+    vi.mocked(retargetFromLifeStrategy).mockResolvedValue(
+      saved({
+        asOf: "2026-08-31",
+        isScenarioOnly: false,
+        savedOn: "2026-09-15",
+        split: { stocks: 1 },
+        version: 4,
+      }),
     );
     renderCard();
 
-    await retargetWith(chosen, "LifeStrategy 100% Equity");
+    await retargetWith("LifeStrategy 100% Equity");
 
     await waitFor(() => {
       expect(
@@ -610,38 +647,19 @@ describe("TargetAllocation", () => {
         "LifeStrategy 100% Equity as at 31 Aug 2026, at 100% equity and 0% bonds. Holds no bonds; the plan holds 30% now",
       );
     });
-    expect(pullLifeStrategy).toHaveBeenCalledWith("9232");
-    expect(importTargets).toHaveBeenCalledWith(
-      readTargets(
-        reweighted(saved80, retargeted(readTargets(saved80), equities, split)),
-      ),
-      [],
-    );
-  });
-
-  it("says why a file cannot be retargeted before Vanguard is asked, and asks for nothing", async () => {
-    renderCard();
-
-    await retargetWith(new File(["<?xml version='1.0'?>"], "portfolio.xml"));
-
-    await waitFor(() => {
-      expect(
-        screen.getByRole("dialog", { name: "Allocation not retargeted" }),
-      ).toHaveAccessibleDescription(
-        "The file is saved as XML, and only a Portfolio Performance file saved in binary can be read",
-      );
+    expect(retargetFromLifeStrategy).toHaveBeenCalledExactlyOnceWith("9232", {
+      afterVersion: 3,
+      on: null,
     });
-    expect(pullLifeStrategy).not.toHaveBeenCalled();
-    expect(importTargets).not.toHaveBeenCalled();
   });
 
-  it("says why when Vanguard is refused, and imports nothing", async () => {
-    vi.mocked(pullLifeStrategy).mockResolvedValue(
+  it("says why when server-side retargeting is refused", async () => {
+    vi.mocked(retargetFromLifeStrategy).mockResolvedValue(
       refused("Vanguard did not send what LifeStrategy 80% Equity holds"),
     );
     renderCard();
 
-    await retargetWith(chosen);
+    await retargetWith();
 
     await waitFor(() => {
       expect(
@@ -650,60 +668,6 @@ describe("TargetAllocation", () => {
         "Vanguard did not send what LifeStrategy 80% Equity holds",
       );
     });
-    expect(importTargets).not.toHaveBeenCalled();
-  });
-
-  // The reference has no category for Japan.
-  it("says why when no category stands for a fund, and imports nothing", async () => {
-    vi.mocked(pullLifeStrategy).mockResolvedValue(
-      saved({
-        ...holdings,
-        funds: [
-          ...holdings.funds,
-          {
-            name: "Vanguard Japan Stock Index Fund",
-            sedol: "B50MZ94",
-            weight: 0.02,
-          },
-        ],
-      }),
-    );
-    renderCard();
-
-    await retargetWith(chosen);
-
-    await waitFor(() => {
-      expect(
-        screen.getByRole("dialog", { name: "Allocation not retargeted" }),
-      ).toHaveAccessibleDescription(
-        "No category stands for Vanguard Japan Stock Index Fund, which LifeStrategy 80% Equity holds",
-      );
-    });
-    expect(importTargets).not.toHaveBeenCalled();
-    expect(
-      screen.queryByRole("link", { name: "Download the retargeted file" }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("says why when the store refuses the retargeted allocation, and offers nothing to download", async () => {
-    vi.mocked(pullLifeStrategy).mockResolvedValue(saved(holdings));
-    vi.mocked(importTargets).mockResolvedValue(
-      refused("A target allocation's categories add up to 100%"),
-    );
-    renderCard();
-
-    await retargetWith(chosen);
-
-    await waitFor(() => {
-      expect(
-        screen.getByRole("dialog", { name: "Allocation not retargeted" }),
-      ).toHaveAccessibleDescription(
-        "A target allocation's categories add up to 100%",
-      );
-    });
-    expect(
-      screen.queryByRole("link", { name: "Download the retargeted file" }),
-    ).not.toBeInTheDocument();
   });
 
   // FTSE USA has no class in the reference, and its name
