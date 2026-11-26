@@ -59,3 +59,99 @@ interface Paid {
   readonly amount: number;
   readonly on: string;
 }
+
+// Whether a stored target allocation structurally matches live
+// categories and portfolios read from a Portfolio Performance file,
+// independent of object key order, category order, and importedOn.
+// Treats null and legacy records without portfolios as unequal so older
+// records upgrade once.
+export function areTargetsEquivalent(
+  kept: null | Targets,
+  live: {
+    readonly categories: readonly Target[];
+    readonly portfolios: readonly Portfolio[];
+  },
+): boolean {
+  if (kept?.portfolios === undefined) {
+    return false;
+  }
+  return (
+    areTargetSetsEqual(kept.categories, live.categories) &&
+    areEqualArrays(kept.portfolios, live.portfolios, isSamePortfolio)
+  );
+}
+
+function areEqualArrays<TItem>(
+  left: readonly TItem[],
+  right: readonly TItem[],
+  isSame: (one: TItem, other: TItem) => boolean,
+): boolean {
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index += 1) {
+    const one = left[index];
+    const other = right[index];
+    if (one === undefined || other === undefined || !isSame(one, other)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function areHeldEqual(
+  left: readonly Held[] | undefined,
+  right: readonly Held[] | undefined,
+): boolean {
+  if (left === undefined || right === undefined) {
+    return left === right;
+  }
+  return areEqualArrays(
+    left,
+    right,
+    (one, other) => one.name === other.name && one.value === other.value,
+  );
+}
+
+function areTargetSetsEqual(
+  left: readonly Target[],
+  right: readonly Target[],
+): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+  const byId = new Map(left.map((target) => [target.id, target]));
+  return right.every((target) => {
+    const matched = byId.get(target.id);
+    if (matched === undefined) {
+      return false;
+    }
+    byId.delete(target.id);
+    return isSameTarget(matched, target);
+  });
+}
+
+function isSamePortfolio(one: Portfolio, other: Portfolio): boolean {
+  return (
+    one.name === other.name &&
+    one.cash === other.cash &&
+    areEqualArrays(
+      one.paid,
+      other.paid,
+      (left, right) => left.on === right.on && left.amount === right.amount,
+    )
+  );
+}
+
+function isSameTarget(one: Target, other: Target): boolean {
+  return (
+    one.name === other.name &&
+    one.isImplemented === other.isImplemented &&
+    one.share === other.share &&
+    one.value === other.value &&
+    areEqualArrays(
+      one.classes,
+      other.classes,
+      (left, right) => left === right,
+    ) &&
+    areHeldEqual(one.accounts, other.accounts)
+  );
+}

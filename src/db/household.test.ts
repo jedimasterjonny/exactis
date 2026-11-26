@@ -6,7 +6,7 @@ import { blank, kept as reference } from "@/data/household.fixture";
 import { sam } from "@/data/owners.fixture";
 import { currentShape, stamped } from "@/data/shapes";
 import { inMemory } from "@/db/memory.fixture";
-import { householdVersions } from "@/db/schema";
+import { householdVersions, portfolioFiles } from "@/db/schema";
 
 import {
   decideScenario,
@@ -78,6 +78,52 @@ describe("household store", () => {
       household: stamped(named),
       version: 2,
     });
+  });
+
+  it("atomically gates keepAfter on portfolioVersion when provided", async () => {
+    await keepAfter(
+      db,
+      { portfolioVersion: 0, scenario: "", version: 0 },
+      blank,
+    );
+    expect(await readLatest(db, "")).toStrictEqual({
+      household: stamped(blank),
+      version: 1,
+    });
+
+    await db
+      .insert(portfolioFiles)
+      .values({
+        content: new Uint8Array([1, 2, 3]),
+        fileName: "northstar.portfolio",
+        version: 1,
+      });
+
+    await expect(
+      keepAfter(db, { portfolioVersion: 0, scenario: "", version: 1 }, named),
+    ).rejects.toThrow(
+      "The household changed while this was being saved, so nothing was",
+    );
+    expect(await readLatest(db, "")).toStrictEqual({
+      household: stamped(blank),
+      version: 1,
+    });
+
+    await keepAfter(
+      db,
+      { portfolioVersion: 1, scenario: "", version: 1 },
+      named,
+    );
+    expect(await readLatest(db, "")).toStrictEqual({
+      household: stamped(named),
+      version: 2,
+    });
+
+    const [row] = await db
+      .select({ savedAt: householdVersions.savedAt })
+      .from(householdVersions)
+      .where(eq(householdVersions.version, 2));
+    expect(row?.savedAt).toBeInstanceOf(Date);
   });
 
   // The household kept twice, then a scenario branched from it and

@@ -347,4 +347,55 @@ describe("PortfolioUpload", () => {
     );
     expect(screen.getByLabelText("Portfolio Performance file")).toBeDisabled();
   });
+
+  it("appends syncWarning to the success toast in both upload and replace modes and closes ConfirmDialog cleanly", async () => {
+    vi.mocked(uploadPortfolio)
+      .mockResolvedValueOnce(
+        saved({
+          fileName: "northstar.portfolio",
+          savedOn: "2026-09-25",
+          syncWarning:
+            "The household target allocation could not be synced yet",
+          version: 1,
+        }),
+      )
+      .mockResolvedValueOnce(
+        saved({
+          fileName: "updated.portfolio",
+          savedOn: "2026-09-25",
+          syncWarning: "The file has no Asset Allocation taxonomy",
+          version: 2,
+        }),
+      );
+    const onReplaced = vi.fn<() => void>();
+
+    const { rerender } = render(<PortfolioUpload version={0} />, {
+      wrapper: Toaster,
+    });
+    choose([new File([sampleBytes], "northstar.portfolio")]);
+
+    await toasted(
+      "Portfolio file uploaded",
+      "Stored with the household. Targets not synced: The household target allocation could not be synced yet",
+    );
+
+    rerender(
+      <PortfolioUpload
+        currentFileName="northstar.portfolio"
+        onReplaced={onReplaced}
+        version={1}
+      />,
+    );
+    choose([new File([sampleBytes], "updated.portfolio")]);
+    fireEvent.click(screen.getByRole("button", { name: "Replace" }));
+
+    await toasted(
+      "Portfolio file replaced",
+      "Kept as the next version for the household. Targets not synced: The file has no Asset Allocation taxonomy",
+    );
+    expect(onReplaced).toHaveBeenCalledOnce();
+    await waitFor(() => {
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    });
+  });
 });

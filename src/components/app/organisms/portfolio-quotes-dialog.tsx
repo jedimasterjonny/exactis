@@ -19,7 +19,11 @@ import { DateField } from "@/components/app/molecules/date-field";
 import { LabelledSwitch } from "@/components/app/molecules/labelled-switch";
 import { EditDialog } from "@/components/app/organisms/edit-dialog";
 import { Badge } from "@/components/kit/badge";
-import { isIsoCalendarDate, maxPortfolioScaled } from "@/data/portfolio";
+import {
+  isIsoCalendarDate,
+  maxPortfolioScaled,
+  withSyncNote,
+} from "@/data/portfolio";
 import { useSender } from "@/hooks/use-sender";
 import { counted } from "@/lib/count";
 import { formatPrice, priceFormatOf } from "@/lib/money";
@@ -126,7 +130,10 @@ export function PortfolioQuotesDialog({
         onSaved();
       },
       success: (result) => ({
-        description: `${counted(result.updatedCount, "price")} saved for ${formatDay(date)}`,
+        description: withSyncNote(
+          `${counted(result.updatedCount, "price")} saved for ${formatDay(date)}`,
+          result.syncWarning,
+        ),
         title: "Quotes updated",
       }),
     });

@@ -13,6 +13,7 @@ import {
   accountsLayoutOf,
   afterVersionSchema,
   cashTotalsOf,
+  effectiveSyncedOn,
   holdingsViewOf,
   isIsoCalendarDate,
   newPortfolioAccountSchema,
@@ -24,6 +25,7 @@ import {
   transactionsViewOf,
   transactionTypeGroups,
   transactionTypeLabels,
+  withSyncNote,
 } from "./portfolio";
 
 const isaCash: CashAccount = {
@@ -869,5 +871,68 @@ describe("portfolio write-back schemas", () => {
         })),
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("effectiveSyncedOn", () => {
+  it("picks the later of quote and transaction dates, falling back to whichever is present or savedOn", () => {
+    expect(
+      effectiveSyncedOn({
+        latestQuoteDate: "2026-09-22",
+        latestTransactionDate: "2026-09-12",
+        savedOn: "2026-09-25",
+      }),
+    ).toBe("2026-09-22");
+    expect(
+      effectiveSyncedOn({
+        latestQuoteDate: "2026-09-12",
+        latestTransactionDate: "2026-09-12",
+        savedOn: "2026-09-25",
+      }),
+    ).toBe("2026-09-12");
+    expect(
+      effectiveSyncedOn({
+        latestQuoteDate: "2026-09-10",
+        latestTransactionDate: "2026-09-20",
+        savedOn: "2026-09-25",
+      }),
+    ).toBe("2026-09-20");
+    expect(
+      effectiveSyncedOn({
+        latestQuoteDate: "2026-09-18",
+        latestTransactionDate: null,
+        savedOn: "2026-09-25",
+      }),
+    ).toBe("2026-09-18");
+    expect(
+      effectiveSyncedOn({
+        latestQuoteDate: null,
+        latestTransactionDate: "2026-09-14",
+        savedOn: "2026-09-25",
+      }),
+    ).toBe("2026-09-14");
+    expect(
+      effectiveSyncedOn({
+        latestQuoteDate: null,
+        latestTransactionDate: null,
+        savedOn: "2026-09-25",
+      }),
+    ).toBe("2026-09-25");
+  });
+});
+
+describe("withSyncNote", () => {
+  it("returns the base description unchanged when syncWarning is undefined, and appends the sync note when present", () => {
+    expect(withSyncNote("Saved to northstar.portfolio", undefined)).toBe(
+      "Saved to northstar.portfolio",
+    );
+    expect(
+      withSyncNote(
+        "Saved to northstar.portfolio",
+        "The file has no Asset Allocation taxonomy, only none",
+      ),
+    ).toBe(
+      "Saved to northstar.portfolio. Targets not synced: The file has no Asset Allocation taxonomy, only none",
+    );
   });
 });

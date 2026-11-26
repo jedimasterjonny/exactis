@@ -9,7 +9,11 @@ import { uploadPortfolio } from "@/actions/portfolio";
 import { ConfirmDialog } from "@/components/app/molecules/confirm-dialog";
 import { Button } from "@/components/kit/button";
 import { toast } from "@/components/kit/toast";
-import { maxPortfolioBytes, portfolioTooLarge } from "@/data/portfolio";
+import {
+  maxPortfolioBytes,
+  portfolioTooLarge,
+  withSyncNote,
+} from "@/data/portfolio";
 import { useSender } from "@/hooks/use-sender";
 
 interface ChosenFile {
@@ -80,14 +84,20 @@ export function PortfolioUpload({
             onReplaced?.();
           }
         },
-        success: () =>
+        success: (result) =>
           isReplacing
             ? {
-                description: "Kept as the next version for the household",
+                description: withSyncNote(
+                  "Kept as the next version for the household",
+                  result.syncWarning,
+                ),
                 title: "Portfolio file replaced",
               }
             : {
-                description: "Stored with the household",
+                description: withSyncNote(
+                  "Stored with the household",
+                  result.syncWarning,
+                ),
                 title: "Portfolio file uploaded",
               },
       },

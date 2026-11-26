@@ -858,4 +858,63 @@ describe("PortfolioTransactionDialog", () => {
       type: "purchase",
     });
   });
+
+  it("surfaces a target sync warning in the success toast while still calling onSaved", async () => {
+    vi.mocked(addPortfolioTransaction).mockResolvedValue(
+      saved({
+        id: "tx-warn",
+        savedOn: "2026-09-25",
+        syncWarning: "The portfolio file has no Asset Allocation taxonomy",
+        version: 2,
+      }),
+    );
+    const onSaved = vi.fn<(draft: NewPortfolioTransaction) => void>();
+    render(
+      <PortfolioTransactionDialog
+        baseCurrency="GBP"
+        cashAccounts={cashAccounts}
+        holdings={holdings}
+        initialDraft={{
+          accountId: "cash-isa",
+          amount: 250,
+          currency: "GBP",
+          date: "2026-09-20",
+          fees: 0,
+          portfolioId: "port-isa",
+          securityId: "sec-world",
+          shares: 5,
+          taxes: 0,
+          type: "purchase",
+        }}
+        onDismiss={vi.fn<() => void>()}
+        onSaved={onSaved}
+        securitiesAccounts={securitiesAccounts}
+        today="2026-09-25"
+        version={1}
+      />,
+      { wrapper: Toaster },
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Transaction saved" }),
+      ).toHaveAccessibleDescription(
+        "Purchase · Global Equity Index · 20 Sep 2026. Targets not synced: The portfolio file has no Asset Allocation taxonomy",
+      );
+    });
+    expect(onSaved).toHaveBeenCalledExactlyOnceWith({
+      accountId: "cash-isa",
+      amount: 250,
+      currency: "GBP",
+      date: "2026-09-20",
+      fees: 0,
+      portfolioId: "port-isa",
+      securityId: "sec-world",
+      shares: 5,
+      taxes: 0,
+      type: "purchase",
+    });
+  });
 });
