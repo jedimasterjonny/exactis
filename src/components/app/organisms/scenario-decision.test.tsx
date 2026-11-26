@@ -7,7 +7,6 @@ import {
 } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { Answer } from "@/lib/answer";
 import type { Decision } from "@/store/household";
 
 import {
@@ -104,7 +103,9 @@ describe("ScenarioDecision", () => {
   });
 
   it("makes the scenario the household once asked, with why, and hands the focus to the title", async () => {
-    vi.mocked(adoptScenario).mockResolvedValue(saved(true));
+    vi.mocked(adoptScenario).mockResolvedValue(
+      saved({ isDecided: true, isPortfolioSynced: true }),
+    );
     renderDecision();
 
     fireEvent.click(
@@ -125,7 +126,7 @@ describe("ScenarioDecision", () => {
 
     expect(within(dialog).getByText("Scenario")).toHaveClass("text-brand");
     expect(dialog).toHaveAccessibleDescription(
-      "The scenario's plan, its target allocation included, replaces the household's. The household keeps its own balances, progress points and house prices, whatever the scenario holds. The BlackRock CMA, the BoE curve and the holdings imported are each the newer of the two. The scenario is kept under Made the household.",
+      "The scenario's plan, its target allocation included, replaces the household's. The household keeps its own balances, progress points and house prices, whatever the scenario holds. The BlackRock CMA, the BoE curve and the portfolio holdings are each the newer of the two. The scenario is kept under Made the household.",
     );
     expect(field("Why", dialog)).toHaveAccessibleDescription(
       "Optional, up to 200 characters. Kept with the decision, to read back later.",
@@ -159,7 +160,7 @@ describe("ScenarioDecision", () => {
 
   // Making Four-day week the household moves a share of the target
   // allocation, which deciding against it does not touch.
-  it("says the next import replaces the targets where making the scenario the household moves a share", () => {
+  it("says adopting also updates the household's portfolio file where making the scenario the household moves a share", () => {
     render(
       <ScenarioDecision
         decision={null}
@@ -176,7 +177,7 @@ describe("ScenarioDecision", () => {
     );
 
     expect(openDialog()).toHaveAccessibleDescription(
-      "The scenario's plan, its target allocation included, replaces the household's. The household keeps its own balances, progress points and house prices, whatever the scenario holds. The BlackRock CMA, the BoE curve and the holdings imported are each the newer of the two. The scenario is kept under Made the household. Each import takes the targets the Portfolio Performance file holds, so the next one replaces the scenario's unless the file holds them too.",
+      "The scenario's plan, its target allocation included, replaces the household's. The household keeps its own balances, progress points and house prices, whatever the scenario holds. The BlackRock CMA, the BoE curve and the portfolio holdings are each the newer of the two. The scenario is kept under Made the household. Adopting also updates the Asset Allocation target weights in the household's portfolio file to match this scenario.",
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
@@ -187,25 +188,45 @@ describe("ScenarioDecision", () => {
     );
   });
 
-  it("says the scenario is left undecided where the household was replaced but its decision not kept", async () => {
-    vi.mocked(adoptScenario).mockResolvedValue(saved(false));
-    renderDecision("rejected");
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "Make this the household…" }),
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Make the household" }));
-
-    expect(adoptScenario).toHaveBeenCalledExactlyOnceWith(
-      "Four-day week",
-      shown,
-      "",
-    );
-    await toasted(
-      "Four-day week is the household",
+  it.each([
+    [
+      false,
+      true,
       "Edits are saved to the household; the scenario's decision could not be kept, so it is left undecided",
-    );
-  });
+    ],
+    [
+      true,
+      false,
+      "Edits are saved to the household; the portfolio file's target weights could not be updated yet",
+    ],
+    [
+      false,
+      false,
+      "Edits are saved to the household; the portfolio file's target weights could not be updated yet, and the scenario's decision could not be kept, so it is left undecided",
+    ],
+  ])(
+    "reports secondary write caveats when the household was replaced (isDecided=%s, isPortfolioSynced=%s)",
+    async (isDecided, isPortfolioSynced, description) => {
+      vi.mocked(adoptScenario).mockResolvedValue(
+        saved({ isDecided, isPortfolioSynced }),
+      );
+      renderDecision("rejected");
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "Make this the household…" }),
+      );
+      fireEvent.click(
+        screen.getByRole("button", { name: "Make the household" }),
+      );
+
+      expect(adoptScenario).toHaveBeenCalledExactlyOnceWith(
+        "Four-day week",
+        shown,
+        "",
+      );
+      await toasted("Four-day week is the household", description);
+    },
+  );
 
   it("decides against the scenario once asked, a blank reason sent as typed", async () => {
     vi.mocked(rejectScenario).mockResolvedValue(saved(undefined));
@@ -287,7 +308,8 @@ describe("ScenarioDecision", () => {
   // The answer is settled before the test ends, since an action still
   // on its way holds every transition after it, the next test's too.
   it("holds every button while a decision is on its way to the store", async () => {
-    const answer = Promise.withResolvers<Answer<boolean>>();
+    const answer =
+      Promise.withResolvers<Awaited<ReturnType<typeof adoptScenario>>>();
     vi.mocked(adoptScenario).mockReturnValue(answer.promise);
     renderDecision();
 
@@ -305,7 +327,7 @@ describe("ScenarioDecision", () => {
       screen.getByRole("button", { hidden: true, name: "Decide against…" }),
     ).toBeDisabled();
 
-    answer.resolve(saved(true));
+    answer.resolve(saved({ isDecided: true, isPortfolioSynced: true }));
 
     await toasted(
       "Four-day week is the household",

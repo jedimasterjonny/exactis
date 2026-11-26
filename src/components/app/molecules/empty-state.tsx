@@ -15,6 +15,7 @@ interface EmptyStateProps {
   readonly className?: string | undefined;
   readonly description: string;
   readonly icon: LucideIcon;
+  readonly textId?: string;
   readonly title: string;
 }
 
@@ -23,18 +24,21 @@ interface EmptyStateProps {
 // gives beneath, a link to where the filling is done. The words are the
 // caller's, since two regions of the same shape want different
 // sentences. A header row over no rows states column names and no
-// information, so a region holding nothing draws this instead.
+// information, so a region holding nothing draws this instead. An
+// optional textId scopes an id to the title and description header
+// without wrapping the action children beneath.
 export function EmptyState({
   children,
   className,
   description,
   icon,
+  textId,
   title,
 }: EmptyStateProps): JSX.Element {
   const Icon = icon;
   return (
     <Empty className={className}>
-      <EmptyHeader>
+      <EmptyHeader id={textId}>
         <EmptyMedia variant="icon">
           <Icon aria-hidden />
         </EmptyMedia>

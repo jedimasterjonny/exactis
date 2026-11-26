@@ -384,15 +384,19 @@ export async function readClosesBefore(
   return closesBefore("", month);
 }
 
-// The household held on the branch open, with the branch and the
-// version it is there, read afresh, as a save reads it, so a cookie
-// naming a scenario no longer kept is refused as a save's is: for an
-// action that writes from the household open other than through amend,
-// as a scenario is made from it. The session is checked first, as every
-// read's is.
-export async function readHeld(): Promise<Held & Read> {
+// The household held on the branch open, with the branch, the version
+// it is there and whether its latest version carries a decision, read
+// afresh, as a save reads it, so a cookie naming a scenario no longer
+// kept is refused as a save's is: for an action that writes from the
+// household open other than through amend, as a scenario is made from
+// it or a LifeStrategy retarget checks the branch before contacting
+// Vanguard. The session is checked first, as every read's is.
+export async function readHeld(): Promise<
+  Held & Read & { readonly isDecided: boolean }
+> {
   await requireSession();
-  return heldIn(await readOpen(true));
+  const open = await readOpen(true);
+  return { ...heldIn(open), isDecided: open.latest?.decided !== undefined };
 }
 
 // The household held on the branch open as a page reads it, with the

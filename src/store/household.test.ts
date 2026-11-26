@@ -40,6 +40,7 @@ import {
   getSourcesDaysAgo,
   isCloseDue,
   readClosesBefore,
+  readHeld,
 } from "./household";
 
 vi.mock("server-only", () => ({}));
@@ -1003,6 +1004,53 @@ describe("the household store", () => {
     expect(refusedWhole?.over).toStrictEqual(refusedWhole?.scenario);
   });
 
+  it("reads the open branch's household, version and decision status, refusing a dropped scenario", async () => {
+    expect(await readHeld()).toStrictEqual({
+      ...soundKept(blank),
+      isDecided: false,
+      scenario: "",
+      version: 0,
+    });
+
+    await keepAfter(db, { scenario: "", version: 0 }, reference);
+
+    expect(await readHeld()).toStrictEqual({
+      ...soundKept(reference),
+      isDecided: false,
+      scenario: "",
+      version: 1,
+    });
+
+    await keepAfter(db, { scenario: "Four-day week", version: 0 }, blank);
+    vi.mocked(openedScenario).mockResolvedValue("Four-day week");
+
+    expect(await readHeld()).toStrictEqual({
+      ...soundKept(blank),
+      isDecided: false,
+      scenario: "Four-day week",
+      version: 1,
+    });
+
+    await decideScenario(
+      db,
+      { scenario: "Four-day week", version: 1 },
+      { decision: "rejected", reason: "Too tight in the early years" },
+    );
+
+    expect(await readHeld()).toStrictEqual({
+      ...soundKept(blank),
+      isDecided: true,
+      scenario: "Four-day week",
+      version: 2,
+    });
+
+    vi.mocked(openedScenario).mockResolvedValue("Dropped");
+
+    await expect(readHeld()).rejects.toThrow(
+      "No scenario is kept under that name",
+    );
+  });
+
   it("reads no scenario, no list of them and no baseline without a session", async () => {
     vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
 
@@ -1011,6 +1059,7 @@ describe("the household store", () => {
     await expect(getScenarios()).rejects.toThrow("redirected");
     await expect(getBaseline()).rejects.toThrow("redirected");
     await expect(getCompared("Four-day week")).rejects.toThrow("redirected");
+    await expect(readHeld()).rejects.toThrow("redirected");
     expect(getDb).not.toHaveBeenCalled();
   });
 });

@@ -95,7 +95,7 @@ export default async function Assumptions({
     targets,
   } = household;
   const hasGlide = glide.length > 0;
-  const branch = opened?.name ?? null;
+  const branch = opened?.isKept === true ? opened.name : null;
   const portfolioStatus = portfolioStatusOf(owned, household, branch !== null);
   return (
     <Screen
