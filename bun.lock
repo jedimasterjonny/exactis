@@ -25,7 +25,7 @@
       "devDependencies": {
         "@commitlint/cli": "21.2.4",
         "@commitlint/config-conventional": "21.2.4",
-        "@electric-sql/pglite": "0.5.16",
+        "@electric-sql/pglite": "0.6.0",
         "@eslint-community/eslint-plugin-eslint-comments": "4.8.1",
         "@eslint-react/eslint-plugin": "5.30.6",
         "@tailwindcss/postcss": "4.3.5",
@@ -186,7 +186,7 @@
 
     "@dual-bundle/import-meta-resolve": ["@dual-bundle/import-meta-resolve@4.2.1", "", {}, "sha512-id+7YRUgoUX6CgV0DtuhirQWodeeA7Lf4i2x71JS/vtA5pRb/hIGWlw+G6MeXvsM+MXrz0VAydTGElX1rAfgPg=="],
 
-    "@electric-sql/pglite": ["@electric-sql/pglite@0.5.16", "", {}, "sha512-Nj8KcIsJL748W408U2N8q4+9IlONdpRIU8MJypIAAINMJ5nqKyqpX7Mgg/5XKkXiAib3AoZGR6hnJFlrlLBrcg=="],
+    "@electric-sql/pglite": ["@electric-sql/pglite@0.6.0", "", {}, "sha512-g3tAPFjRLEdN1g5FvawTl4ETo9LtmVwBRUJYnH6Erl6mhlKFRGB2mYhPABffIuXMYxki64mX0Al8U4UFUhuYDQ=="],
 
     "@emnapi/core": ["@emnapi/core@1.11.2", "", { "dependencies": { "@emnapi/wasi-threads": "1.2.2", "tslib": "^2.4.0" } }, "sha512-TC8MkTuZUtcTSiFeuC0ksCh9QIJ5+F21MvZ4Wn4ORfYaFJ/0dsiudv5tVkejgwZlwQ39jL9WWDe2lz8x0WglOA=="],
 
