@@ -10,12 +10,17 @@ import {
 import { unzipSync } from "fflate";
 import { describe, expect, it, vi } from "vitest";
 
-import type { Mapping } from "@/data/cma";
+import type { Cma, Mapping } from "@/data/cma";
+import type { Allocation } from "@/data/rates";
 import type { Targets } from "@/data/targets";
 import type { Answer } from "@/lib/answer";
 
 import { pullLifeStrategy } from "@/actions/lifestrategy";
-import { importTargets, mapByName } from "@/actions/targets";
+import {
+  importTargets,
+  mapByName,
+  syncTargetsFromPortfolio,
+} from "@/actions/targets";
 import { Toaster } from "@/components/kit/toast";
 import { cma, mappings } from "@/data/cma.fixture";
 import { range, retargeted } from "@/data/lifestrategy";
@@ -29,6 +34,8 @@ import {
   reference,
 } from "@/lib/portfolio-file.fixture";
 
+import type { PortfolioTargetStatus } from "./target-allocation";
+
 import { TargetAllocation } from "./target-allocation";
 
 vi.mock("@/actions/lifestrategy", () => ({ pullLifeStrategy: vi.fn() }));
@@ -36,15 +43,24 @@ vi.mock("@/actions/targets", () => ({
   importTargets: vi.fn(),
   mapByName: vi.fn(),
   mapCategory: vi.fn(),
+  syncTargetsFromPortfolio: vi.fn(),
 }));
 
 // The reference taxonomy as Portfolio Performance saves it, and chosen
 // as a file on the device.
 const saved80 = portfolioFile(clientOf([["Asset Allocation", reference]]));
-const chosen = new File([saved80], "PortfolioPerformance.portfolio");
+const chosen = new File([saved80], "northstar.portfolio");
 
 // The split the plan holds now, seven tenths in stocks.
 const split = { stocks: 0.7 };
+
+// A synced household file status for tests focusing on table, mapping,
+// and retargeting.
+const syncedStatus: PortfolioTargetStatus = {
+  fileName: "northstar.portfolio",
+  kind: "synced",
+  version: 3,
+};
 
 // The file retargeted from what the fixture's LifeStrategy holds, at
 // the split, as the card writes it.
@@ -78,16 +94,31 @@ function choose(files: null | readonly File[]): HTMLInputElement {
   return picker;
 }
 
-// The card over the targets given, the reference's by default, with
-// the reference's mappings onto August's vintage. An import reports
-// through the toast manager, which needs its Toaster mounted.
-function renderCard(held: null | Targets = targets): RenderResult {
+// The card over the props given, defaulting to synced household targets
+// with August's CMA and the reference's mappings.
+function renderCard({
+  branch = null,
+  cma: chosenCma = cma,
+  mappings: chosenMappings = mappings,
+  portfolioStatus = syncedStatus,
+  split: chosenSplit = split,
+  targets: chosenTargets = targets,
+}: {
+  readonly branch?: null | string;
+  readonly cma?: Cma | null;
+  readonly mappings?: readonly Mapping[];
+  readonly portfolioStatus?: PortfolioTargetStatus;
+  readonly split?: Allocation | null;
+  readonly targets?: null | Targets;
+} = {}): RenderResult {
   return render(
     <TargetAllocation
-      cma={cma}
-      mappings={mappings}
-      split={split}
-      targets={held}
+      branch={branch}
+      cma={chosenCma}
+      mappings={chosenMappings}
+      portfolioStatus={portfolioStatus}
+      split={chosenSplit}
+      targets={chosenTargets}
     />,
     { wrapper: Toaster },
   );
@@ -111,27 +142,32 @@ async function retargetWith(
 }
 
 describe("TargetAllocation", () => {
-  it("heads the card as the screen's fifth, offering to reload the targets", () => {
+  it("heads the card as the screen's third section, shows the synced provenance footer, and renders no caution or sync button when synced", () => {
     renderCard();
 
     const card = screen.getByRole("region", { name: "Target allocation" });
+    const provenance = within(card).getByRole("paragraph");
 
     expect(within(card).getByText("Sect. VI.iii")).toHaveClass("label");
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
     expect(
-      within(card).getByRole("button", {
-        name: "Reload from Portfolio Performance",
+      within(card).queryByRole("button", { name: "Sync from Portfolio" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(card).queryByRole("button", {
+        name: /from Portfolio Performance/,
       }),
-    ).toBeEnabled();
-    // Marked with the import's glyph, as the Cogitator's import is.
+    ).not.toBeInTheDocument();
+    expect(provenance).toHaveTextContent(
+      "Read from northstar.portfolio on Portfolio.",
+    );
+    expect(provenance).toHaveClass("min-w-0", "wrap-anywhere");
     expect(
-      within(card)
-        .getByRole("button", { name: "Reload from Portfolio Performance" })
-        // eslint-disable-next-line testing-library/no-node-access -- the glyph is an icon hidden from the tree, with no role or text of its own
-        .querySelector("svg"),
-    ).toHaveClass("lucide-upload");
+      within(card).getByRole("link", { name: "Open Portfolio" }),
+    ).toHaveAttribute("href", "/portfolio");
   });
 
-  it("lays out the categories imported, each with its CMA class", () => {
+  it("lays out the categories synced, each with its CMA class", () => {
     renderCard();
 
     // A row a category, one a group of them, stocks, bonds and those
@@ -142,134 +178,255 @@ describe("TargetAllocation", () => {
     expect(
       screen.getAllByRole("combobox", { name: "CMA class for UK equity" })[0],
     ).toHaveValue("UK large cap equities");
+  });
+
+  it("renders no caution or sync button when a scenario is intentionally retargeted and notes scenario isolation in the footer", () => {
+    renderCard({
+      branch: "Retire early",
+      portfolioStatus: {
+        fileName: "northstar.portfolio",
+        kind: "retargeted",
+        version: 4,
+      },
+    });
+
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
     expect(
-      screen.queryByText("No allocation imported yet"),
+      screen.queryByRole("button", { name: "Sync from Portfolio" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("paragraph")).toHaveTextContent(
+      "Read from northstar.portfolio on Portfolio. Changes here apply to this scenario only.",
+    );
+  });
+
+  it("shows the upload empty state and footer when no portfolio file is uploaded and no targets are saved", () => {
+    renderCard({ portfolioStatus: { kind: "missing" }, targets: null });
+
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    expect(screen.getByText("No portfolio file uploaded")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Upload a binary Portfolio Performance file on Portfolio to load your target allocation.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("paragraph")).toHaveTextContent(
+      "Upload a portfolio file on Portfolio to feed the target allocation.",
+    );
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(
+      screen
+        .getAllByRole("link", { name: "Upload on Portfolio" })
+        .map((link) => link.getAttribute("href")),
+    ).toStrictEqual(["/portfolio", "/portfolio"]);
+  });
+
+  it("shows a legacy upload caution above the card when household targets exist without an uploaded file", () => {
+    renderCard({ portfolioStatus: { kind: "missing" } });
+
+    const note = screen.getByRole("note");
+
+    expect(note).toHaveTextContent("No portfolio file uploaded yet");
+    expect(note).toHaveTextContent(
+      "Upload a binary Portfolio Performance file on Portfolio to keep your target allocation synced.",
+    );
+    expect(
+      within(note).getByRole("link", { name: "Upload on Portfolio" }),
+    ).toHaveAttribute("href", "/portfolio");
+    expect(screen.getByRole("table")).toBeInTheDocument();
+  });
+
+  it("omits the legacy upload caution in a scenario when no portfolio file is uploaded", () => {
+    renderCard({
+      branch: "Retire early",
+      portfolioStatus: { kind: "missing" },
+    });
+
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    expect(screen.getByRole("table")).toBeInTheDocument();
+  });
+
+  it("shows a refused caution above the card and keeps the table when existing targets remain readable", () => {
+    renderCard({
+      portfolioStatus: {
+        fileName: "broken.portfolio",
+        kind: "refused",
+        reason: "The file has no Asset Allocation taxonomy, only none",
+      },
+    });
+
+    const note = screen.getByRole("note");
+
+    expect(note).toHaveTextContent("Portfolio file could not be synced");
+    expect(note).toHaveTextContent(
+      "The file has no Asset Allocation taxonomy, only none",
+    );
+    expect(
+      screen.queryByRole("button", { name: "Sync from Portfolio" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("table")).toBeInTheDocument();
+  });
+
+  it("shows the refused caution and concise unreadable empty state without repeating the reason when no targets are saved", () => {
+    renderCard({
+      portfolioStatus: {
+        fileName: "broken.portfolio",
+        kind: "refused",
+        reason: "The file has no Asset Allocation taxonomy, only none",
+      },
+      targets: null,
+    });
+
+    const note = screen.getByRole("note");
+    const card = screen.getByRole("region", { name: "Target allocation" });
+
+    expect(note).toHaveTextContent("Portfolio file could not be synced");
+    expect(note).toHaveTextContent(
+      "The file has no Asset Allocation taxonomy, only none",
+    );
+    expect(
+      within(card).getByText("Allocation could not be read"),
+    ).toBeInTheDocument();
+    expect(
+      within(card).getByText(
+        "Fix the file on Portfolio to load your target allocation.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(card).queryByText(
+        "The file has no Asset Allocation taxonomy, only none",
+      ),
+    ).not.toBeInTheDocument();
+    expect(
+      within(card)
+        .getAllByRole("link", { name: "Open Portfolio" })
+        .map((link) => link.getAttribute("href")),
+    ).toStrictEqual(["/portfolio", "/portfolio"]);
+    expect(
+      screen.queryByRole("button", { name: "Sync from Portfolio" }),
     ).not.toBeInTheDocument();
   });
 
-  it("says nothing has been imported before anything is, what would be read, and offers the import", () => {
-    renderCard(null);
+  it("places a single default Sync from Portfolio button in the empty state when a readable file has not been synced yet", () => {
+    renderCard({
+      portfolioStatus: {
+        fileName: "northstar.portfolio",
+        kind: "unsynced",
+        version: 1,
+      },
+      targets: null,
+    });
 
-    expect(screen.getByText("No allocation imported yet")).toBeInTheDocument();
-    expect(
-      screen.getByText("Import a Portfolio Performance file."),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole("table")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Import from Portfolio Performance" }),
-    ).toBeEnabled();
-  });
-
-  it("says what of the file leaves the browser", () => {
-    renderCard(null);
-
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    expect(screen.getByText("No allocation synced yet")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "The file is read in the browser. Only the targets, what each category holds, and each account's cash and what was paid into it leave it.",
+        "Sync the Asset Allocation taxonomy from your portfolio file.",
       ),
     ).toBeInTheDocument();
+    const buttons = screen.getAllByRole("button", {
+      name: "Sync from Portfolio",
+    });
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0]).toHaveClass("bg-primary");
   });
 
-  it("opens the file picker, which takes a Portfolio Performance file", () => {
-    renderCard();
-
-    const picker = screen.getByLabelText<HTMLInputElement>(
-      "Portfolio Performance file",
+  it("shows the household unsynced caution above the card and syncs from the header button", async () => {
+    vi.mocked(syncTargetsFromPortfolio).mockResolvedValue(
+      saved({ ...targets, importedOn: "2026-09-25" }),
     );
-    const open = vi.spyOn(picker, "click").mockImplementation(() => {
-      // The device's picker does not open under test.
+    renderCard({
+      portfolioStatus: {
+        fileName: "northstar.portfolio",
+        kind: "unsynced",
+        version: 4,
+      },
     });
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Reload from Portfolio Performance" }),
+    const note = screen.getByRole("note");
+    const button = screen.getByRole("button", { name: "Sync from Portfolio" });
+
+    expect(note).toHaveTextContent(
+      "Portfolio file has newer targets or holdings",
     );
+    expect(note).toHaveTextContent("Sync from Portfolio to update this plan.");
+    expect(button).toBeEnabled();
+    expect(button).toHaveClass("border-border");
 
-    expect(open).toHaveBeenCalledOnce();
-    expect(picker).toHaveAttribute("accept", ".portfolio");
-    expect(picker).toHaveAttribute("type", "file");
-  });
-
-  // The page is drawn again from the store's targets, which the toast
-  // reads.
-  it("reads the file chosen here, sends the store what it reads of it, and says what was imported", async () => {
-    const answer = Promise.withResolvers<Answer<Targets>>();
-    vi.mocked(importTargets).mockReturnValue(answer.promise);
-    renderCard();
-
-    const button = screen.getByRole("button", {
-      name: "Reload from Portfolio Performance",
-    });
-    const picker = choose([chosen]);
+    fireEvent.click(button);
 
     await waitFor(() => {
-      expect(importTargets).toHaveBeenCalledWith(
-        readTargets(portfolioFile(clientOf([["Asset Allocation", reference]]))),
-        [],
-      );
-    });
-    expect(picker).toHaveValue("");
-    expect(button).toHaveAttribute("aria-busy", "true");
-
-    answer.resolve(saved({ ...targets, importedOn: "2026-09-15" }));
-
-    await waitFor(() => {
-      expect(
-        screen.getByRole("dialog", { name: "Target allocation imported" }),
-      ).toHaveAccessibleDescription(
-        "From the Asset Allocation taxonomy, as at 15 Sep 2026",
-      );
-    });
-    await waitFor(() => {
-      expect(button).not.toHaveAttribute("aria-busy");
+      expect(syncTargetsFromPortfolio).toHaveBeenCalledExactlyOnceWith(null);
     });
   });
 
-  it("says why a file cannot be read, and sends nothing", async () => {
-    renderCard();
-
-    choose([new File(["<?xml version='1.0'?>"], "portfolio.xml")]);
-
-    await waitFor(() => {
-      expect(
-        screen.getByRole("dialog", { name: "Allocation not imported" }),
-      ).toHaveAccessibleDescription(
-        "The file is saved as XML, and only a Portfolio Performance file saved in binary can be read",
-      );
-    });
-    expect(importTargets).not.toHaveBeenCalled();
-  });
-
-  it("says why when the store refuses the targets", async () => {
-    vi.mocked(importTargets).mockResolvedValue(
-      refused("A target allocation's categories add up to 100%"),
+  it("shows scenario-specific copy and passes the scenario branch when syncing in a scenario", async () => {
+    vi.mocked(syncTargetsFromPortfolio).mockResolvedValue(
+      saved({ ...targets, importedOn: "2026-09-25" }),
     );
-    renderCard(null);
+    renderCard({
+      branch: "Retire early",
+      portfolioStatus: {
+        fileName: "northstar.portfolio",
+        kind: "unsynced",
+        version: 4,
+      },
+    });
 
-    choose([chosen]);
+    const note = screen.getByRole("note");
+    const button = screen.getByRole("button", { name: "Sync from Portfolio" });
+
+    expect(note).toHaveTextContent(
+      "Portfolio file has newer holdings or categories",
+    );
+    expect(note).toHaveTextContent(
+      "Syncing pulls the household's latest holdings and target weights into this scenario.",
+    );
+    expect(button).toBeEnabled();
+
+    fireEvent.click(button);
 
     await waitFor(() => {
-      expect(
-        screen.getByRole("dialog", { name: "Allocation not imported" }),
-      ).toHaveAccessibleDescription(
-        "A target allocation's categories add up to 100%",
+      expect(syncTargetsFromPortfolio).toHaveBeenCalledExactlyOnceWith(
+        "Retire early",
       );
     });
   });
 
-  it("sends nothing when the picker closes without a file", () => {
+  it("disables Sync from Portfolio and ties it to the blocker caution when live CMA rates prevent syncing", () => {
+    const blockedReason =
+      "Emerging markets small cap has no CMA class, so this allocation cannot be synced while the plan runs on the CMA's rates";
+    renderCard({
+      portfolioStatus: {
+        blockedReason,
+        fileName: "northstar.portfolio",
+        kind: "unsynced",
+        version: 4,
+      },
+    });
+
+    const note = screen.getByRole("note");
+    const button = screen.getByRole("button", { name: "Sync from Portfolio" });
+
+    expect(note).toHaveTextContent("Portfolio file has unsynced changes");
+    expect(note).toHaveTextContent(blockedReason);
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription(
+      `Portfolio file has unsynced changes ${blockedReason}`,
+    );
+  });
+
+  it("sends nothing when the retarget file picker closes without a file", () => {
     renderCard();
 
     choose([]);
     choose(null);
 
+    expect(pullLifeStrategy).not.toHaveBeenCalled();
     expect(importTargets).not.toHaveBeenCalled();
-    expect(
-      screen.getByRole("button", { name: "Reload from Portfolio Performance" }),
-    ).toBeEnabled();
   });
 
   it("offers no retargeted file to download before one is retargeted", () => {
-    renderCard(null);
+    renderCard({ portfolioStatus: { kind: "missing" }, targets: null });
 
     expect(
       screen.queryByRole("link", { name: "Download the retargeted file" }),
@@ -296,9 +453,6 @@ describe("TargetAllocation", () => {
     });
     expect(pullLifeStrategy).toHaveBeenCalledWith("9244");
     expect(button).toHaveAttribute("aria-busy", "true");
-    expect(
-      screen.getByRole("button", { name: "Reload from Portfolio Performance" }),
-    ).not.toHaveAttribute("aria-busy");
 
     answer.resolve(saved({ ...targets, importedOn: "2026-09-15" }));
 
@@ -314,7 +468,7 @@ describe("TargetAllocation", () => {
     });
     const first = link.getAttribute("href") ?? "";
     expect(first).toMatch(/^blob:/);
-    expect(link).toHaveAttribute("download", "PortfolioPerformance.portfolio");
+    expect(link).toHaveAttribute("download", "northstar.portfolio");
     // The zip is stamped with the moment it was written, so the parts
     // are compared rather than the bytes.
     expect(
@@ -336,10 +490,6 @@ describe("TargetAllocation", () => {
       screen
         .getByRole("link", { name: "Download the retargeted file" })
         .getAttribute("href") ?? "";
-    // The first is let go in an effect, which React runs after the
-    // commit the new link is read from, and in a turn of its own once
-    // the redraw has run past its slice, so it is waited for rather
-    // than read off at once.
     await waitFor(() => {
       expect(StubUrl.revokeObjectURL).toHaveBeenCalledWith(first);
     });
@@ -351,37 +501,6 @@ describe("TargetAllocation", () => {
     expect(StubUrl.revokeObjectURL).toHaveBeenCalledWith(second);
   });
 
-  // The file offered would no longer be the allocation the store holds.
-  it("takes the retargeted file off when a file is imported as it is", async () => {
-    vi.stubGlobal("URL", StubUrl);
-    vi.mocked(pullLifeStrategy).mockResolvedValue(saved(holdings));
-    vi.mocked(importTargets).mockResolvedValue(
-      saved({ ...targets, importedOn: "2026-09-15" }),
-    );
-    renderCard();
-
-    await retargetWith(chosen);
-    const link = await screen.findByRole("link", {
-      name: "Download the retargeted file",
-    });
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "Reload from Portfolio Performance" }),
-    );
-    choose([chosen]);
-
-    await waitFor(() => {
-      expect(link).not.toBeInTheDocument();
-    });
-    // The file is let go in an effect, which can run in a turn after
-    // the commit that takes the link off, so it is waited for too.
-    await waitFor(() => {
-      expect(StubUrl.revokeObjectURL).toHaveBeenCalledWith(
-        link.getAttribute("href"),
-      );
-    });
-  });
-
   // The plan's split being the target allocation's own, the fund is
   // laid at its own four fifths in equities.
   it("retargets at the fund's own split while the plan's is the target allocation's own", async () => {
@@ -390,15 +509,7 @@ describe("TargetAllocation", () => {
     vi.mocked(importTargets).mockResolvedValue(
       saved({ ...targets, importedOn: "2026-09-15" }),
     );
-    render(
-      <TargetAllocation
-        cma={cma}
-        mappings={mappings}
-        split={null}
-        targets={targets}
-      />,
-      { wrapper: Toaster },
-    );
+    renderCard({ split: null });
 
     await retargetWith(chosen);
 
@@ -445,15 +556,7 @@ describe("TargetAllocation", () => {
   // laid at its own, and retargeting moves the plan with it, so there is
   // nothing to flag.
   it("offers each fund at its own split, flagging nothing, while the plan's split is the target allocation's own", async () => {
-    render(
-      <TargetAllocation
-        cma={cma}
-        mappings={mappings}
-        split={null}
-        targets={targets}
-      />,
-      { wrapper: Toaster },
-    );
+    renderCard({ split: null });
 
     fireEvent.click(
       screen.getByRole("button", { name: "Retarget from LifeStrategy" }),
@@ -468,15 +571,7 @@ describe("TargetAllocation", () => {
   });
 
   it("flags nothing while the plan holds no bonds either", async () => {
-    render(
-      <TargetAllocation
-        cma={cma}
-        mappings={mappings}
-        split={{ stocks: 1 }}
-        targets={targets}
-      />,
-      { wrapper: Toaster },
-    );
+    renderCard({ split: { stocks: 1 } });
 
     fireEvent.click(
       screen.getByRole("button", { name: "Retarget from LifeStrategy" }),
@@ -641,15 +736,7 @@ describe("TargetAllocation", () => {
   // has no name for.
   it("counts every category without a class its name suggests one for, and says how many it mapped", async () => {
     vi.mocked(mapByName).mockResolvedValue(saved(mappings));
-    render(
-      <TargetAllocation
-        cma={cma}
-        mappings={[]}
-        split={split}
-        targets={targets}
-      />,
-      { wrapper: Toaster },
-    );
+    renderCard({ mappings: [] });
 
     fireEvent.click(screen.getByRole("button", { name: "Map 8 by name" }));
 
@@ -679,17 +766,12 @@ describe("TargetAllocation", () => {
 
   it("offers no mapping by name with nothing to map, no CMA or no allocation", () => {
     const ftseUsa = targets.categories.find(({ name }) => name === "FTSE USA");
-    const { rerender } = render(
-      <TargetAllocation
-        cma={cma}
-        mappings={[
-          ...mappings,
-          { asset: "US large cap equities", category: ftseUsa?.id ?? "" },
-        ]}
-        split={split}
-        targets={targets}
-      />,
-    );
+    const { rerender } = renderCard({
+      mappings: [
+        ...mappings,
+        { asset: "US large cap equities", category: ftseUsa?.id ?? "" },
+      ],
+    });
 
     expect(
       screen.queryByRole("button", { name: /by name$/ }),
@@ -697,8 +779,10 @@ describe("TargetAllocation", () => {
 
     rerender(
       <TargetAllocation
+        branch={null}
         cma={null}
         mappings={[]}
+        portfolioStatus={syncedStatus}
         split={split}
         targets={targets}
       />,
@@ -709,7 +793,14 @@ describe("TargetAllocation", () => {
     ).not.toBeInTheDocument();
 
     rerender(
-      <TargetAllocation cma={cma} mappings={[]} split={split} targets={null} />,
+      <TargetAllocation
+        branch={null}
+        cma={cma}
+        mappings={[]}
+        portfolioStatus={{ kind: "missing" }}
+        split={split}
+        targets={null}
+      />,
     );
 
     expect(

@@ -154,7 +154,7 @@ describe("blendsOf", () => {
 
   it("makes no blend without a target allocation", () => {
     expect(blendsOf(cma, null, mappings)).toStrictEqual({
-      short: "No target allocation is imported to weight the CMA by",
+      short: "No target allocation is synced to weight the CMA by",
     });
   });
 
@@ -467,7 +467,7 @@ describe("derivedSet", () => {
       short: "No inflation curve is pulled",
     });
     expect(derivedSet({ ...sources, targets: null })).toStrictEqual({
-      short: "No target allocation is imported to weight the CMA by",
+      short: "No target allocation is synced to weight the CMA by",
     });
   });
 });
@@ -706,7 +706,7 @@ describe("spreadOf", () => {
     expect(
       spreadOf({ cma: vintages, mappings, targets: null }, live(0.8)),
     ).toStrictEqual({
-      short: "No target allocation is imported to weight the CMA by",
+      short: "No target allocation is synced to weight the CMA by",
     });
     expect(
       spreadOf(

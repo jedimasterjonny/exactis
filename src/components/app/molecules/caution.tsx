@@ -30,12 +30,14 @@ export function Caution({
   title,
 }: CautionProps): JSX.Element {
   return (
-    <Alert className="px-4 py-3" id={id} role="note" variant="caution">
+    <Alert className="px-4 py-3" role="note" variant="caution">
       <TriangleAlert aria-hidden />
-      <AlertTitle>{title}</AlertTitle>
-      {children !== undefined && (
-        <AlertDescription>{children}</AlertDescription>
-      )}
+      <div className="col-start-2 flex flex-col gap-0.5" id={id}>
+        <AlertTitle>{title}</AlertTitle>
+        {children !== undefined && (
+          <AlertDescription>{children}</AlertDescription>
+        )}
+      </div>
       {action !== undefined && <div className="col-start-2 mt-2">{action}</div>}
     </Alert>
   );

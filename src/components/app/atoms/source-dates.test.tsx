@@ -11,7 +11,7 @@ import { SourceDates } from "./source-dates";
 
 // The strip on the eighth of September over the fixtures' sources:
 // August's vintage with its data as of the end of June, the first of
-// September's curve, the allocation imported on the seventh, and fees
+// September's curve, the allocation synced on the seventh, and fees
 // and yield set that day; with what is given in their place.
 function renderStrip(
   given: Partial<ComponentProps<typeof SourceDates>> = {},
@@ -49,7 +49,7 @@ describe("SourceDates", () => {
       "BlackRock CMA": "Aug 2026, data 30 Jun 2026 · 70 days old",
       "BoE curve": "1 Sep 2026 · 7 days old",
       "Fees and yield": "Set 8 Sep 2026 · today",
-      "Target allocation": "Imported 7 Sep 2026 · 1 day old",
+      "Target allocation": "Synced 7 Sep 2026 · 1 day old",
     });
   });
 
@@ -65,7 +65,21 @@ describe("SourceDates", () => {
       "BlackRock CMA": "Not pulled yet",
       "BoE curve": "Not pulled yet",
       "Fees and yield": "Not dated",
-      "Target allocation": "Not imported yet",
+      "Target allocation": "Not synced yet",
+    });
+  });
+
+  it("omits relative age when a source date is ahead of today", () => {
+    renderStrip({
+      targets: { ...targets, importedOn: "2026-09-09" },
+      today: "2026-09-08",
+    });
+
+    expect(sources()).toStrictEqual({
+      "BlackRock CMA": "Aug 2026, data 30 Jun 2026 · 70 days old",
+      "BoE curve": "1 Sep 2026 · 7 days old",
+      "Fees and yield": "Set 8 Sep 2026 · today",
+      "Target allocation": "Synced 9 Sep 2026",
     });
   });
 });

@@ -1,5 +1,7 @@
 import * as z from "zod";
 
+import type { Portfolio, Target } from "@/data/targets";
+import type { Answer } from "@/lib/answer";
 import type { OptionGroup } from "@/lib/options";
 
 import { sumOf } from "@/lib/ledger";
@@ -110,10 +112,26 @@ export interface NewPortfolioTransaction {
 }
 
 // One leaf classification in the file's Asset Allocation taxonomy: its
-// protobuf classification id and disambiguated display name.
+// protobuf classification id, disambiguated display name, and the active
+// catalogued security UUIDs assigned to it.
 export interface PortfolioCategory {
   readonly id: string;
   readonly name: string;
+  readonly securityIds: readonly string[];
+}
+
+// Lightweight feed parsed from the household's owned .portfolio file
+// for Assumptions, Month end, and Cogitator: quote and transaction
+// freshness dates, validated target categories and portfolios (or their
+// refusal), and active account/category handoff lookups.
+export interface PortfolioFeed {
+  readonly handoff: PortfolioHandoff;
+  readonly latestQuoteDate: null | string;
+  readonly latestTransactionDate: null | string;
+  readonly targets: Answer<{
+    readonly categories: readonly Target[];
+    readonly portfolios: readonly Portfolio[];
+  }>;
 }
 
 // Input for recording a batch of historical quotes dated to one ISO
@@ -131,10 +149,10 @@ export interface PortfolioQuoteUpdate {
 
 // What reading a binary Portfolio Performance file hands the Portfolio
 // screen: the file name and base currency, the latest quote date across
-// priced securities (or null when none have quotes), the securities and
-// cash accounts, the security catalogue with per-account shares, the
-// Asset Allocation categories when present, active sterling totals, and
-// every transaction newest first.
+// active priced securities (or null when none exist), the securities
+// and cash accounts, the security catalogue with per-account shares,
+// the Asset Allocation categories when present, active sterling totals,
+// and every transaction newest first.
 export interface PortfolioSnapshot {
   readonly baseCurrency: string;
   readonly cashAccounts: readonly CashAccount[];
@@ -246,6 +264,21 @@ interface HoldingsView {
   readonly hasZeroShare: boolean;
   readonly rows: readonly HoldingRow[];
   readonly totalGbp: number;
+}
+
+interface PortfolioHandoff {
+  readonly securitiesAccounts: readonly {
+    readonly id: string;
+    readonly name: string;
+  }[];
+  readonly securitiesByCategory: Readonly<
+    Record<string, readonly PortfolioSecurityHandoff[]>
+  >;
+}
+
+interface PortfolioSecurityHandoff {
+  readonly heldInAccountIds: readonly string[];
+  readonly id: string;
 }
 
 interface TransactionsFilter {

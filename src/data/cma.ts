@@ -192,7 +192,7 @@ export function blendsOf(
   mappings: readonly Mapping[],
 ): Blends {
   if (targets === null) {
-    return { short: "No target allocation is imported to weight the CMA by" };
+    return { short: "No target allocation is synced to weight the CMA by" };
   }
   const asked = targets.categories.filter(({ share }) => share > 0);
   const named = new Map(cma.assets.map((asset) => [asset.name, asset]));

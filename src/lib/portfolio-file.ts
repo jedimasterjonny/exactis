@@ -9,6 +9,7 @@ import type {
   NewPortfolioSecurity,
   NewPortfolioTransaction,
   PortfolioCategory,
+  PortfolioFeed,
   PortfolioQuoteBatch,
   PortfolioQuoteUpdate,
   PortfolioSnapshot,
@@ -27,7 +28,7 @@ import {
   maxPortfolioScaled,
   roundPence,
 } from "@/data/portfolio";
-import { Refusal } from "@/lib/answer";
+import { answerOf, Refusal } from "@/lib/answer";
 import { sumOf } from "@/lib/ledger";
 import { formatPercent } from "@/lib/money";
 import {
@@ -144,7 +145,7 @@ interface WriteOptions {
 }
 
 // The taxonomy the target allocation is read from, as tradey reads it.
-export const taxonomy = "Asset Allocation";
+const taxonomy = "Asset Allocation";
 
 // What Portfolio Performance writes ahead of the protobuf in a file
 // saved in binary, and the part of the zip it writes both to.
@@ -582,6 +583,60 @@ export function appendTransaction(
   return { content, id };
 }
 
+// Opens a binary Portfolio Performance file once and extracts the
+// lightweight feed consumed by Assumptions, Month end, and Cogitator:
+// quote and transaction freshness dates, validated target categories
+// and portfolios (or their refusal), and active account/category
+// handoff lookups.
+export function readPortfolioFeed(file: Uint8Array): PortfolioFeed {
+  const client = messageOf(opened(file).client);
+  const securities = securitiesOf(client);
+  const held = sharesHeld(client);
+  const rawTransactions = messagesAt(client, fields.client.transactions);
+  const latestQuoteDate = latestQuoteDateOf(
+    securities,
+    held,
+    activePortfolioIdsOf(client),
+  );
+  const latestTransactionDate = latestTransactionDateOf(rawTransactions);
+  const targets = answerOf(() => {
+    const categories = readTargetsFromClient(client);
+    validateTargetShares(categories);
+    return { categories, portfolios: readPortfoliosFromClient(client) };
+  });
+  const { categories } = taxonomyInfoOf(client, securities);
+  const securitiesAccounts = messagesAt(client, fields.client.portfolios)
+    .filter((portfolio) => int32At(portfolio, fields.portfolio.isRetired) === 0)
+    .flatMap((portfolio) => {
+      const id = optionalText(portfolio, fields.portfolio.id);
+      const name = textOf(portfolio, fields.portfolio.name);
+      return id === undefined || name.trim() === "" ? [] : [{ id, name }];
+    });
+  const handoffPortfolioIds = new Set(
+    securitiesAccounts.map((account) => account.id),
+  );
+  const securitiesByCategory = Object.fromEntries(
+    categories.map((category) => [
+      category.id,
+      category.securityIds.map((id) => ({
+        heldInAccountIds: [...(held.get(id) ?? [])]
+          .filter(
+            ([portfolioId, written]) =>
+              handoffPortfolioIds.has(portfolioId) && written > 0,
+          )
+          .map(([portfolioId]) => portfolioId),
+        id,
+      })),
+    ]),
+  );
+  return {
+    handoff: { securitiesAccounts, securitiesByCategory },
+    latestQuoteDate,
+    latestTransactionDate,
+    targets,
+  };
+}
+
 // What each securities account a Portfolio Performance file lists held
 // in cash and was paid, read off its reference account, the cash
 // account its purchases are paid from: the account's name; the cash
@@ -692,7 +747,7 @@ export function readPortfolioSnapshot(
       (account) => account.marketValue,
     ),
   );
-  const { categories, categoryBySecurity } = taxonomyInfoOf(client);
+  const { categories, categoryBySecurity } = taxonomyInfoOf(client, securities);
   const holdings = holdingsOf(securities, held, {
     activePortfolioIds,
     categoryBySecurity,
@@ -1203,7 +1258,7 @@ function decodeTransaction(
 // Whether a classification id exists as a root-reachable named leaf in
 // the file's Asset Allocation taxonomy.
 function hasTaxonomyLeaf(client: Message, categoryId: string): boolean {
-  return taxonomyInfoOf(client).categories.some(
+  return taxonomyInfoOf(client, new Map()).categories.some(
     (category) => category.id === categoryId,
   );
 }
@@ -1901,7 +1956,10 @@ function targetsOf(
 // sorted security assignments from the file's Asset Allocation taxonomy,
 // returning empty results rather than refusing when the taxonomy or root
 // is absent.
-function taxonomyInfoOf(client: Message): {
+function taxonomyInfoOf(
+  client: Message,
+  securities: ReadonlyMap<string, Security>,
+): {
   readonly categories: readonly PortfolioCategory[];
   readonly categoryBySecurity: ReadonlyMap<string, string>;
 } {
@@ -1934,7 +1992,22 @@ function taxonomyInfoOf(client: Message): {
       : leaf.name,
   }));
   const categories: readonly PortfolioCategory[] = labeled
-    .map(({ id, name }) => ({ id, name }))
+    .map(({ assignments, id, name }) => {
+      const securityIds: string[] = [];
+      const seenSecurityIds = new Set<string>();
+      for (const { vehicle } of assignments) {
+        const security = securities.get(vehicle);
+        if (
+          security !== undefined &&
+          !security.isRetired &&
+          !seenSecurityIds.has(vehicle)
+        ) {
+          seenSecurityIds.add(vehicle);
+          securityIds.push(vehicle);
+        }
+      }
+      return { id, name, securityIds };
+    })
     .toSorted((one, other) => {
       const byName = one.name.localeCompare(other.name);
       return byName !== 0 ? byName : one.id.localeCompare(other.id);

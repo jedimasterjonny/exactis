@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import type { JSX } from "react";
 
+import type { PortfolioTargetStatus } from "@/components/app/organisms/target-allocation";
+import type { Household } from "@/data/household";
 import type { RateSet as Chosen } from "@/data/rates";
 
 import { SourceDates } from "@/components/app/atoms/source-dates";
@@ -11,12 +13,20 @@ import { RateSet } from "@/components/app/organisms/rate-set";
 import { StatePension } from "@/components/app/organisms/state-pension";
 import { TargetAllocation } from "@/components/app/organisms/target-allocation";
 import { Screen } from "@/components/app/templates/screen";
+import { holdWhileLive } from "@/data/household";
+import { effectiveSyncedOn } from "@/data/portfolio";
 import { realRate } from "@/data/rates";
+import {
+  areTargetBookkeepingEqual,
+  areTargetsEquivalent,
+} from "@/data/targets";
 import { laidOut } from "@/engine/projection";
+import { answerOf } from "@/lib/answer";
 import { formatPercent } from "@/lib/money";
 import { today } from "@/lib/months";
 import { assumptions, sectionLabel } from "@/lib/nav";
-import { getHousehold, getSourcesDaysAgo } from "@/store/household";
+import { getHousehold, getOpened, getSourcesDaysAgo } from "@/store/household";
+import { getPortfolioFeed } from "@/store/portfolio";
 
 export const metadata: Metadata = { title: assumptions.label };
 
@@ -38,50 +48,55 @@ const setNames: Record<Chosen, string> = {
 // one, and beneath them the inflation source, over the curve last
 // pulled from the Bank, which the derived rates take and the rates typed
 // by hand set aside. The second holds the target
-// allocation last imported from Portfolio Performance, with the class
-// of the latest CMA each category is mapped onto, retargeted at the
-// split the plan holds now unless that is the target allocation's own,
-// as under the CMA's rates with no glide path. The third holds the
-// glide path, the bond share by age it sets. The fourth holds the State
-// Pension, each owner's qualifying years and what they earn, counted to
-// the retirement the plan lays out as its own projection has it, as the
-// plan screen lays it out. The header names the set of rates live, and
-// the body opens, above the strip and the tabs, on a sentence saying
-// the plan rate, what it comes to in today's money at the plan's
-// inflation, the rates worksheet's own real return, and that inflation,
-// so the screen answers its question before a card is read, whichever
-// tab is open; on a glide path the rate is the one it holds now, so the
-// sentence says "now". No-break spaces bind "a year" and "today's
-// money", so no line breaks inside either. The tab the address
-// names, as ?tab=glide-path does, is the one open as the screen opens.
-// The page reads the store, which reads the session first, so it
+// allocation fed from the household's owned Portfolio Performance file,
+// with the class of the latest CMA each category is mapped onto,
+// retargeted at the split the plan holds now unless that is the target
+// allocation's own, as under the CMA's rates with no glide path. The
+// third holds the glide path, the bond share by age it sets. The fourth
+// holds the State Pension, each owner's qualifying years and what they
+// earn, counted to the retirement the plan lays out as its own
+// projection has it, as the plan screen lays it out. The header names
+// the set of rates live, and the body opens, above the strip and the
+// tabs, on a sentence saying the plan rate, what it comes to in today's
+// money at the plan's inflation, the rates worksheet's own real return,
+// and that inflation, so the screen answers its question before a card
+// is read, whichever tab is open; on a glide path the rate is the one it
+// holds now, so the sentence says "now". No-break spaces bind "a year"
+// and "today's money", so no line breaks inside either. The tab the
+// address names, as ?tab=glide-path does, is the one open as the screen
+// opens. The page reads the store, which reads the session first, so it
 // renders behind the loading screen beside it.
 export default async function Assumptions({
   searchParams,
 }: Readonly<{
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }>): Promise<JSX.Element> {
-  const [
-    {
-      accounts,
-      allocation,
-      cma,
-      curve,
-      deductions,
-      glide,
-      mappings,
-      owners,
-      plan,
-      rates,
-      rateSet,
-      schedule,
-      split,
-      targets,
-    },
-    before,
-    { tab },
-  ] = await Promise.all([getHousehold(), getSourcesDaysAgo(30), searchParams]);
+  const [household, before, opened, owned, { tab }] = await Promise.all([
+    getHousehold(),
+    getSourcesDaysAgo(30),
+    getOpened(),
+    getPortfolioFeed(),
+    searchParams,
+  ]);
+  const {
+    accounts,
+    allocation,
+    cma,
+    curve,
+    deductions,
+    glide,
+    mappings,
+    owners,
+    plan,
+    rates,
+    rateSet,
+    schedule,
+    split,
+    targets,
+  } = household;
   const hasGlide = glide.length > 0;
+  const branch = opened?.name ?? null;
+  const portfolioStatus = portfolioStatusOf(owned, household, branch !== null);
   return (
     <Screen
       label={sectionLabel(assumptions)}
@@ -124,8 +139,10 @@ export default async function Assumptions({
           {
             children: (
               <TargetAllocation
+                branch={branch}
                 cma={cma?.latest ?? null}
                 mappings={mappings}
+                portfolioStatus={portfolioStatus}
                 split={rateSet === "cma" && !hasGlide ? null : split}
                 targets={targets}
               />
@@ -149,4 +166,71 @@ export default async function Assumptions({
       />
     </Screen>
   );
+}
+
+// Compares the household's owned .portfolio feed against the open
+// branch's saved target allocation, distinguishing intentional scenario
+// retargets (same bookkeeping, different shares) from unsynced updates
+// and evaluating live-CMA sync blockers when saved targets exist.
+function portfolioStatusOf(
+  owned: Awaited<ReturnType<typeof getPortfolioFeed>>,
+  household: Household,
+  isInScenario: boolean,
+): PortfolioTargetStatus {
+  if (owned === null) {
+    return { kind: "missing" };
+  }
+  if (owned.feed.targets.kind === "refused") {
+    return {
+      fileName: owned.fileName,
+      kind: "refused",
+      reason: owned.feed.targets.reason,
+    };
+  }
+  const live = owned.feed.targets.value;
+  if (areTargetsEquivalent(household.targets, live)) {
+    return { fileName: owned.fileName, kind: "synced", version: owned.version };
+  }
+  if (
+    isInScenario &&
+    household.targets !== null &&
+    areTargetBookkeepingEqual(household.targets, live)
+  ) {
+    return {
+      fileName: owned.fileName,
+      kind: "retargeted",
+      version: owned.version,
+    };
+  }
+  const blocked =
+    household.targets === null
+      ? null
+      : answerOf(() => {
+          holdWhileLive(
+            {
+              ...household,
+              targets: {
+                categories: live.categories,
+                importedOn: effectiveSyncedOn({
+                  latestQuoteDate: owned.feed.latestQuoteDate,
+                  latestTransactionDate: owned.feed.latestTransactionDate,
+                  savedOn: owned.savedOn,
+                }),
+                portfolios: live.portfolios,
+              },
+            },
+            {
+              cannot: "this allocation cannot be synced",
+              then: "sync it and give its new categories a class",
+            },
+          );
+        });
+  const blockedReason =
+    blocked?.kind === "refused" ? blocked.reason : undefined;
+  return {
+    ...(blockedReason !== undefined && { blockedReason }),
+    fileName: owned.fileName,
+    kind: "unsynced",
+    version: owned.version,
+  };
 }

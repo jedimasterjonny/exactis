@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Portfolio, Target, Targets } from "./targets";
 
-import { areTargetsEquivalent } from "./targets";
+import { areTargetBookkeepingEqual, areTargetsEquivalent } from "./targets";
 
 const equityCategory: Target = {
   accounts: [
@@ -372,6 +372,177 @@ describe("areTargetsEquivalent", () => {
                 { amount: 800, on: "2026-09-25" },
               ],
             },
+            giaPortfolio,
+          ],
+        },
+        live,
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("areTargetBookkeepingEqual", () => {
+  it("ignores category shares and importedOn when all bookkeeping fields match", () => {
+    const retargeted: Targets = {
+      ...kept,
+      categories: [
+        { ...equityCategory, share: 0.6 },
+        { ...bondCategory, share: 0.4 },
+      ],
+      importedOn: "2026-08-01",
+    };
+
+    expect(areTargetBookkeepingEqual(retargeted, live)).toBe(true);
+    expect(areTargetsEquivalent(retargeted, live)).toBe(false);
+  });
+
+  it("matches reordered categories by id even when target shares differ", () => {
+    const reorderedWithDifferentShares: Targets = {
+      ...kept,
+      categories: [
+        { ...bondCategory, share: 0.45 },
+        { ...equityCategory, share: 0.55 },
+      ],
+    };
+
+    expect(areTargetBookkeepingEqual(reorderedWithDifferentShares, live)).toBe(
+      true,
+    );
+    expect(
+      areTargetBookkeepingEqual(kept, {
+        ...live,
+        categories: [
+          { ...bondCategory, share: 0.4 },
+          { ...equityCategory, share: 0.6 },
+        ],
+      }),
+    ).toBe(true);
+  });
+
+  it("returns false when portfolios are omitted or any non-share category or portfolio field differs", () => {
+    expect(
+      areTargetBookkeepingEqual(
+        { categories: [equityCategory], importedOn: "2026-09-15" },
+        { categories: [equityCategory], portfolios: [] },
+      ),
+    ).toBe(false);
+    expect(
+      areTargetBookkeepingEqual(
+        { ...kept, categories: [equityCategory] },
+        live,
+      ),
+    ).toBe(false);
+    expect(
+      areTargetBookkeepingEqual(
+        { ...kept, categories: [equityCategory, equityCategory] },
+        live,
+      ),
+    ).toBe(false);
+    expect(
+      areTargetBookkeepingEqual(kept, {
+        ...live,
+        categories: [equityCategory, equityCategory],
+      }),
+    ).toBe(false);
+    expect(
+      areTargetBookkeepingEqual(
+        {
+          ...kept,
+          categories: [{ ...equityCategory, id: "cat-other" }, bondCategory],
+        },
+        live,
+      ),
+    ).toBe(false);
+    expect(
+      areTargetBookkeepingEqual(
+        {
+          ...kept,
+          categories: [
+            { ...equityCategory, name: "World equity" },
+            bondCategory,
+          ],
+        },
+        live,
+      ),
+    ).toBe(false);
+    expect(
+      areTargetBookkeepingEqual(
+        {
+          ...kept,
+          categories: [
+            { ...equityCategory, classes: ["Equity"] },
+            bondCategory,
+          ],
+        },
+        live,
+      ),
+    ).toBe(false);
+    expect(
+      areTargetBookkeepingEqual(
+        {
+          ...kept,
+          categories: [
+            { ...equityCategory, isImplemented: false },
+            bondCategory,
+          ],
+        },
+        live,
+      ),
+    ).toBe(false);
+    expect(
+      areTargetBookkeepingEqual(
+        {
+          ...kept,
+          categories: [{ ...equityCategory, value: 9999 }, bondCategory],
+        },
+        live,
+      ),
+    ).toBe(false);
+    expect(
+      areTargetBookkeepingEqual(
+        {
+          ...kept,
+          categories: [
+            {
+              ...equityCategory,
+              accounts: [{ name: "Harbour ISA", value: 8400 }],
+            },
+            bondCategory,
+          ],
+        },
+        live,
+      ),
+    ).toBe(false);
+    expect(
+      areTargetBookkeepingEqual({ ...kept, portfolios: [isaPortfolio] }, live),
+    ).toBe(false);
+    expect(
+      areTargetBookkeepingEqual(
+        { ...kept, portfolios: [giaPortfolio, isaPortfolio] },
+        live,
+      ),
+    ).toBe(false);
+    expect(
+      areTargetBookkeepingEqual(
+        {
+          ...kept,
+          portfolios: [{ ...isaPortfolio, name: "Renamed ISA" }, giaPortfolio],
+        },
+        live,
+      ),
+    ).toBe(false);
+    expect(
+      areTargetBookkeepingEqual(
+        { ...kept, portfolios: [{ ...isaPortfolio, cash: 500 }, giaPortfolio] },
+        live,
+      ),
+    ).toBe(false);
+    expect(
+      areTargetBookkeepingEqual(
+        {
+          ...kept,
+          portfolios: [
+            { ...isaPortfolio, paid: [{ amount: 1200, on: "2026-08-25" }] },
             giaPortfolio,
           ],
         },

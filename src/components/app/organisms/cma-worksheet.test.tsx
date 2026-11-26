@@ -351,10 +351,15 @@ describe("CmaWorksheet", () => {
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
 
-  it("says nothing is worked out before a target allocation is imported", () => {
+  it("says nothing is worked out before there is a target allocation", () => {
     renderSheet({ targets: null });
 
-    expect(screen.getByText("No allocation imported yet")).toBeInTheDocument();
+    expect(screen.getByText("No target allocation yet")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Upload a portfolio file on Portfolio, or sync it on the Target allocation tab.",
+      ),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
 

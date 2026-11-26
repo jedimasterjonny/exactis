@@ -5,7 +5,7 @@ import type { Curve } from "@/data/inflation";
 import type { Targets } from "@/data/targets";
 
 import { vintageMonth } from "@/data/cma";
-import { formatDated } from "@/lib/months";
+import { formatDated, formatDay } from "@/lib/months";
 
 interface SourceDatesProps {
   readonly cma: null | Vintages;
@@ -17,7 +17,7 @@ interface SourceDatesProps {
 
 // The four things the rates rest on, in one strip, each with the day it
 // was brought in on and how old that is: BlackRock's vintage and the day
-// its data are as of, the Bank's curve, the target allocation imported,
+// its data are as of, the Bank's curve, the target allocation synced,
 // and the fees and yield, the only two nothing pulled moves. A source
 // not brought in yet says so, and so do fees and yield kept before the
 // day was. The strip says how old each is rather than judging whether
@@ -31,7 +31,8 @@ export function SourceDates({
   targets,
   today,
 }: SourceDatesProps): JSX.Element {
-  const dated = (day: string): string => formatDated(day, today);
+  const dated = (day: string): string =>
+    day > today ? formatDay(day) : formatDated(day, today);
   const sources = [
     {
       name: "BlackRock CMA",
@@ -48,8 +49,8 @@ export function SourceDates({
       name: "Target allocation",
       value:
         targets === null
-          ? "Not imported yet"
-          : `Imported ${dated(targets.importedOn)}`,
+          ? "Not synced yet"
+          : `Synced ${dated(targets.importedOn)}`,
     },
     {
       name: "Fees and yield",

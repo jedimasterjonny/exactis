@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Written } from "@/lib/protobuf.fixture";
 
-import { Refusal } from "@/lib/answer";
+import { Refusal, refused, saved } from "@/lib/answer";
 import {
   clientOf,
   portfolioFile,
@@ -26,6 +26,7 @@ import {
   appendAccount,
   appendSecurity,
   appendTransaction,
+  readPortfolioFeed,
   readPortfolios,
   readPortfolioSnapshot,
   readPortfolioTargets,
@@ -738,8 +739,16 @@ describe("readPortfolioSnapshot", () => {
         },
       ],
       categories: [
-        { id: "aa-dev", name: "Global equity" },
-        { id: "aa-bonds", name: "UK gilts" },
+        {
+          id: "aa-dev",
+          name: "Global equity",
+          securityIds: ["sec-gbp", "sec-usd"],
+        },
+        {
+          id: "aa-bonds",
+          name: "UK gilts",
+          securityIds: ["sec-gbp", "sec-gbx"],
+        },
       ],
       fileName: "household.portfolio",
       holdings: [
@@ -1586,9 +1595,9 @@ describe("readPortfolioSnapshot", () => {
 
     const snapshot = readPortfolioSnapshot(file, "tax.portfolio");
     expect(snapshot.categories).toStrictEqual([
-      { id: "a", name: "Alpha" },
-      { id: "loop", name: "Loop" },
-      { id: "z", name: "Zebra" },
+      { id: "a", name: "Alpha", securityIds: ["sec-split"] },
+      { id: "loop", name: "Loop", securityIds: [] },
+      { id: "z", name: "Zebra", securityIds: ["sec-split"] },
     ]);
     expect(String(snapshot.holdings[0]?.shares)).toBe("0.3");
     expect(snapshot.holdings[0]?.category).toBe("Alpha, Zebra");
@@ -1714,10 +1723,10 @@ describe("readPortfolioSnapshot", () => {
       "disambiguated.portfolio",
     );
     expect(disambiguatedSnapshot.categories).toStrictEqual([
-      { id: "bd-dom", name: "Bonds · Domestic" },
-      { id: "tie-a", name: "Cash" },
-      { id: "tie-b", name: "Cash" },
-      { id: "eq-dom", name: "Equity · Domestic" },
+      { id: "bd-dom", name: "Bonds · Domestic", securityIds: ["sec-both"] },
+      { id: "tie-a", name: "Cash", securityIds: [] },
+      { id: "tie-b", name: "Cash", securityIds: [] },
+      { id: "eq-dom", name: "Equity · Domestic", securityIds: ["sec-both"] },
     ]);
     expect(disambiguatedSnapshot.holdings[0]?.category).toBe(
       "Bonds · Domestic, Equity · Domestic",
@@ -1978,6 +1987,110 @@ describe("readPortfolioSnapshot", () => {
         "The file is saved as XML, and only a Portfolio Performance file saved in binary can be read",
       ),
     );
+  });
+
+  it("filters category securityIds to active catalogued deduplicated securities while keeping retired holding categories", () => {
+    const file = portfolioFile([
+      [
+        2,
+        [
+          [1, "sec-active"],
+          [3, "Active Tracker"],
+          [4, "GBP"],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-retired"],
+          [3, "Retired Tracker"],
+          [4, "GBP"],
+          [20, 1],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-isa"],
+          [2, "ISA Cash"],
+          [3, "GBP"],
+        ],
+      ],
+      [
+        8,
+        [
+          [2, "Asset Allocation"],
+          [
+            5,
+            [
+              [1, "root"],
+              [3, "Asset Allocation"],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "aa-eq"],
+              [2, "root"],
+              [3, "Global equity"],
+              [
+                9,
+                [
+                  [1, "sec-active"],
+                  [2, 5000],
+                ],
+              ],
+              // Duplicate assignment to the same leaf is deduplicated.
+              [
+                9,
+                [
+                  [1, "sec-active"],
+                  [2, 5000],
+                ],
+              ],
+              // Retired security excluded from securityIds, kept on holding.category.
+              [
+                9,
+                [
+                  [1, "sec-retired"],
+                  [2, 10_000],
+                ],
+              ],
+              // Cash account and unlisted vehicles excluded from securityIds.
+              [
+                9,
+                [
+                  [1, "cash-isa"],
+                  [2, 10_000],
+                ],
+              ],
+              [
+                9,
+                [
+                  [1, "sec-unlisted"],
+                  [2, 10_000],
+                ],
+              ],
+            ],
+          ],
+        ],
+      ],
+    ]);
+
+    const snapshot = readPortfolioSnapshot(file, "filtered.portfolio");
+    expect(snapshot.categories).toStrictEqual([
+      { id: "aa-eq", name: "Global equity", securityIds: ["sec-active"] },
+    ]);
+    expect(
+      snapshot.holdings.map(({ category, id, isRetired }) => ({
+        category,
+        id,
+        isRetired,
+      })),
+    ).toStrictEqual([
+      { category: "Global equity", id: "sec-active", isRetired: false },
+      { category: "Global equity", id: "sec-retired", isRetired: true },
+    ]);
   });
 });
 
@@ -4579,5 +4692,371 @@ describe("readPortfolioTargets", () => {
         "The file is not a zip, as a Portfolio Performance file saved in binary is",
       ),
     );
+  });
+});
+
+describe("readPortfolioFeed", () => {
+  it("reads freshness dates, validated targets, and active handoff accounts and holdings in a single pass", () => {
+    const file = portfolioFile([
+      [1, 66],
+      [
+        2,
+        [
+          [1, "sec-world"],
+          [3, "Global Equity Index"],
+          [4, "GBP"],
+          [
+            13,
+            [
+              [1, 20_721],
+              [2, 12_500_000_000],
+            ],
+          ],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-watch"],
+          [3, "Watchlist Equity"],
+          [4, "GBP"],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-sold"],
+          [3, "Sold Out Gilts"],
+          [4, "GBP"],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-retired"],
+          [3, "Retired Equity"],
+          [4, "GBP"],
+          [20, 1],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-isa"],
+          [2, "Northstar ISA Cash"],
+          [3, "GBP"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-isa"],
+          [2, "Northstar ISA"],
+          [5, "cash-isa"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-old"],
+          [2, "Closed ISA"],
+          [4, 1],
+        ],
+      ],
+      // Active portfolios missing raw id or blank name are excluded from handoff.
+      [4, [[2, "No Id Portfolio"]]],
+      [
+        4,
+        [
+          [1, "port-blank"],
+          [2, "   "],
+        ],
+      ],
+      // Deposit & purchases across active and retired accounts, plus a sold-out lot.
+      [
+        5,
+        [
+          [1, "tx-1"],
+          [2, 6],
+          [3, "cash-isa"],
+          [9, [[1, 1_789_000_000]]],
+          [10, "GBP"],
+          [11, 200_000],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-2"],
+          [2, 0],
+          [3, "cash-isa"],
+          [4, "port-isa"],
+          [9, [[1, 1_789_200_000]]],
+          [10, "GBP"],
+          [11, 125_000],
+          [12, 1_000_000_000],
+          [14, "sec-world"],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-3"],
+          [2, 2],
+          [4, "port-old"],
+          [9, [[1, 1_789_100_000]]],
+          [12, 500_000_000],
+          [14, "sec-world"],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-4"],
+          [2, 2],
+          [4, "port-isa"],
+          [12, 100_000_000],
+          [14, "sec-sold"],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-5"],
+          [2, 3],
+          [4, "port-isa"],
+          [12, 100_000_000],
+          [14, "sec-sold"],
+        ],
+      ],
+      [
+        8,
+        [
+          [1, "tax-aa"],
+          [2, "Asset Allocation"],
+          [
+            5,
+            [
+              [1, "aa-root"],
+              [3, "Asset Allocation"],
+              [6, 10_000],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "aa-eq"],
+              [2, "aa-root"],
+              [3, "Global equity"],
+              [6, 8000],
+              [
+                9,
+                [
+                  [1, "sec-world"],
+                  [2, 10_000],
+                ],
+              ],
+              [
+                9,
+                [
+                  [1, "sec-watch"],
+                  [2, 10_000],
+                ],
+              ],
+              [
+                9,
+                [
+                  [1, "sec-retired"],
+                  [2, 10_000],
+                ],
+              ],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "aa-bonds"],
+              [2, "aa-root"],
+              [3, "UK gilts"],
+              [6, 2000],
+              [
+                9,
+                [
+                  [1, "sec-sold"],
+                  [2, 10_000],
+                ],
+              ],
+            ],
+          ],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+
+    expect(readPortfolioFeed(file)).toStrictEqual({
+      handoff: {
+        securitiesAccounts: [{ id: "port-isa", name: "Northstar ISA" }],
+        securitiesByCategory: {
+          "aa-bonds": [{ heldInAccountIds: [], id: "sec-sold" }],
+          "aa-eq": [
+            { heldInAccountIds: ["port-isa"], id: "sec-world" },
+            { heldInAccountIds: [], id: "sec-watch" },
+          ],
+        },
+      },
+      latestQuoteDate: "2026-09-25",
+      latestTransactionDate: "2026-09-12",
+      targets: saved({
+        categories: readTargets(file),
+        portfolios: readPortfolios(file),
+      }),
+    });
+  });
+
+  it("wraps target taxonomy, share-bound, sum-to-100%, and FX refusals in targets without dropping freshness dates", () => {
+    const withoutTaxonomy = portfolioFile(clientOf([]));
+    expect(readPortfolioFeed(withoutTaxonomy)).toStrictEqual({
+      handoff: {
+        securitiesAccounts: [{ id: "portfolio-1", name: "Brokerage" }],
+        securitiesByCategory: {},
+      },
+      latestQuoteDate: "2024-10-05",
+      latestTransactionDate: null,
+      targets: refused("The file has no Asset Allocation taxonomy, only none"),
+    });
+
+    const halfWeighted = portfolioFile([
+      [1, 66],
+      [
+        8,
+        [
+          [2, "Asset Allocation"],
+          [
+            5,
+            [
+              [1, "root"],
+              [3, "Asset Allocation"],
+              [6, 10_000],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "half"],
+              [2, "root"],
+              [3, "Half"],
+              [6, 5000],
+            ],
+          ],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+    expect(readPortfolioFeed(halfWeighted).targets).toStrictEqual(
+      refused("Target category shares must add up to 100%"),
+    );
+
+    const negativeWeight = portfolioFile([
+      [1, 66],
+      [
+        8,
+        [
+          [2, "Asset Allocation"],
+          [
+            5,
+            [
+              [1, "root"],
+              [3, "Asset Allocation"],
+              [6, 10_000],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "neg"],
+              [2, "root"],
+              [3, "Negative"],
+              [6, -1000],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "pos"],
+              [2, "root"],
+              [3, "Positive"],
+              [6, 11_000],
+            ],
+          ],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+    expect(readPortfolioFeed(negativeWeight).targets).toStrictEqual(
+      refused("Each target category share must be between 0% and 100%"),
+    );
+
+    const overOneWeight = portfolioFile([
+      [1, 66],
+      [
+        8,
+        [
+          [2, "Asset Allocation"],
+          [
+            5,
+            [
+              [1, "root"],
+              [3, "Asset Allocation"],
+              [6, 10_000],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "over"],
+              [2, "root"],
+              [3, "Over"],
+              [6, 15_000],
+            ],
+          ],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+    expect(readPortfolioFeed(overOneWeight).targets).toStrictEqual(
+      refused("Each target category share must be between 0% and 100%"),
+    );
+
+    const unconvertibleFx = holding(
+      [["usd-fund", 10_000]],
+      [security("usd-fund", "USD", 5_000_000_000)],
+      [transaction(0, 100_000_000, "usd-fund")],
+    );
+    expect(readPortfolioFeed(unconvertibleFx).targets).toStrictEqual(
+      refused(
+        "The file holds Fund usd-fund, priced in USD, and no transaction in pounds gives a rate for it",
+      ),
+    );
+  });
+
+  it("refuses unreadable files and skips out-of-range transaction timestamps", () => {
+    expect(() => readPortfolioFeed(strToU8("<client></client>"))).toThrow(
+      new Refusal(
+        "The file is saved as XML, and only a Portfolio Performance file saved in binary can be read",
+      ),
+    );
+
+    const tooLate = portfolioFile([
+      [
+        5,
+        [
+          [2, 6],
+          [9, [[1, 300_000_000_000]]],
+          [10, "GBP"],
+          [11, 1000],
+        ],
+      ],
+    ]);
+    expect(readPortfolioFeed(tooLate).latestTransactionDate).toBeNull();
   });
 });

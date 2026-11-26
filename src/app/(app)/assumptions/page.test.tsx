@@ -8,10 +8,11 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Household } from "@/data/household";
+import type { PortfolioFeed } from "@/data/portfolio";
 import type { Targets } from "@/data/targets";
 import type { Answer } from "@/lib/answer";
 
-import { importTargets } from "@/actions/targets";
+import { syncTargetsFromPortfolio } from "@/actions/targets";
 import { Toaster } from "@/components/kit/toast";
 import { cma, mappings } from "@/data/cma.fixture";
 import { soundKept } from "@/data/household";
@@ -21,21 +22,19 @@ import { curve } from "@/data/inflation.fixture";
 import { owners } from "@/data/owners.fixture";
 import { allocation, rates } from "@/data/rates.fixture";
 import { targets } from "@/data/targets.fixture";
-import { saved } from "@/lib/answer";
-import {
-  clientOf,
-  portfolioFile,
-  reference,
-} from "@/lib/portfolio-file.fixture";
-import { getHousehold, getSourcesDaysAgo } from "@/store/household";
+import { refused, saved } from "@/lib/answer";
+import { getHousehold, getOpened, getSourcesDaysAgo } from "@/store/household";
+import { getPortfolioFeed } from "@/store/portfolio";
 import { worksheet } from "@/test/dom";
 
 import Assumptions, { metadata } from "./page";
 
 vi.mock("@/store/household", () => ({
   getHousehold: vi.fn(),
+  getOpened: vi.fn(),
   getSourcesDaysAgo: vi.fn(),
 }));
+vi.mock("@/store/portfolio", () => ({ getPortfolioFeed: vi.fn() }));
 vi.mock("@/actions/cma", () => ({ pullCma: vi.fn() }));
 vi.mock("@/actions/inflation", () => ({ pullCurve: vi.fn() }));
 vi.mock("@/actions/lifestrategy", () => ({ pullLifeStrategy: vi.fn() }));
@@ -44,6 +43,7 @@ vi.mock("@/actions/targets", () => ({
   importTargets: vi.fn(),
   mapByName: vi.fn(),
   mapCategory: vi.fn(),
+  syncTargetsFromPortfolio: vi.fn(),
 }));
 vi.mock("@/actions/plan", () => ({
   removeAnchor: vi.fn(),
@@ -53,6 +53,8 @@ vi.mock("@/actions/plan", () => ({
   saveRates: vi.fn(),
   saveRateSet: vi.fn(),
 }));
+
+const syncedTargets: Targets = { ...targets, portfolios: [] };
 
 // The fixtures' August vintage and the reference's mappings onto it,
 // 0.20% of fees and a 2% yield, the rates typed by hand live, the
@@ -69,8 +71,29 @@ const household: Household = {
   plan: retiring,
   rates,
   rateSet: "custom",
-  targets,
+  targets: syncedTargets,
 };
+
+// A stored portfolio feed carrying the given target answer, defaulting
+// to the reference categories with empty portfolios.
+function feedOf(
+  targetAnswer: PortfolioFeed["targets"] = saved({
+    categories: syncedTargets.categories,
+    portfolios: [],
+  }),
+): NonNullable<Awaited<ReturnType<typeof getPortfolioFeed>>> {
+  return {
+    feed: {
+      handoff: { securitiesAccounts: [], securitiesByCategory: {} },
+      latestQuoteDate: "2026-09-25",
+      latestTransactionDate: "2026-09-25",
+      targets: targetAnswer,
+    },
+    fileName: "northstar.portfolio",
+    savedOn: "2026-09-25",
+    version: 3,
+  };
+}
 
 // The page as Next renders it at /assumptions, under the query given.
 async function page(
@@ -82,6 +105,8 @@ async function page(
 describe("Assumptions", () => {
   beforeEach(() => {
     vi.mocked(getHousehold).mockResolvedValue(household);
+    vi.mocked(getOpened).mockResolvedValue(null);
+    vi.mocked(getPortfolioFeed).mockResolvedValue(feedOf());
     vi.mocked(getSourcesDaysAgo).mockResolvedValue(null);
   });
 
@@ -134,12 +159,12 @@ describe("Assumptions", () => {
   it("says above the tabs when each source was brought in, from the store's sources", async () => {
     render(await page());
 
-    const [vintage, curveDay, imported, deductions] =
+    const [vintage, curveDay, synced, deductions] =
       screen.getAllByRole("definition");
 
     expect(vintage).toHaveTextContent(/^Aug 2026, data 30 Jun 2026 · /);
     expect(curveDay).toHaveTextContent(/^1 Sep 2026 · /);
-    expect(imported).toHaveTextContent(/^Imported 7 Sep 2026 · /);
+    expect(synced).toHaveTextContent(/^Synced 7 Sep 2026 · /);
     expect(deductions).toHaveTextContent("Not dated");
   });
 
@@ -159,7 +184,7 @@ describe("Assumptions", () => {
     // A row a category, one for the group of them none of which is
     // blended before a CMA is pulled, and the header.
     expect(screen.getAllByRole("row")).toHaveLength(
-      targets.categories.length + 1 + 1,
+      syncedTargets.categories.length + 1 + 1,
     );
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
   });
@@ -179,7 +204,7 @@ describe("Assumptions", () => {
 
     expect(
       screen.getByRole("region", { name: "Target allocation" }),
-    ).toHaveTextContent("Reload from Portfolio Performance");
+    ).toHaveTextContent("Read from northstar.portfolio on Portfolio.");
     expect(
       screen.getAllByRole("combobox", { name: "CMA class for UK equity" })[0],
     ).toHaveValue("UK large cap equities");
@@ -309,42 +334,178 @@ describe("Assumptions", () => {
     ).not.toHaveAttribute("readonly");
   });
 
-  // A tab left is kept rather than drawn afresh, so the import is still
-  // held when the tab is opened again, and a second cannot be started
-  // over it.
-  it("keeps an import held while the rates are open", async () => {
+  // A tab left is kept rather than drawn afresh, so a sync in flight is
+  // still held when the tab is opened again, and a second cannot be
+  // started over it.
+  it("keeps a sync held while the rates are open", async () => {
     const answer = Promise.withResolvers<Answer<Targets>>();
-    vi.mocked(importTargets).mockReturnValue(answer.promise);
+    vi.mocked(syncTargetsFromPortfolio).mockReturnValue(answer.promise);
+    vi.mocked(getPortfolioFeed).mockResolvedValue(
+      feedOf(
+        saved({
+          categories: syncedTargets.categories.map((category, index) =>
+            index === 0
+              ? { ...category, value: category.value + 500 }
+              : category,
+          ),
+          portfolios: [],
+        }),
+      ),
+    );
     render(await page(), { wrapper: Toaster });
 
     fireEvent.click(screen.getByRole("tab", { name: "Target allocation" }));
-    fireEvent.change(screen.getByLabelText("Portfolio Performance file"), {
-      target: {
-        files: [
-          new File(
-            [portfolioFile(clientOf([["Asset Allocation", reference]]))],
-            "PortfolioPerformance.portfolio",
-          ),
-        ],
-      },
-    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Sync from Portfolio" }),
+    );
     await waitFor(() => {
-      expect(importTargets).toHaveBeenCalledOnce();
+      expect(syncTargetsFromPortfolio).toHaveBeenCalledExactlyOnceWith(null);
     });
     fireEvent.click(screen.getByRole("tab", { name: "Rates" }));
     fireEvent.click(screen.getByRole("tab", { name: "Target allocation" }));
 
-    const button = screen.getByRole("button", {
-      name: "Reload from Portfolio Performance",
-    });
+    const button = screen.getByRole("button", { name: "Sync from Portfolio" });
 
     expect(button).toHaveAttribute("aria-busy", "true");
 
-    answer.resolve(saved(targets));
+    answer.resolve(saved(syncedTargets));
 
     await waitFor(() => {
       expect(button).not.toHaveAttribute("aria-busy");
     });
+  });
+
+  it("shows missing status when no portfolio file has been uploaded", async () => {
+    vi.mocked(getPortfolioFeed).mockResolvedValue(null);
+
+    render(await page({ tab: "target-allocation" }));
+
+    expect(screen.getByRole("note")).toHaveTextContent(
+      "No portfolio file uploaded yet",
+    );
+  });
+
+  it("shows refused status when the owned portfolio file's targets cannot be read", async () => {
+    vi.mocked(getPortfolioFeed).mockResolvedValue(
+      feedOf(refused("The file has no Asset Allocation taxonomy, only none")),
+    );
+
+    render(await page({ tab: "target-allocation" }));
+
+    expect(screen.getByRole("note")).toHaveTextContent(
+      "Portfolio file could not be synced",
+    );
+    expect(screen.getByRole("note")).toHaveTextContent(
+      "The file has no Asset Allocation taxonomy, only none",
+    );
+  });
+
+  it("treats share-only divergence in a scenario as intentionally retargeted with no caution", async () => {
+    const [first, second, ...rest] = syncedTargets.categories;
+    vi.mocked(getOpened).mockResolvedValue({
+      isKept: true,
+      name: "Retire early",
+    });
+    vi.mocked(getPortfolioFeed).mockResolvedValue(
+      feedOf(
+        saved({
+          categories:
+            first !== undefined && second !== undefined
+              ? [
+                  { ...first, share: first.share + 0.05 },
+                  { ...second, share: second.share - 0.05 },
+                  ...rest,
+                ]
+              : syncedTargets.categories,
+          portfolios: [],
+        }),
+      ),
+    );
+
+    render(await page({ tab: "target-allocation" }));
+
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Sync from Portfolio" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Target allocation" }),
+    ).toHaveTextContent(
+      "Read from northstar.portfolio on Portfolio. Changes here apply to this scenario only.",
+    );
+  });
+
+  it("flags unsynced changes in a scenario when bookkeeping differs or targets are not synced yet", async () => {
+    vi.mocked(getOpened).mockResolvedValue({
+      isKept: true,
+      name: "Retire early",
+    });
+    vi.mocked(getPortfolioFeed).mockResolvedValue(
+      feedOf(
+        saved({
+          categories: syncedTargets.categories.map((category, index) =>
+            index === 0
+              ? { ...category, value: category.value + 100 }
+              : category,
+          ),
+          portfolios: [],
+        }),
+      ),
+    );
+
+    const { unmount } = render(await page({ tab: "target-allocation" }));
+
+    expect(screen.getByRole("note")).toHaveTextContent(
+      "Portfolio file has newer holdings or categories",
+    );
+    unmount();
+
+    vi.mocked(getHousehold).mockResolvedValue({ ...household, targets: null });
+    render(await page({ tab: "target-allocation" }));
+
+    expect(screen.getByText("No allocation synced yet")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Sync from Portfolio" }),
+    ).toBeEnabled();
+  });
+
+  it("evaluates live-CMA blockers when unsynced targets introduce an unmapped category", async () => {
+    const [first, ...rest] = syncedTargets.categories;
+    vi.mocked(getHousehold).mockResolvedValue({ ...household, rateSet: "cma" });
+    vi.mocked(getPortfolioFeed).mockResolvedValue(
+      feedOf(
+        saved({
+          categories:
+            first !== undefined
+              ? [
+                  { ...first, share: first.share - 0.05 },
+                  ...rest,
+                  {
+                    classes: ["Equity"],
+                    id: "unmapped-small-cap",
+                    isImplemented: true,
+                    name: "Global small cap",
+                    share: 0.05,
+                    value: 1000,
+                  },
+                ]
+              : syncedTargets.categories,
+          portfolios: [],
+        }),
+      ),
+    );
+
+    render(await page({ tab: "target-allocation" }));
+
+    const button = screen.getByRole("button", { name: "Sync from Portfolio" });
+
+    expect(screen.getByRole("note")).toHaveTextContent(
+      "Portfolio file has unsynced changes",
+    );
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription(
+      /this allocation cannot be synced while the plan runs on the CMA's rates/,
+    );
   });
 
   // August's blends less the deductions run stocks at 7.84% in all and
@@ -405,7 +566,7 @@ describe("Assumptions", () => {
         curve,
         deductions: household.deductions,
         mappings,
-        targets,
+        targets: syncedTargets,
       },
     });
 

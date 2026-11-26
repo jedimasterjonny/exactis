@@ -3,7 +3,7 @@ import { refresh } from "next/cache";
 import { cache } from "react";
 
 import type { Kept } from "@/data/household";
-import type { PortfolioSnapshot } from "@/data/portfolio";
+import type { PortfolioFeed, PortfolioSnapshot } from "@/data/portfolio";
 import type { Portfolio, Target } from "@/data/targets";
 import type { StoredPortfolio } from "@/db/portfolio";
 import type { Answer } from "@/lib/answer";
@@ -22,6 +22,7 @@ import { keepPortfolioAfter, readLatestPortfolio } from "@/db/portfolio";
 import { Refusal, refused, saved, Stale } from "@/lib/answer";
 import { dayOf, monthBefore, thisMonth } from "@/lib/months";
 import {
+  readPortfolioFeed,
   readPortfolioSnapshot,
   readPortfolioTargets,
 } from "@/lib/portfolio-file";
@@ -64,6 +65,15 @@ interface LivePortfolioTargets {
   readonly portfolios: readonly Portfolio[];
 }
 
+// Lightweight portfolio feed paired with the stored row's metadata for
+// Assumptions, Month end, and Cogitator without crossing raw bytes.
+interface OwnedPortfolioFeed {
+  readonly feed: PortfolioFeed;
+  readonly fileName: string;
+  readonly savedOn: string;
+  readonly version: number;
+}
+
 // What an in-place mutation of the stored .portfolio file returns to
 // amendPortfolio: the rewritten binary bytes and the action-specific
 // payload to hand back beside savedOn and version.
@@ -78,6 +88,19 @@ interface PortfolioMutation<TResult extends Record<string, unknown>> {
 const readLatest = cache(async (): Promise<null | StoredPortfolio> =>
   readLatestPortfolio(getDb()),
 );
+
+const readLatestFeed = cache(async (): Promise<null | OwnedPortfolioFeed> => {
+  const row = await readLatest();
+  if (row === null) {
+    return null;
+  }
+  return {
+    feed: readPortfolioFeed(row.content),
+    fileName: row.fileName,
+    savedOn: dayOf(row.savedAt),
+    version: row.version,
+  };
+});
 
 // Applies a byte-preserving mutation to the household's latest stored
 // .portfolio file after afterVersion, verifying the 4 MB ceiling and
@@ -148,6 +171,15 @@ export async function getPortfolio(): Promise<null | OwnedPortfolio> {
   }
   const snapshot = readPortfolioSnapshot(row.content, row.fileName);
   return { savedOn: dayOf(row.savedAt), snapshot, version: row.version };
+}
+
+// Lightweight portfolio feed parsed once per RSC request for
+// Assumptions, Month end, and Cogitator, or null before a file is
+// uploaded. Readable while a scenario is open because portfolio_files
+// belongs to the household alone.
+export async function getPortfolioFeed(): Promise<null | OwnedPortfolioFeed> {
+  await requireSession();
+  return readLatestFeed();
 }
 
 // The household's latest stored .portfolio file as exact raw bytes, or

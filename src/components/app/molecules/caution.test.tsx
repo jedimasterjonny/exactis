@@ -30,22 +30,36 @@ describe("Caution", () => {
     );
   });
 
-  it("carries an id for aria-describedby and renders an optional action beneath the text", () => {
+  it("scopes id to the title and description so aria-describedby excludes any action label", () => {
     render(
-      <Caution
-        action={<button type="button">Clear preview</button>}
-        id="preview-note"
-        title="Preview entries are kept in this browser tab only"
-      >
-        Balances and holdings are not recalculated.
-      </Caution>,
+      <>
+        <Caution
+          action={
+            <button aria-describedby="preview-note" type="button">
+              Clear preview
+            </button>
+          }
+          id="preview-note"
+          title="Preview entries are kept in this browser tab only"
+        >
+          Balances and holdings are not recalculated.
+        </Caution>
+        <button aria-describedby="preview-note" disabled type="button">
+          Save
+        </button>
+      </>,
     );
 
     const note = screen.getByRole("note");
+    const actionButton = screen.getByRole("button", { name: "Clear preview" });
+    const outsideButton = screen.getByRole("button", { name: "Save" });
 
-    expect(note).toHaveAttribute("id", "preview-note");
-    expect(
-      screen.getByRole("button", { name: "Clear preview" }),
-    ).toBeInTheDocument();
+    expect(note).not.toHaveAttribute("id");
+    expect(actionButton).toHaveAccessibleDescription(
+      "Preview entries are kept in this browser tab only Balances and holdings are not recalculated.",
+    );
+    expect(outsideButton).toHaveAccessibleDescription(
+      "Preview entries are kept in this browser tab only Balances and holdings are not recalculated.",
+    );
   });
 });

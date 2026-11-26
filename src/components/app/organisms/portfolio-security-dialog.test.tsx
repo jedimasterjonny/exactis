@@ -21,8 +21,8 @@ describe("PortfolioSecurityDialog", () => {
     render(
       <PortfolioSecurityDialog
         categories={[
-          { id: "aa-equity", name: "Global equity" },
-          { id: "aa-bonds", name: "UK gilts" },
+          { id: "aa-equity", name: "Global equity", securityIds: [] },
+          { id: "aa-bonds", name: "UK gilts", securityIds: [] },
         ]}
         onDismiss={vi.fn<() => void>()}
         onSaved={onSaved}
@@ -109,7 +109,7 @@ describe("PortfolioSecurityDialog", () => {
     const onDismiss = vi.fn<() => void>();
     const { rerender } = render(
       <PortfolioSecurityDialog
-        categories={[{ id: "aa-bonds", name: "UK gilts" }]}
+        categories={[{ id: "aa-bonds", name: "UK gilts", securityIds: [] }]}
         onDismiss={onDismiss}
         onSaved={onSaved}
         today="2026-09-25"
