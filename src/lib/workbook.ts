@@ -26,14 +26,25 @@ const valueTag = /<v>(.*?)<\/v>/s;
 const attribute = /\s([\w:]+)="([^"]*)"/g;
 const place = /^([A-Z]+)\d+$/;
 
-// The most the files a zip holds may unzip to, together, in bytes:
-// over ten times the 2.3 MB the largest of the Bank's workbooks unzips
-// to, and short of what a zip built to fill the memory unzips to.
+// The most the files wanted from a zip may unzip to, together, in
+// bytes: over six times the 4.7 MB of parts BlackRock's workbook is
+// read for, the most of any file read here, and short of what a zip
+// built to fill the memory unzips to.
 const ceiling = 32_000_000;
 
-// The most files a zip may list: nine times the 111 BlackRock's
-// workbook lists, the most of any file read.
+// The most files a zip may list: over twice the 463 BlackRock's
+// workbook lists, the most of any file read. Every file listed counts
+// against it, wanted or not, since what it bounds is the walk of the
+// zip's directory rather than what is unzipped.
 const mostFiles = 1000;
+
+// The parts a workbook is read for, named one by one; its sheets are
+// wanted by the prefix they are kept under instead, in isPartRead.
+const workbookParts: ReadonlySet<string> = new Set([
+  "xl/_rels/workbook.xml.rels",
+  "xl/sharedStrings.xml",
+  "xl/workbook.xml",
+]);
 
 // The five characters XML writes as entities, in a map rather than an
 // object, so a name an object inherits, constructor, is no entity.
@@ -49,13 +60,15 @@ const entities: ReadonlyMap<string, string> = new Map([
 // as the sheet lists them. What is read is the part of the format the
 // Bank of England's and BlackRock's workbooks are written in and no
 // more: the sheets the workbook lists and where it keeps them, the
-// strings it keeps once, and each cell's number or text. A sheet is
-// found by its name with any spaces around it let go, since BlackRock
-// writes one sheet's name with a space after it that no one reading the
-// tab could see. What the reader cannot find is refused in words naming
-// it, since the screen says why a file was not pulled.
+// strings it keeps once, and each cell's number or text. Those parts
+// are all that is taken from the zip, since a workbook can carry far
+// more beside them than the ceiling allows. A sheet is found by its
+// name with any spaces around it let go, since BlackRock writes one
+// sheet's name with a space after it that no one reading the tab could
+// see. What the reader cannot find is refused in words naming it, since
+// the screen says why a file was not pulled.
 export function readSheet(workbook: Uint8Array, name: string): readonly Row[] {
-  const parts = unzipped(workbook, "The workbook is not a zip");
+  const parts = unzipped(workbook, "The workbook is not a zip", isPartRead);
   const strings = stringsOf(parts);
   return [...partOf(parts, sheetPath(parts, name)).matchAll(rowTag)].map(
     ([, cells]) => rowOf(cells ?? "", strings),
@@ -64,32 +77,47 @@ export function readSheet(workbook: Uint8Array, name: string): readonly Row[] {
 
 // The files a zip holds by their paths, or a refusal in the words given
 // when it is no zip. The Bank's file is a zip of workbooks, and each
-// workbook a zip of its parts, so both are opened this way. A zip is
-// refused before another of its files is read once it lists more files
-// than the most, or once its files come to more than the ceiling, each
-// counted at the larger of its size in the zip and the size it says it
-// unzips to: a stored file is copied at the first, however many of the
-// zip's entries point at it, and a compressed one is unzipped into room
-// the size of the second, and cut off there whatever it unzips to.
-// ponytail: a compressed file is still inflated to its end past that
-// room, written nowhere, so the time is bounded only by deflate's
-// thousand to one over the 32 MB of compressed sizes the ceiling lets
-// through, some 33 GB inflated to nowhere, minutes for each zip; feed
-// fflate's streaming Inflate each file in slices and stop at what it
-// said, should a source ever send one.
-export function unzipped(file: Uint8Array, refusal: string): Unzipped {
+// workbook a zip of its parts, so both are opened this way. A caller
+// that knows which files it reads says so, and the rest are left where
+// they are: neither unzipped nor counted against the ceiling, so a
+// workbook is read for its sheets however much it carries beside them.
+// A caller that reads a zip whole says nothing and every file counts.
+// A zip is refused before another of its files is read once it lists
+// more files than the most, or once the files wanted from it come to
+// more than the ceiling, each counted at the larger of its size in the
+// zip and the size it says it unzips to: a stored file is copied at the
+// first, however many of the zip's entries point at it, and a
+// compressed one is unzipped into room the size of the second, and cut
+// off there whatever it unzips to.
+// ponytail: a file wanted is still inflated to its end past that room,
+// written nowhere, so the time is bounded only by deflate's thousand to
+// one over the 32 MB of compressed sizes the ceiling lets through, some
+// 33 GB inflated to nowhere, minutes for each zip. Naming the files
+// read spends that on those alone rather than on everything a zip
+// lists, which is what made BlackRock's workbook readable, but a bomb
+// written into one of them is inflated still; feed fflate's streaming
+// Inflate each file in slices and stop at what it said, should a source
+// ever send one.
+export function unzipped(
+  file: Uint8Array,
+  refusal: string,
+  isWanted?: (path: string) => boolean,
+): Unzipped {
   let files = 0;
   let size = 0;
   try {
     return unzipSync(file, {
       filter: (entry) => {
         files += 1;
-        size += Math.max(entry.size, entry.originalSize);
         if (files > mostFiles) {
           throw new Refusal(
             "The zip lists more than 1,000 files, far more than any read here",
           );
         }
+        if (isWanted?.(entry.name) === false) {
+          return false;
+        }
+        size += Math.max(entry.size, entry.originalSize);
         if (size > ceiling) {
           throw new Refusal(
             "The zip unzips to more than 32 MB, far past any file read from one",
@@ -148,6 +176,17 @@ function columnOf(reference: string | undefined): number {
     column = column * 26 + letter.charCodeAt(0) - 64;
   }
   return column - 1;
+}
+
+// Whether a workbook is read for the part at that path: the parts it
+// is read for by name, and every part kept under the sheets' prefix,
+// since which one holds the sheet is not known until the first two have
+// been read and both sources point at theirs under it. The rest is what
+// a workbook carries that the reader never opens, and BlackRock's
+// carries 27 MB of it, the values cached from each of the 213 workbooks
+// it links to, which came to more than the ceiling on their own.
+function isPartRead(path: string): boolean {
+  return workbookParts.has(path) || path.startsWith("xl/worksheets/");
 }
 
 function partOf(parts: Unzipped, path: string): string {
