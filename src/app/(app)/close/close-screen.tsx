@@ -1,8 +1,8 @@
 import type { JSX, ReactNode } from "react";
 
-import { CalendarCheck, History } from "lucide-react";
+import { Briefcase, CalendarCheck, History } from "lucide-react";
 import Link from "next/link";
-import { Suspense, use } from "react";
+import { Suspense, use, useId } from "react";
 
 import type { WorksheetRow } from "@/components/app/atoms/worksheet";
 import type { TrackRow } from "@/components/app/organisms/track-record";
@@ -10,16 +10,19 @@ import type { Household, Kept } from "@/data/household";
 import type { Plan } from "@/data/plan";
 import type { KeptPoint } from "@/data/progress";
 import type { Month } from "@/data/schedule";
+import type { Targets } from "@/data/targets";
 import type { Answer } from "@/lib/answer";
 import type { KeptClose, Landed, Passed } from "@/lib/landed";
 import type { Group, Moved, RateSource, Standing } from "@/lib/moved";
+import type { PortfolioFreshness } from "@/lib/sources";
 import type { SinceClose } from "@/store/household";
 
 import { Ledger } from "@/components/app/atoms/ledger";
 import { Note } from "@/components/app/atoms/note";
-import { PortfolioImport } from "@/components/app/atoms/portfolio-import";
+import { PortfolioSync } from "@/components/app/atoms/portfolio-sync";
 import { StepBar } from "@/components/app/atoms/step-bar";
 import { Worksheet } from "@/components/app/atoms/worksheet";
+import { Caution } from "@/components/app/molecules/caution";
 import { EmptyState } from "@/components/app/molecules/empty-state";
 import { MonthEnd } from "@/components/app/organisms/month-end";
 import { SectionCard } from "@/components/app/organisms/section-card";
@@ -57,7 +60,25 @@ import {
   sourceNames,
   standingOf,
 } from "@/lib/moved";
-import { cogitator, monthEnd, sectionLabel, subsectionLabel } from "@/lib/nav";
+import {
+  cogitator,
+  monthEnd,
+  portfolio as portfolioScreen,
+  sectionLabel,
+  subsectionLabel,
+} from "@/lib/nav";
+import { formatPortfolioDates, isPortfolioFreshFor } from "@/lib/sources";
+
+// How the household's owned portfolio file stands for the month end:
+// its freshness dates together with whether its target allocation is
+// refused, synced (carrying the synced targets for trade offers), or
+// unsynced (with an optional live-CMA sync blocker).
+export type ClosePortfolio = PortfolioFreshness &
+  (
+    | { readonly blockedReason?: string; readonly kind: "unsynced" }
+    | { readonly kind: "refused"; readonly reason: string }
+    | { readonly kind: "synced"; readonly targets: Targets }
+  );
 
 // A band of the futures as the card where the invested balances landed
 // gives it, to three significant figures, so a small pot's band over a
@@ -95,6 +116,7 @@ interface CloseScreenProps {
   readonly isInScenario: boolean;
   readonly isUpdating: boolean;
   readonly month: Month;
+  readonly portfolio: ClosePortfolio | null;
   readonly since: null | SinceClose;
   readonly today: string;
 }
@@ -146,8 +168,8 @@ interface Stood {
 // pull first, and says since when a month has been due: the
 // cut of the month after the latest point's, or that none is closed yet
 // with no point kept. Once it is, the balances the close set against those it
-// closed from, with what the plan paid in beside what Portfolio
-// Performance says was, where it says, what moved the plan since the
+// closed from, with what the plan paid in beside what Portfolio says
+// was, where it says, what moved the plan since the
 // close before as the steps movedSince takes, drawn as a waterfall of
 // the liquid worth where two steps or more moved it, the caption saying
 // the order they are taken in and a note the ends of the scale, with a
@@ -184,6 +206,7 @@ export function CloseScreen({
   isInScenario,
   isUpdating,
   month: due,
+  portfolio,
   since,
   today,
 }: CloseScreenProps): JSX.Element {
@@ -233,7 +256,12 @@ export function CloseScreen({
           plan={plan}
           schedule={schedule}
           sources={
-            <SourcePulls household={household} month={due} today={today} />
+            <SourcePulls
+              household={household}
+              month={due}
+              portfolio={portfolio}
+              today={today}
+            />
           }
           today={today}
         />
@@ -309,7 +337,7 @@ export function CloseScreen({
               },
               {
                 ...(moved.balances.actual.length > 0 && {
-                  detail: `${formatGbp(moved.balances.planned)} planned · ${moved.balances.actual.join(", ")} from Portfolio Performance`,
+                  detail: `${formatGbp(moved.balances.planned)} planned · ${moved.balances.actual.join(", ")} from Portfolio`,
                 }),
                 figure: formatGbp(moved.balances.paid),
                 label: "Paid in",
@@ -376,7 +404,7 @@ export function CloseScreen({
           />
         </Suspense>
       )}
-      <Trades month={due} moved={moved} targets={household.targets} />
+      <Trades month={due} moved={moved} portfolio={portfolio} />
     </Screen>
   );
 }
@@ -454,7 +482,7 @@ function cutDay(month: Month): string {
 
 // What a group's row rests on: for the balances, how far they stand from
 // what the month end expected, what was paid in, against what the plan
-// paid where any of it is what Portfolio Performance says was, and what
+// paid where any of it is what Portfolio says was, and what
 // moved them, and how many were left as they stood; for the rates, the sources that
 // changed, a tab of the assumptions screen at a time; for the household's
 // own changes, the records that changed.
@@ -606,9 +634,9 @@ function LandedCard({
 // horizon in it, naming the close and the band of its futures the
 // balances landed in; the balances against the middle future and the
 // middle half and middle 80% of the run; what the balances are, and how
-// many were left out; how paid in is counted, as Portfolio Performance
-// gives it for the accounts it names, or as the plan paid it, saying so
-// where the holdings were imported before this close; that the plan
+// many were left out; how paid in is counted, as Portfolio gives it for
+// the accounts it names, or as the plan paid it, saying so where the
+// portfolio file was last updated before this close; that the plan
 // draws on the savings, where it does in any of the months; and each
 // close passed over on the way, and why. Where no close gives a reading
 // it says so in one sentence: none was closed in the year, none checked
@@ -734,16 +762,16 @@ function notesOf(
   ];
 }
 
-// How a reading counts what was paid in: as Portfolio Performance gives
-// it for the accounts it names, with how far that is from what the plan
-// paid, or that it is the same to the pound, and as the plan paid it for
-// the rest; or as the plan paid it, saying so where the holdings were
-// imported before this close.
+// How a reading counts what was paid in: as Portfolio gives it for the
+// accounts it names, with how far that is from what the plan paid, or
+// that it is the same to the pound, and as the plan paid it for the
+// rest; or as the plan paid it, saying so where the portfolio file was
+// last updated before this close.
 function paidInOf({ beyond, paidBy, read }: Landed, now: Kept): string {
   if (paidBy.length === 0) {
     const { targets } = now;
     return targets !== null && targets.importedOn < cutOf(now.asOf)
-      ? "The futures count paid in as the plan paid it, since the holdings were imported before this close."
+      ? "The futures count paid in as the plan paid it, since the portfolio file was last updated before this close."
       : "The futures count paid in as the plan paid it.";
   }
   const side = beyond < 0 ? "less" : "more";
@@ -753,7 +781,7 @@ function paidInOf({ beyond, paidBy, read }: Landed, now: Kept): string {
       : `${formatGbp(Math.abs(beyond))} ${side} than the plan paid`;
   const rest =
     paidBy.length < read ? ", and as the plan paid for the rest" : "";
-  return `The futures count paid in as Portfolio Performance gives it for ${listed.format(paidBy)}, ${against}${rest}.`;
+  return `The futures count paid in as Portfolio gives it for ${listed.format(paidBy)}, ${against}${rest}.`;
 }
 
 // Why a close was passed over, as its note says it.
@@ -887,6 +915,56 @@ function spanOf({ expected, steps }: Moved): Span {
   return { hi, isDrawn: steps.length > 1 && hi > lo, lo };
 }
 
+// Trade actions and uninvested cash note for a fresh, synced portfolio
+// target allocation: offers each listed securities account's uninvested
+// cash, or falls back to what the plan paid in when no account cash was
+// read.
+function syncedTradesOf(
+  month: Month,
+  moved: Moved,
+  targets: Targets,
+): { readonly action: ReactNode; readonly detail: ReactNode } {
+  const held = targets.portfolios ?? [];
+  const uninvested =
+    held.length === 0 ? undefined : held.filter(({ cash }) => cash > 0);
+  const listed = new Set(
+    targets.categories.flatMap((category) =>
+      (category.accounts ?? []).map(({ name }) => name),
+    ),
+  );
+  const action =
+    uninvested === undefined
+      ? moved.invested > 0 && (
+          <Link
+            className={buttonVariants({ size: "sm" })}
+            href={`${cogitator.href}?amount=${String(moved.invested)}&from=${keyOf(month)}`}
+          >
+            {`Work out trades for ${formatGbp(moved.invested)}`}
+          </Link>
+        )
+      : uninvested
+          .filter(({ name }) => listed.has(name))
+          .map(({ cash, name }) => (
+            <Link
+              className={buttonVariants({ size: "sm" })}
+              href={`${cogitator.href}?${new URLSearchParams({ account: name, amount: String(cash), from: keyOf(month) }).toString()}`}
+              key={name}
+            >
+              {`Work out trades for ${formatGbp(cash)} in ${name}`}
+            </Link>
+          ));
+  return {
+    action,
+    detail: uninvested !== undefined && (
+      <p>
+        {uninvested.length === 0
+          ? "The portfolio holds no cash uninvested."
+          : `The portfolio holds ${uninvested.map(({ cash, name }) => [formatGbp(cash), name].join(" in ")).join(", ")} uninvested.`}
+      </p>
+    ),
+  };
+}
+
 // The title, which gives the answer: how far the close moved the
 // retirement, where it did; and otherwise how far the balances closed
 // from what the plan expected, or that they closed on it, with where
@@ -1000,7 +1078,7 @@ function TrackRecordSince({
   const moving =
     landed === null
       ? ""
-      : ` ${monthName(latest.month, "long")}'s is the one above, and moves with its balances or a Portfolio Performance import until ${next} closes.`;
+      : ` ${monthName(latest.month, "long")}'s is the one above, and moves with its balances or updates to the portfolio file until ${next} closes.`;
   return (
     <RecordCard caption="Middle half and middle 80% of the futures, with a reading each month end">
       {isMoved && (
@@ -1068,68 +1146,38 @@ function TrackRecordSince({
   );
 }
 
-// The offer of the cash each securities account holds uninvested to the
-// cogitator, an account at a time, as the amount to work trades out for
-// in it, the month closed with it so the cogitator can say where it
-// came from, or any amount chosen there, for the accounts the
-// allocation lists, since the cogitator can keep its trades to no
-// other; where the holdings were imported before their cash was read,
-// or none of it could be, what the plan paid into the ISAs and the
-// GIAs, in all; or, where they were imported before the month closed
-// was cut, the word to import them first, with the file to import them
-// from, and no amount, since trades worked out from them would be for
-// holdings that have moved since. What the plan paid in is said
-// whichever is offered, and the cash held where it was read.
+// The offer of trades to the cogitator after a month closes: always
+// says what the plan paid into the ISAs and GIA and offers to choose an
+// amount; guides to upload, open, update or sync the owned portfolio
+// file when it is missing, refused, stale for the month's cut or
+// unsynced; and once fresh and synced, offers each listed securities
+// account's uninvested cash or what the plan paid in.
 function Trades({
   month,
   moved,
-  targets,
+  portfolio,
 }: {
   readonly month: Month;
   readonly moved: Moved;
-  readonly targets: Kept["targets"];
+  readonly portfolio: ClosePortfolio | null;
 }): JSX.Element {
-  const fresh =
-    targets === null || targets.importedOn < cutOf(month) ? null : targets;
-  const held = fresh?.portfolios ?? [];
-  const uninvested =
-    held.length === 0 ? undefined : held.filter(({ cash }) => cash > 0);
-  const listed = new Set(
-    fresh?.categories.flatMap((category) =>
-      (category.accounts ?? []).map(({ name }) => name),
-    ),
-  );
+  const blockedId = useId();
   const months =
     moved.months === 1
       ? `in ${formatMonth(month)}`
       : `in the ${String(moved.months)} months to ${formatMonth(month)}`;
   const paid = moved.invested === 0 ? "nothing" : formatGbp(moved.invested);
-  const offers =
-    uninvested === undefined
-      ? moved.invested > 0 && (
-          <Link
-            className={buttonVariants({ size: "sm" })}
-            href={`${cogitator.href}?amount=${String(moved.invested)}&from=${keyOf(month)}`}
-          >
-            {`Work out trades for ${formatGbp(moved.invested)}`}
-          </Link>
-        )
-      : uninvested
-          .filter(({ name }) => listed.has(name))
-          .map(({ cash, name }) => (
-            <Link
-              className={buttonVariants({ size: "sm" })}
-              href={`${cogitator.href}?${new URLSearchParams({ account: name, amount: String(cash), from: keyOf(month) }).toString()}`}
-              key={name}
-            >
-              {`Work out trades for ${formatGbp(cash)} in ${name}`}
-            </Link>
-          ));
+  const { action, detail } = tradesStateOf({
+    blockedId,
+    month,
+    moved,
+    portfolio,
+  });
   return (
     <SectionCard
       actions={
         <>
-          {fresh === null ? <PortfolioImport /> : offers}
+          {action}
           <Link
             className={buttonVariants({ size: "sm", variant: "outline" })}
             href={cogitator.href}
@@ -1143,19 +1191,100 @@ function Trades({
     >
       <CardContent className="grid gap-4">
         <p>{`The plan paid ${paid} into the ISAs and GIA ${months}.`}</p>
-        {uninvested !== undefined && (
-          <p>
-            {uninvested.length === 0
-              ? "Portfolio Performance holds no cash uninvested."
-              : `Portfolio Performance holds ${uninvested.map(({ cash, name }) => [formatGbp(cash), name].join(" in ")).join(", ")} uninvested.`}
-          </p>
-        )}
-        {fresh === null && (
-          <Note>Import this month&apos;s holdings first.</Note>
-        )}
+        {detail}
       </CardContent>
     </SectionCard>
   );
+}
+
+// The primary action and status detail for the Trades card across all
+// five portfolio states: missing, refused, stale, unsynced (with or
+// without a live-CMA blocker), and fresh & synced.
+function tradesStateOf({
+  blockedId,
+  month,
+  moved,
+  portfolio,
+}: {
+  readonly blockedId: string;
+  readonly month: Month;
+  readonly moved: Moved;
+  readonly portfolio: ClosePortfolio | null;
+}): { readonly action: ReactNode; readonly detail: ReactNode } {
+  if (portfolio === null) {
+    return {
+      action: (
+        <Link
+          className={buttonVariants({ size: "sm" })}
+          href={portfolioScreen.href}
+        >
+          <Briefcase aria-hidden />
+          Upload on Portfolio
+        </Link>
+      ),
+      detail: <Note>Upload a portfolio file on Portfolio first.</Note>,
+    };
+  }
+  if (portfolio.kind === "refused") {
+    return {
+      action: (
+        <Link
+          className={buttonVariants({ size: "sm" })}
+          href={portfolioScreen.href}
+        >
+          <Briefcase aria-hidden />
+          Open Portfolio
+        </Link>
+      ),
+      detail: (
+        <Caution title="Portfolio targets could not be read">
+          {portfolio.reason}
+        </Caution>
+      ),
+    };
+  }
+  if (!isPortfolioFreshFor(portfolio, month)) {
+    return {
+      action: (
+        <Link
+          className={buttonVariants({ size: "sm" })}
+          href={portfolioScreen.href}
+        >
+          <Briefcase aria-hidden />
+          Update on Portfolio
+        </Link>
+      ),
+      detail: (
+        <Note>
+          {`${formatPortfolioDates(portfolio)}. Update on Portfolio for ${formatDay(cutOf(month))} first.`}
+        </Note>
+      ),
+    };
+  }
+  if (portfolio.kind === "unsynced") {
+    const { blockedReason } = portfolio;
+    return {
+      action: (
+        <PortfolioSync
+          {...(blockedReason !== undefined && {
+            describedBy: blockedId,
+            isDisabled: true,
+          })}
+          branch={null}
+          variant="default"
+        />
+      ),
+      detail:
+        blockedReason !== undefined ? (
+          <Caution id={blockedId} title="Target allocation could not be synced">
+            {blockedReason}
+          </Caution>
+        ) : (
+          <Note>Sync the latest portfolio file before working out trades.</Note>
+        ),
+    };
+  }
+  return syncedTradesOf(month, moved, portfolio.targets);
 }
 
 // What a month of the track record says: in the crosshair, its reading,

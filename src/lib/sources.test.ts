@@ -9,7 +9,11 @@ import { kept } from "@/data/household.fixture";
 import { house, houseLoan } from "@/data/houses.fixture";
 import { curve } from "@/data/inflation.fixture";
 
-import { sourcesOf } from "./sources";
+import {
+  formatPortfolioDates,
+  isPortfolioFreshFor,
+  sourcesOf,
+} from "./sources";
 
 // A second house, kept with no purchase, invented.
 const annexe: Account = {
@@ -30,6 +34,125 @@ const housed = {
   rateSet: "cma" as const,
 };
 
+describe("formatPortfolioDates", () => {
+  it("writes both quote and transaction dates when present", () => {
+    expect(
+      formatPortfolioDates({
+        latestQuoteDate: "2026-10-23",
+        latestTransactionDate: "2026-10-15",
+        savedOn: "2026-10-24",
+      }),
+    ).toBe("Quotes to 23 Oct 2026 · Last transaction 15 Oct 2026");
+  });
+
+  it("writes only quotes when no transactions exist", () => {
+    expect(
+      formatPortfolioDates({
+        latestQuoteDate: "2026-10-23",
+        latestTransactionDate: null,
+        savedOn: "2026-10-24",
+      }),
+    ).toBe("Quotes to 23 Oct 2026 · No transactions");
+  });
+
+  it("writes only transactions when no quotes exist", () => {
+    expect(
+      formatPortfolioDates({
+        latestQuoteDate: null,
+        latestTransactionDate: "2026-10-15",
+        savedOn: "2026-10-24",
+      }),
+    ).toBe("No quotes yet · Last transaction 15 Oct 2026");
+  });
+
+  it("says neither is present when both dates are null", () => {
+    expect(
+      formatPortfolioDates({
+        latestQuoteDate: null,
+        latestTransactionDate: null,
+        savedOn: "2026-10-24",
+      }),
+    ).toBe("No quotes or transactions yet");
+  });
+});
+
+describe("isPortfolioFreshFor", () => {
+  // October 2026's close is cut on Friday 23 October 2026.
+  const october = { month: 9, year: 2026 };
+
+  it("is fresh when the latest quote falls on or after the month's cut", () => {
+    expect(
+      isPortfolioFreshFor(
+        {
+          latestQuoteDate: "2026-10-23",
+          latestTransactionDate: "2026-10-01",
+          savedOn: "2026-10-24",
+        },
+        october,
+      ),
+    ).toBe(true);
+    expect(
+      isPortfolioFreshFor(
+        {
+          latestQuoteDate: "2026-10-25",
+          latestTransactionDate: null,
+          savedOn: "2026-10-26",
+        },
+        october,
+      ),
+    ).toBe(true);
+  });
+
+  it("is stale when quotes exist and the latest falls before the cut, even with a newer transaction", () => {
+    expect(
+      isPortfolioFreshFor(
+        {
+          latestQuoteDate: "2026-10-22",
+          latestTransactionDate: "2026-10-24",
+          savedOn: "2026-10-24",
+        },
+        october,
+      ),
+    ).toBe(false);
+  });
+
+  it("falls back to the latest transaction when no quotes exist", () => {
+    expect(
+      isPortfolioFreshFor(
+        {
+          latestQuoteDate: null,
+          latestTransactionDate: "2026-10-23",
+          savedOn: "2026-10-24",
+        },
+        october,
+      ),
+    ).toBe(true);
+    expect(
+      isPortfolioFreshFor(
+        {
+          latestQuoteDate: null,
+          latestTransactionDate: "2026-10-22",
+          savedOn: "2026-10-24",
+        },
+        october,
+      ),
+    ).toBe(false);
+  });
+
+  it("is stale when neither quotes nor transactions exist", () => {
+    expect(
+      isPortfolioFreshFor(
+        {
+          latestQuoteDate: null,
+          latestTransactionDate: null,
+          savedOn: "2026-10-24",
+        },
+        october,
+      ),
+    ).toBe(false);
+  });
+});
+
 describe("sourcesOf", () => {
   // January 2027's close: October's vintage is three months before it,
   // September's four.
@@ -44,10 +167,17 @@ describe("sourcesOf", () => {
           },
         },
         { month: 0, year: 2027 },
+        null,
       );
 
-    expect(at(9)).toStrictEqual([{ isStale: false, source: "cma" }]);
-    expect(at(8)).toStrictEqual([{ isStale: true, source: "cma" }]);
+    expect(at(9)).toStrictEqual([
+      { isStale: false, source: "cma" },
+      { isStale: false, source: "portfolio" },
+    ]);
+    expect(at(8)).toStrictEqual([
+      { isStale: true, source: "cma" },
+      { isStale: false, source: "portfolio" },
+    ]);
   });
 
   // January 2027's close again: a curve of the first of December is a
@@ -57,27 +187,35 @@ describe("sourcesOf", () => {
       sourcesOf(
         { ...housed, curve: { ...curve, asOf } },
         { month: 0, year: 2027 },
+        null,
       );
 
     expect(at("2026-12-01")).toStrictEqual([
       { isStale: true, source: "cma" },
       { isStale: false, source: "curve" },
       { isStale: true, source: "housePrices" },
+      { isStale: false, source: "portfolio" },
     ]);
     expect(at("2026-11-30")).toStrictEqual([
       { isStale: true, source: "cma" },
       { isStale: true, source: "curve" },
       { isStale: true, source: "housePrices" },
+      { isStale: false, source: "portfolio" },
     ]);
   });
 
   // Nothing the custom rates run on reads the curve, however old.
   it("offers no curve under the custom rates", () => {
     expect(
-      sourcesOf({ ...housed, rateSet: "custom" }, { month: 0, year: 2027 }),
+      sourcesOf(
+        { ...housed, rateSet: "custom" },
+        { month: 0, year: 2027 },
+        null,
+      ),
     ).toStrictEqual([
       { isStale: true, source: "cma" },
       { isStale: true, source: "housePrices" },
+      { isStale: false, source: "portfolio" },
     ]);
   });
 
@@ -99,7 +237,8 @@ describe("sourcesOf", () => {
           },
         },
         { month: 9, year: 2026 },
-      ).at(-1);
+        null,
+      ).find(({ source }) => source === "housePrices");
 
     expect(at(7, "2026-09-16")).toStrictEqual({
       isStale: false,
@@ -126,8 +265,9 @@ describe("sourcesOf", () => {
       sourcesOf(
         { ...housed, accounts: [...housed.accounts, annexe] },
         { month: 9, year: 2026 },
+        null,
       ).map(({ source }) => source),
-    ).toStrictEqual(["cma", "curve", "housePrices"]);
+    ).toStrictEqual(["cma", "curve", "housePrices", "portfolio"]);
   });
 
   it("offers no house prices where no house is listed, or two with their purchases", () => {
@@ -139,21 +279,48 @@ describe("sourcesOf", () => {
         sourcesOf(
           { ...housed, accounts: listed },
           { month: 9, year: 2026 },
+          null,
         ).map(({ source }) => source),
-      ).toStrictEqual(["cma", "curve"]);
+      ).toStrictEqual(["cma", "curve", "portfolio"]);
     }
   });
 
-  it("marks nothing stale that was never pulled", () => {
+  it("marks the portfolio fresh when current for the cut and stale when behind it", () => {
+    const at = (
+      latestQuoteDate: string,
+    ): ReturnType<typeof sourcesOf>[number] | undefined =>
+      sourcesOf(
+        kept,
+        { month: 9, year: 2026 },
+        {
+          latestQuoteDate,
+          latestTransactionDate: "2026-10-15",
+          savedOn: "2026-10-24",
+        },
+      ).at(-1);
+
+    expect(at("2026-10-23")).toStrictEqual({
+      isStale: false,
+      source: "portfolio",
+    });
+    expect(at("2026-10-22")).toStrictEqual({
+      isStale: true,
+      source: "portfolio",
+    });
+  });
+
+  it("marks nothing stale that was never pulled or uploaded", () => {
     expect(
       sourcesOf(
         { ...housed, cma: null, curve: null, housePrices: null },
         { month: 0, year: 2027 },
+        null,
       ),
     ).toStrictEqual([
       { isStale: false, source: "cma" },
       { isStale: false, source: "curve" },
       { isStale: false, source: "housePrices" },
+      { isStale: false, source: "portfolio" },
     ]);
   });
 });
