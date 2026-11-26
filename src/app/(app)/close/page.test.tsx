@@ -8,7 +8,9 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Kept } from "@/data/household";
+import type { PortfolioFeed } from "@/data/portfolio";
 import type { KeptPoint } from "@/data/progress";
+import type { Portfolio, Target, Targets } from "@/data/targets";
 import type { KeptClose, Landed, Landing } from "@/lib/landed";
 import type { Moved } from "@/lib/moved";
 
@@ -29,8 +31,10 @@ import {
   getOpened,
   getSinceClose,
 } from "@/store/household";
+import { getPortfolioFeed } from "@/store/portfolio";
 import { bySlot } from "@/test/dom";
 
+import { CloseScreen } from "./close-screen";
 import Close, { metadata } from "./page";
 
 const replace = vi.hoisted(() => vi.fn());
@@ -41,11 +45,12 @@ vi.mock("@/store/household", () => ({
   getOpened: vi.fn(),
   getSinceClose: vi.fn(),
 }));
+vi.mock("@/store/portfolio", () => ({ getPortfolioFeed: vi.fn() }));
 vi.mock("@/actions/accounts", () => ({ closeBalances: vi.fn() }));
 vi.mock("@/actions/cma", () => ({ pullCma: vi.fn() }));
 vi.mock("@/actions/house-prices", () => ({ pullHousePrices: vi.fn() }));
 vi.mock("@/actions/inflation", () => ({ pullCurve: vi.fn() }));
-vi.mock("@/actions/targets", () => ({ importTargets: vi.fn() }));
+vi.mock("@/actions/targets", () => ({ syncTargetsFromPortfolio: vi.fn() }));
 // The reading stood in for, and the band it is named by kept as it is,
 // since the screen says it.
 vi.mock(import("@/lib/landed"), async (importOriginal) => ({
@@ -63,6 +68,14 @@ vi.mock(import("@/lib/moved"), async (importOriginal) => ({
 vi.mock("next/navigation", () => ({
   useRouter: (): { readonly replace: typeof replace } => ({ replace }),
 }));
+
+// The stored owned portfolio feed shape returned by getPortfolioFeed.
+type OwnedFeed = NonNullable<Awaited<ReturnType<typeof getPortfolioFeed>>>;
+
+// The reference target allocation with portfolios initialized, matching
+// a synced owned portfolio file.
+const syncedTargets: Targets = { ...targets, portfolios: [] };
+const syncedKept: Kept = { ...kept, targets: syncedTargets };
 
 // The reference household as the close of July 2026 left it.
 const july: Kept = {
@@ -174,6 +187,36 @@ function detail(name: string): HTMLElement {
   return screen.getByRole("rowheader", { name });
 }
 
+// A stored owned portfolio feed consistent with syncedTargets, fresh
+// for August 2026's close by default.
+function feedOf({
+  categories = syncedTargets.categories,
+  latestQuoteDate = "2026-08-25",
+  latestTransactionDate = "2026-08-24",
+  portfolios: held = [],
+  savedOn = "2026-08-25",
+  targets: answer,
+}: {
+  readonly categories?: readonly Target[];
+  readonly latestQuoteDate?: null | string;
+  readonly latestTransactionDate?: null | string;
+  readonly portfolios?: readonly Portfolio[];
+  readonly savedOn?: string;
+  readonly targets?: PortfolioFeed["targets"];
+} = {}): OwnedFeed {
+  return {
+    feed: {
+      handoff: { securitiesAccounts: [], securitiesByCategory: {} },
+      latestQuoteDate,
+      latestTransactionDate,
+      targets: answer ?? saved({ categories, portfolios: held }),
+    },
+    fileName: "plan.portfolio",
+    savedOn,
+    version: 1,
+  };
+}
+
 // The card where the invested balances landed, once it is drawn: its
 // caption, where it has one, and its lines.
 function landing(): {
@@ -208,13 +251,15 @@ function notes(): (null | string)[] {
 
 // The month end at the address given on the day given, over the
 // household given, as the store reads it, with a scenario open where one
-// is named, the close before the latest as given, and the closes kept in
-// the year before the latest as given, read once the page is drawn.
+// is named, the owned portfolio feed as given, the close before the
+// latest as given, and the closes kept in the year before the latest as
+// given, read once the page is drawn.
 async function renderClose({
   address = {},
   closes = unclosed,
   day = "2026-09-15",
-  household = kept,
+  household = syncedKept,
+  portfolio,
   scenario = null,
   since = { balances: null, before: saved(july), now: kept },
 }: {
@@ -222,6 +267,7 @@ async function renderClose({
   readonly closes?: Promise<readonly KeptClose[]>;
   readonly day?: string;
   readonly household?: Kept;
+  readonly portfolio?: null | OwnedFeed;
   readonly scenario?: null | string;
   readonly since?: Awaited<ReturnType<typeof getSinceClose>>;
 } = {}): Promise<void> {
@@ -232,6 +278,9 @@ async function renderClose({
   );
   vi.mocked(getSinceClose).mockResolvedValue(since);
   vi.mocked(getClosesBack).mockReturnValue(closes);
+  if (portfolio !== undefined) {
+    vi.mocked(getPortfolioFeed).mockResolvedValue(portfolio);
+  }
   const page = await Close({ searchParams: Promise.resolve(address) });
   render(page);
 }
@@ -265,8 +314,32 @@ function updating(): null | string {
     .getAttribute("href");
 }
 
+// Reference categories with a new unmapped category carved out of the
+// first category's share, triggering holdWhileLive under CMA rates.
+function withUnmappedCategory(
+  categories: readonly Target[],
+): readonly Target[] {
+  const [first, ...rest] = categories;
+  if (first === undefined) {
+    return categories;
+  }
+  return [
+    { ...first, share: first.share - 0.05 },
+    ...rest,
+    {
+      classes: ["Equity"],
+      id: "unmapped-small-cap",
+      isImplemented: true,
+      name: "Global small cap",
+      share: 0.05,
+      value: 1000,
+    },
+  ];
+}
+
 describe("Close", () => {
   beforeEach(() => {
+    vi.mocked(getPortfolioFeed).mockResolvedValue(feedOf());
     vi.mocked(movedSince).mockReturnValue(moved);
     vi.mocked(landedSince).mockReturnValue({ landed: null, passed: [] });
     vi.mocked(standingOf).mockReturnValue(atSixtyOne);
@@ -367,9 +440,9 @@ describe("Close", () => {
     ]);
   });
 
-  // Of the £1,500 paid in, what Portfolio Performance says was paid into
-  // the ISA and the pension stands in for the plan's £1,800.
-  it("says what was paid in against what the plan paid, and which accounts Portfolio Performance said it of", async () => {
+  // Of the £1,500 paid in, what Portfolio says was paid into the ISA
+  // and the pension stands in for the plan's £1,800.
+  it("says what was paid in against what the plan paid, and which accounts Portfolio said it of", async () => {
     vi.mocked(movedSince).mockReturnValue({
       ...moved,
       balances: {
@@ -385,7 +458,7 @@ describe("Close", () => {
         .getAllByRole("listitem")
         .map((step) => step.textContent),
     ).toContain(
-      "Paid in£1,800 planned · Stocks & shares ISA, Workplace pension from Portfolio Performance£1,500",
+      "Paid in£1,800 planned · Stocks & shares ISA, Workplace pension from Portfolio£1,500",
     );
     expect(detail("Balances against the plan")).toHaveAccessibleDescription(
       "£2,140 above what was expected · £1,500 paid in against £1,800 planned · £3,000 moved · 1 balance left unchecked",
@@ -397,11 +470,12 @@ describe("Close", () => {
   it("offers trades for the cash each account the allocation lists holds uninvested, in that account", async () => {
     await renderClose({
       household: { ...kept, targets: { ...targets, portfolios } },
+      portfolio: feedOf({ portfolios }),
     });
 
     expect(trades()).toStrictEqual([
       "The plan paid £1,250 into the ISAs and GIA in August 2026.",
-      "Portfolio Performance holds £1,830 in Stocks & shares ISA, £64 in Brokerage uninvested.",
+      "The portfolio holds £1,830 in Stocks & shares ISA, £64 in Brokerage uninvested.",
     ]);
     expect(links()).toStrictEqual([
       [
@@ -415,7 +489,37 @@ describe("Close", () => {
   it("offers what the plan paid in where the file gave no account's cash", async () => {
     await renderClose({
       household: { ...kept, targets: { ...targets, portfolios: [] } },
+      portfolio: feedOf({ portfolios: [] }),
     });
+
+    expect(trades()).toStrictEqual([
+      "The plan paid £1,250 into the ISAs and GIA in August 2026.",
+    ]);
+    expect(links()).toStrictEqual([
+      ["Work out trades for £1,250", "/cogitator?amount=1250&from=2026-08"],
+      ["Choose an amount", "/cogitator"],
+    ]);
+  });
+
+  it("offers what the plan paid in when CloseScreen receives synced targets without portfolio cash records", () => {
+    render(
+      <CloseScreen
+        closes={null}
+        household={soundKept(kept).household}
+        isInScenario={false}
+        isUpdating={false}
+        month={{ month: 7, year: 2026 }}
+        portfolio={{
+          kind: "synced",
+          latestQuoteDate: "2026-08-25",
+          latestTransactionDate: "2026-08-24",
+          savedOn: "2026-08-25",
+          targets,
+        }}
+        since={{ balances: null, before: saved(july), now: kept }}
+        today="2026-09-15"
+      />,
+    );
 
     expect(trades()).toStrictEqual([
       "The plan paid £1,250 into the ISAs and GIA in August 2026.",
@@ -428,56 +532,147 @@ describe("Close", () => {
 
   // An allocation read before the accounts holding each category were.
   it("offers no account's cash in trades where the allocation lists no account", async () => {
+    const withoutAccounts = targets.categories.map(
+      ({ classes, id, isImplemented, name, share, value }) => ({
+        classes,
+        id,
+        isImplemented,
+        name,
+        share,
+        value,
+      }),
+    );
     await renderClose({
       household: {
         ...kept,
-        targets: {
-          ...targets,
-          categories: targets.categories.map(
-            ({ classes, id, isImplemented, name, share, value }) => ({
-              classes,
-              id,
-              isImplemented,
-              name,
-              share,
-              value,
-            }),
-          ),
-          portfolios,
-        },
+        targets: { ...targets, categories: withoutAccounts, portfolios },
       },
+      portfolio: feedOf({ categories: withoutAccounts, portfolios }),
     });
 
     expect(trades()).toContain(
-      "Portfolio Performance holds £1,830 in Stocks & shares ISA, £64 in Brokerage uninvested.",
+      "The portfolio holds £1,830 in Stocks & shares ISA, £64 in Brokerage uninvested.",
     );
     expect(links()).toStrictEqual([["Choose an amount", "/cogitator"]]);
   });
 
   it("offers no account's cash where none holds any uninvested", async () => {
+    const zeroCash = portfolios.map((each) => ({ ...each, cash: 0 }));
     await renderClose({
-      household: {
-        ...kept,
-        targets: {
-          ...targets,
-          portfolios: portfolios.map((each) => ({ ...each, cash: 0 })),
-        },
-      },
+      household: { ...kept, targets: { ...targets, portfolios: zeroCash } },
+      portfolio: feedOf({ portfolios: zeroCash }),
     });
 
-    expect(trades()).toContain(
-      "Portfolio Performance holds no cash uninvested.",
-    );
+    expect(trades()).toContain("The portfolio holds no cash uninvested.");
     expect(links()).toStrictEqual([["Choose an amount", "/cogitator"]]);
   });
 
-  // September closed, on the fifteenth of October, over holdings
-  // imported on the seventh of September, before September was cut.
-  it("asks for this month's holdings, from the file, where they were imported before the month closed was cut", async () => {
+  // File saved before August's cut whose quotes reach the cut advances
+  // importedOn on sync, so pre-cut household targets are unsynced.
+  it("asks to sync when cut-day quotes outdate pre-cut saved targets even if the file was saved before the cut", async () => {
+    await renderClose({
+      household: {
+        ...kept,
+        targets: { ...targets, importedOn: "2026-08-24", portfolios },
+      },
+      portfolio: feedOf({
+        latestQuoteDate: "2026-08-25",
+        latestTransactionDate: "2026-08-24",
+        portfolios,
+        savedOn: "2026-08-24",
+      }),
+    });
+
+    const card = screen.getByRole("region", { name: "Trades" });
+
+    expect(trades()).toStrictEqual([
+      "The plan paid £1,250 into the ISAs and GIA in August 2026.",
+      "Sync the latest portfolio file before working out trades.",
+    ]);
+    expect(
+      within(card).getByRole("button", { name: "Sync from Portfolio" }),
+    ).toBeEnabled();
+    expect(links()).toStrictEqual([["Choose an amount", "/cogitator"]]);
+  });
+
+  // File saved on August's cut whose quotes and transactions both
+  // predate the cut is stale and keeps matching pre-cut targets without
+  // reporting a false sync mismatch.
+  it("treats a cut-day save with pre-cut quotes and transactions as stale rather than unsynced", async () => {
+    await renderClose({
+      household: {
+        ...kept,
+        targets: { ...targets, importedOn: "2026-08-20", portfolios },
+      },
+      portfolio: feedOf({
+        latestQuoteDate: "2026-08-24",
+        latestTransactionDate: "2026-08-20",
+        portfolios,
+        savedOn: "2026-08-25",
+      }),
+    });
+
+    const card = screen.getByRole("region", { name: "Trades" });
+
+    expect(trades()).toStrictEqual([
+      "The plan paid £1,250 into the ISAs and GIA in August 2026.",
+      "Quotes to 24 Aug 2026 · Last transaction 20 Aug 2026. Update on Portfolio for 25 Aug 2026 first.",
+    ]);
+    expect(
+      within(card).queryByRole("button", { name: "Sync from Portfolio" }),
+    ).not.toBeInTheDocument();
+    expect(links()).toStrictEqual([
+      ["Update on Portfolio", "/portfolio"],
+      ["Choose an amount", "/cogitator"],
+    ]);
+  });
+
+  it("guides to upload a portfolio file on Portfolio when none is stored", async () => {
+    await renderClose({ portfolio: null });
+
+    expect(trades()).toStrictEqual([
+      "The plan paid £1,250 into the ISAs and GIA in August 2026.",
+      "Upload a portfolio file on Portfolio first.",
+    ]);
+    expect(links()).toStrictEqual([
+      ["Upload on Portfolio", "/portfolio"],
+      ["Choose an amount", "/cogitator"],
+    ]);
+  });
+
+  it("shows a caution and links to Portfolio when the portfolio file's targets cannot be read", async () => {
+    await renderClose({
+      portfolio: feedOf({
+        targets: refused(
+          "The file has no Asset Allocation taxonomy, only none",
+        ),
+      }),
+    });
+
+    const card = screen.getByRole("region", { name: "Trades" });
+
+    expect(trades()).toStrictEqual([
+      "The plan paid £1,250 into the ISAs and GIA in August 2026.",
+    ]);
+    expect(within(card).getByRole("note")).toHaveTextContent(
+      "Portfolio targets could not be read",
+    );
+    expect(within(card).getByRole("note")).toHaveTextContent(
+      "The file has no Asset Allocation taxonomy, only none",
+    );
+    expect(links()).toStrictEqual([
+      ["Open Portfolio", "/portfolio"],
+      ["Choose an amount", "/cogitator"],
+    ]);
+  });
+
+  // September closed, on the fifteenth of October, over a portfolio
+  // file whose quotes stop at 25 August, before September's cut.
+  it("asks to update on Portfolio where the file's quotes are before the month closed was cut", async () => {
     await renderClose({
       day: "2026-10-15",
       household: {
-        ...kept,
+        ...syncedKept,
         asOf: { month: 8, year: 2026 },
         points: [
           ...kept.points,
@@ -490,25 +685,98 @@ describe("Close", () => {
 
     expect(trades()).toStrictEqual([
       "The plan paid £1,250 into the ISAs and GIA in September 2026.",
-      "Import this month's holdings first.",
+      "Quotes to 25 Aug 2026 · Last transaction 24 Aug 2026. Update on Portfolio for 25 Sep 2026 first.",
     ]);
-    expect(links()).toStrictEqual([["Choose an amount", "/cogitator"]]);
-    expect(
-      within(screen.getByRole("region", { name: "Trades" })).getByRole(
-        "button",
-        { name: "Import from Portfolio Performance" },
-      ),
-    ).toBeInTheDocument();
+    expect(links()).toStrictEqual([
+      ["Update on Portfolio", "/portfolio"],
+      ["Choose an amount", "/cogitator"],
+    ]);
   });
 
-  it("asks for holdings where none are imported, over the months since the close before", async () => {
+  it("asks to sync the portfolio file where no targets are saved yet, over the months since the close before", async () => {
     vi.mocked(movedSince).mockReturnValue({ ...moved, months: 3 });
     await renderClose({ household: { ...kept, targets: null } });
 
+    const card = screen.getByRole("region", { name: "Trades" });
+
     expect(trades()).toStrictEqual([
       "The plan paid £1,250 into the ISAs and GIA in the 3 months to August 2026.",
-      "Import this month's holdings first.",
+      "Sync the latest portfolio file before working out trades.",
     ]);
+    expect(
+      within(card).getByRole("button", { name: "Sync from Portfolio" }),
+    ).toBeEnabled();
+    expect(links()).toStrictEqual([["Choose an amount", "/cogitator"]]);
+  });
+
+  it("asks to sync when the fresh portfolio file's categories differ from the household's saved targets", async () => {
+    await renderClose({
+      portfolio: feedOf({
+        categories: syncedTargets.categories.map((category, index) =>
+          index === 0 ? { ...category, value: category.value + 500 } : category,
+        ),
+      }),
+    });
+
+    const card = screen.getByRole("region", { name: "Trades" });
+
+    expect(trades()).toStrictEqual([
+      "The plan paid £1,250 into the ISAs and GIA in August 2026.",
+      "Sync the latest portfolio file before working out trades.",
+    ]);
+    expect(
+      within(card).getByRole("button", { name: "Sync from Portfolio" }),
+    ).toBeEnabled();
+    expect(links()).toStrictEqual([["Choose an amount", "/cogitator"]]);
+  });
+
+  it("asks to sync when the file was saved on or after the month's cut while saved targets predate it", async () => {
+    await renderClose({
+      household: {
+        ...syncedKept,
+        targets: { ...syncedTargets, importedOn: "2026-08-20" },
+      },
+      portfolio: feedOf({ savedOn: "2026-08-25" }),
+    });
+
+    const card = screen.getByRole("region", { name: "Trades" });
+
+    expect(trades()).toStrictEqual([
+      "The plan paid £1,250 into the ISAs and GIA in August 2026.",
+      "Sync the latest portfolio file before working out trades.",
+    ]);
+    expect(
+      within(card).getByRole("button", { name: "Sync from Portfolio" }),
+    ).toBeEnabled();
+    expect(links()).toStrictEqual([["Choose an amount", "/cogitator"]]);
+  });
+
+  it("disables Sync from Portfolio with a caution when live CMA rates block syncing an unmapped category", async () => {
+    await renderClose({
+      household: { ...syncedKept, rateSet: "cma" },
+      portfolio: feedOf({
+        categories: withUnmappedCategory(syncedTargets.categories),
+      }),
+    });
+
+    const card = screen.getByRole("region", { name: "Trades" });
+    const syncButton = within(card).getByRole("button", {
+      name: "Sync from Portfolio",
+    });
+    const caution = within(card).getByRole("note");
+
+    expect(trades()).toStrictEqual([
+      "The plan paid £1,250 into the ISAs and GIA in August 2026.",
+    ]);
+    expect(caution).toHaveTextContent("Target allocation could not be synced");
+    expect(caution).toHaveTextContent(
+      /this allocation cannot be synced while the plan runs on the CMA's rates/u,
+    );
+    expect(syncButton).toBeDisabled();
+    expect(syncButton).toHaveAccessibleDescription(
+      /this allocation cannot be synced while the plan runs on the CMA's rates/u,
+    );
+    expect(links()).toStrictEqual([["Choose an amount", "/cogitator"]]);
   });
 
   // Nothing moved: the title says the month went to plan, the meta line
@@ -808,9 +1076,13 @@ describe("Close", () => {
     ).toBeInTheDocument();
     expect(
       within(
-        screen.getByRole("region", { name: "Balances on 25 Aug 2026" }),
-      ).getByRole("region", { name: "Sources" }),
-    ).toBeInTheDocument();
+        within(
+          screen.getByRole("region", { name: "Balances on 25 Aug 2026" }),
+        ).getByRole("region", { name: "Sources" }),
+      ).getByRole("group", { name: "Portfolio" }),
+    ).toHaveTextContent(
+      "PortfolioQuotes to 25 Aug 2026 · Last transaction 24 Aug 2026Open Portfolio",
+    );
     expect(
       within(screen.getByRole("banner")).getByRole("link", {
         name: "What moved",
@@ -924,10 +1196,11 @@ describe("Close", () => {
     expect(getClosesBack).not.toHaveBeenCalled();
   });
 
-  // September's close: August's vintage is a month before it, and the
-  // reference household runs on the custom rates, which read no curve,
-  // and lists its home as a real asset rather than a house, so the CMA
-  // alone is offered, current, ahead of the Month field.
+  // September's close: August's vintage is a month before it, the
+  // reference household runs on the custom rates (no curve) and lists
+  // its home as a real asset (no house prices), so the CMA and
+  // Portfolio are offered ahead of the Month field; the default August
+  // portfolio feed is stale against September's cut.
   it("heads the worksheet with the sources its balances rest on, to pull first", async () => {
     await renderClose({ day: "2026-09-25" });
 
@@ -941,12 +1214,52 @@ describe("Close", () => {
         .map((group) => group.textContent),
     ).toStrictEqual([
       "BlackRock CMAAug 2026, data 30 Jun 2026 · 87 days oldPull CMA workbook",
+      "PortfolioStaleQuotes to 25 Aug 2026 · Last transaction 24 Aug 2026Open Portfolio",
     ]);
     expect(
       sources.compareDocumentPosition(
         screen.getByRole("combobox", { name: "Month" }),
       ) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+
+  it("shows Portfolio as not uploaded yet in Sources before a portfolio file is stored", async () => {
+    await renderClose({ day: "2026-09-25", portfolio: null });
+
+    const portfolioGroup = within(
+      screen.getByRole("region", { name: "Sources" }),
+    ).getByRole("group", { name: "Portfolio" });
+
+    expect(portfolioGroup).toHaveTextContent(
+      "PortfolioNot uploaded yetUpload on Portfolio",
+    );
+    expect(
+      within(portfolioGroup).getByRole("link", { name: "Upload on Portfolio" }),
+    ).toHaveAttribute("href", "/portfolio");
+  });
+
+  it("shows Portfolio as Not synced with Sync from Portfolio in Sources when fresh and unsynced", async () => {
+    await renderClose({
+      day: "2026-09-25",
+      portfolio: feedOf({
+        latestQuoteDate: "2026-09-25",
+        latestTransactionDate: "2026-09-24",
+        savedOn: "2026-09-25",
+      }),
+    });
+
+    const portfolioGroup = within(
+      screen.getByRole("region", { name: "Sources" }),
+    ).getByRole("group", { name: /^Portfolio\s?Not synced$/u });
+
+    expect(
+      within(portfolioGroup).getByRole("button", {
+        name: "Sync from Portfolio",
+      }),
+    ).toBeEnabled();
+    expect(
+      within(portfolioGroup).getByRole("link", { name: "Open Portfolio" }),
+    ).toHaveAttribute("href", "/portfolio");
   });
 
   it("offers house prices to pull where the household lists its house, not pulled yet", async () => {
@@ -1003,6 +1316,7 @@ describe("Close", () => {
     expect(screen.queryByRole("region")).not.toBeInTheDocument();
     expect(getSinceClose).not.toHaveBeenCalled();
     expect(getClosesBack).not.toHaveBeenCalled();
+    expect(getPortfolioFeed).not.toHaveBeenCalled();
   });
 });
 
@@ -1021,6 +1335,7 @@ describe("Where the invested balances landed", () => {
   }
 
   beforeEach(() => {
+    vi.mocked(getPortfolioFeed).mockResolvedValue(feedOf());
     vi.mocked(movedSince).mockReturnValue(moved);
     vi.mocked(standingOf).mockReturnValue(atSixtyOne);
   });
@@ -1048,14 +1363,14 @@ describe("Where the invested balances landed", () => {
         "Over the month since July 2026's close, the invested balances landed in the middle half of the futures its plan drew.",
         "£190,412 invested on 25 Aug 2026. The middle future of the 1,000 came to £191,000; the middle half ran from £186,000 to £197,000, and the middle 80% from £180,000 to £202,000.",
         "Invested balances are the accounts growing at the plan rate that were checked at both closes, as their statements give them. 1 of them was not checked at both and is left out.",
-        "The futures count paid in as Portfolio Performance gives it for Stocks & shares ISA, £300 more than the plan paid, and as the plan paid for the rest.",
+        "The futures count paid in as Portfolio gives it for Stocks & shares ISA, £300 more than the plan paid, and as the plan paid for the rest.",
       ],
     });
     expect(landedSince).toHaveBeenCalledExactlyOnceWith(julyCloses, kept);
   });
 
   // March's close read five months on, February's passed over, and both
-  // invested balances named by Portfolio Performance, less than planned.
+  // invested balances named by Portfolio, less than planned.
   it("says where they landed over the months since an older close, naming each close passed over", async () => {
     await renderLanded(
       {
@@ -1079,16 +1394,16 @@ describe("Where the invested balances landed", () => {
         "Over the 5 months since March 2026's close, the invested balances landed in the bottom quarter of the futures its plan drew.",
         "£183,250 invested on 25 Aug 2026. The middle future of the 1,000 came to £191,000; the middle half ran from £186,000 to £197,000, and the middle 80% from £180,000 to £202,000.",
         "Invested balances are the accounts growing at the plan rate that were checked at both closes, as their statements give them. 2 of them were not checked at both and are left out.",
-        "The futures count paid in as Portfolio Performance gives it for Stocks & shares ISA and Workplace pension, £300 less than the plan paid.",
+        "The futures count paid in as Portfolio gives it for Stocks & shares ISA and Workplace pension, £300 less than the plan paid.",
         "February 2026's close is passed over, since it is in a form this app cannot read.",
       ],
     });
   });
 
-  // August 2025's close read a year on, from a household whose holdings
-  // were imported on the 20th, before August's cut, and whose plan draws
-  // on its savings.
-  it("says where they landed over the year, that paid in is as planned where the holdings are older than the close, and that the plan draws on the savings", async () => {
+  // August 2025's close read a year on, from a household whose
+  // portfolio file was updated on the 20th, before August's cut, and
+  // whose plan draws on its savings.
+  it("says where they landed over the year, that paid in is as planned where the portfolio file is older than the close, and that the plan draws on the savings", async () => {
     await renderLanded(
       {
         landed: {
@@ -1110,13 +1425,13 @@ describe("Where the invested balances landed", () => {
       "Over the year since August 2025's close, the invested balances landed in the top tenth of the futures its plan drew.",
       "£250,000 invested on 25 Aug 2026. The middle future of the 1,000 came to £191,000; the middle half ran from £186,000 to £197,000, and the middle 80% from £180,000 to £202,000.",
       "Invested balances are the accounts growing at the plan rate that were checked at both closes, as their statements give them.",
-      "The futures count paid in as the plan paid it, since the holdings were imported before this close.",
+      "The futures count paid in as the plan paid it, since the portfolio file was last updated before this close.",
       "The plan draws on the savings in at least one of these months, but the futures here draw nothing, so the invested balances can land lower among them than the markets alone would put them.",
     ]);
   });
 
-  // Portfolio Performance says 40p more went into the ISA than the plan
-  // paid it, which is nothing to the pound.
+  // Portfolio says 40p more went into the ISA than the plan paid it,
+  // which is nothing to the pound.
   it("says paid in was the same as the plan paid where it is to the pound", async () => {
     await renderLanded(
       { landed: { ...landed, beyond: 0.4 }, passed: [] },
@@ -1124,7 +1439,7 @@ describe("Where the invested balances landed", () => {
     );
 
     expect(landing().lines[3]).toBe(
-      "The futures count paid in as Portfolio Performance gives it for Stocks & shares ISA, the same as the plan paid, and as the plan paid for the rest.",
+      "The futures count paid in as Portfolio gives it for Stocks & shares ISA, the same as the plan paid, and as the plan paid for the rest.",
     );
   });
 
@@ -1275,6 +1590,7 @@ describe("Track record", () => {
   }
 
   beforeEach(() => {
+    vi.mocked(getPortfolioFeed).mockResolvedValue(feedOf());
     vi.mocked(movedSince).mockReturnValue(moved);
   });
 
@@ -1301,7 +1617,7 @@ describe("Track record", () => {
       "This counts your own changes to the plan as well as the markets. The chart sets the markets apart: where the invested balances landed at each month end.",
       "Over the years, a plan whose rates hold up lands in each band about as often as the band is tall: half the time in the middle half, and one time in ten in the top tenth, as in the bottom. Each reading looks back up to a year, so neighbouring readings share most of their months, and a run of low ones is one lean stretch of the markets, not a lean month after another.",
       "Hollow readings look back less than a year, as every one in the first year must, or where the close a year before was not kept or could not be read.",
-      "Each reading is kept as it stood when the month after it closed, and is not read again. August's is the one above, and moves with its balances or a Portfolio Performance import until September closes. Earlier liquid worth is carried into today's money at the plan's inflation.",
+      "Each reading is kept as it stood when the month after it closed, and is not read again. August's is the one above, and moves with its balances or updates to the portfolio file until September closes. Earlier liquid worth is carried into today's money at the plan's inflation.",
     ]);
     expect(
       within(card()).getByRole("columnheader", { name: "Liquid at 61" }),
