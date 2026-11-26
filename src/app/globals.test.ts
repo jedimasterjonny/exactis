@@ -47,4 +47,13 @@ describe("globals.css", () => {
     expect(Object.keys(dark)).toHaveLength(20);
     expect(forced).toStrictEqual(dark);
   });
+
+  // Focus outlines inside an inverse tile sit on the primary surface,
+  // ink in light and paper in dark, so --ring takes the primary
+  // foreground to clear contrast in both themes.
+  it("declares an inverse focus ring token on [data-tone='inverse']", () => {
+    const inverse = declared(/(?:^|\n)\[data-tone="inverse"\] \{/u);
+
+    expect(inverse["--ring"]).toBe("var(--primary-foreground)");
+  });
 });

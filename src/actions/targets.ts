@@ -3,22 +3,17 @@
 import * as z from "zod";
 
 import type { Mapping } from "@/data/cma";
-import type { Portfolio, Target, Targets } from "@/data/targets";
+import type { Targets } from "@/data/targets";
 import type { Answer } from "@/lib/answer";
 
 import { suggestedMappings } from "@/data/class-table";
 import { holdWhileLive } from "@/data/household";
 import { effectiveSyncedOn } from "@/data/portfolio";
-import {
-  categoryValues,
-  named,
-  portfolioValues,
-  scenarioName,
-} from "@/data/schemas";
+import { named, scenarioName } from "@/data/schemas";
 import { getDb } from "@/db/client";
 import { readLatestPortfolio } from "@/db/portfolio";
 import { Refusal } from "@/lib/answer";
-import { dayOf, today } from "@/lib/months";
+import { dayOf } from "@/lib/months";
 import { readPortfolioTargets } from "@/lib/portfolio-file";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
@@ -28,58 +23,9 @@ import { amend } from "@/store/household";
 // branch is open.
 const branch = scenarioName.nullable().optional();
 
-// What an import carries: the categories as the reader read them out of
-// the file, each as the model holds one.
-const categories = z.array(z.object(categoryValues)) satisfies z.ZodType<
-  readonly Target[]
->;
-
-// What an import carries beside them: each securities account's cash and
-// what was paid into it, as the reader read them out of the file.
-const portfolios = z.array(z.object(portfolioValues)) satisfies z.ZodType<
-  readonly Portfolio[]
->;
-
 // What a mapping carries: the category by its id, and the asset class
 // it is mapped onto by its name, or none, to map it onto none.
 const mapped = z.object({ asset: named.nullable(), category: z.string() });
-
-// Keeps the target allocation read out of a Portfolio Performance file
-// over whatever the household held, as imported today, with each
-// securities account's cash and what was paid into it, and hands it
-// back as kept. The file is read in the browser, so only the categories
-// are sent, each with what it holds to the pound, in all and in each
-// securities account by the account's name, and the accounts' cash and
-// what was paid in by the day, to the pound, never the holdings and
-// transactions those are worked out from. An action answers a POST from anywhere, so it checks the
-// session for itself and parses what it was sent rather than trusting
-// the reader that sent it. The categories are held by the household to
-// shares of the whole that add up to it, each listed once, and a
-// refusal is in the rule's words, since the screen says so under a
-// toast. An allocation the CMA's rates, while live, cannot be derived
-// from, as one adding a category with no class is, is refused saying how
-// it can be imported, under the rates typed.
-export async function importTargets(
-  read: readonly Target[],
-  held: readonly Portfolio[],
-): Promise<Answer<Targets>> {
-  await requireSession();
-  const parsed = categories.parse(read);
-  const accounts = portfolios.parse(held);
-  return amend(({ kept }) => {
-    const targets = {
-      categories: parsed,
-      importedOn: today(),
-      portfolios: accounts,
-    };
-    const next = { ...kept, targets };
-    holdWhileLive(next, {
-      cannot: "this allocation cannot be imported",
-      then: "import it and give its new categories a class",
-    });
-    return { kept: next, result: targets };
-  });
-}
 
 // Maps every category of the target allocation the latest CMA cannot
 // blend, with no class or one it does not price, onto the class its name

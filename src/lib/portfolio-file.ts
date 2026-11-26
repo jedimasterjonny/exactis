@@ -637,31 +637,6 @@ export function readPortfolioFeed(file: Uint8Array): PortfolioFeed {
   };
 }
 
-// What each securities account a Portfolio Performance file lists held
-// in cash and was paid, read off its reference account, the cash
-// account its purchases are paid from: the account's name; the cash
-// left uninvested there, to the pound, what every transaction naming it
-// has put in and taken out as the signs take them; and what was paid
-// into it from outside the securities accounts' reference accounts on
-// each day anything was, less what was taken out, to the pound, earliest
-// first. A deposit is paid in and a removal taken out, and so is cash
-// moved from or to a cash account no securities account takes as its
-// reference, as a current account kept in the file is, while cash moved
-// between two reference accounts is paid into neither. Securities
-// accounts of one name are read together, over the reference accounts
-// they take, each once. One taking no reference account, or one kept in
-// a currency other than sterling, is left out, since the reader cannot
-// say what it holds in pounds, and so is one with no name, as the
-// cogitator leaves it. A day is the one the file dates a transaction on,
-// which it writes as a moment in UTC. The file is opened and refused as
-// readTargets opens it.
-// ponytail: two securities accounts of different names taking one
-// reference account each read its cash whole; split it by what each
-// bought if a file ever shares one.
-export function readPortfolios(file: Uint8Array): readonly Portfolio[] {
-  return readPortfoliosFromClient(messageOf(opened(file).client));
-}
-
 // What a binary Portfolio Performance file holds for the Portfolio
 // screen: its base currency, the latest quote date across priced
 // securities, each securities account with its holdings count and
@@ -1667,6 +1642,26 @@ function rawIdsOf(
   return ids;
 }
 
+// What each securities account a Portfolio Performance file lists held
+// in cash and was paid, read off its reference account, the cash
+// account its purchases are paid from: the account's name; the cash
+// left uninvested there, to the pound, what every transaction naming it
+// has put in and taken out as the signs take them; and what was paid
+// into it from outside the securities accounts' reference accounts on
+// each day anything was, less what was taken out, to the pound, earliest
+// first. A deposit is paid in and a removal taken out, and so is cash
+// moved from or to a cash account no securities account takes as its
+// reference, as a current account kept in the file is, while cash moved
+// between two reference accounts is paid into neither. Securities
+// accounts of one name are read together, over the reference accounts
+// they take, each once. One taking no reference account, or one kept in
+// a currency other than sterling, is left out, since the reader cannot
+// say what it holds in pounds, and so is one with no name, as the
+// cogitator leaves it. A day is the one the file dates a transaction on,
+// which it writes as a moment in UTC.
+// ponytail: two securities accounts of different names taking one
+// reference account each read its cash whole; split it by what each
+// bought if a file ever shares one.
 function readPortfoliosFromClient(client: Message): readonly Portfolio[] {
   const sterling = new Set(
     messagesAt(client, fields.client.accounts)

@@ -27,7 +27,6 @@ import {
   appendSecurity,
   appendTransaction,
   readPortfolioFeed,
-  readPortfolios,
   readPortfolioSnapshot,
   readPortfolioTargets,
   readTargets,
@@ -164,7 +163,7 @@ function weightsIn(file: Uint8Array): ReadonlyMap<string, number> {
   );
 }
 
-describe("readPortfolios", () => {
+describe("readPortfolioTargets portfolios", () => {
   // A cash account as a test writes one: its id, a name from it, and
   // the currency it is kept in.
   const account = (id: string, currency: string): Written => [
@@ -243,9 +242,10 @@ describe("readPortfolios", () => {
         moving(6, "usd-cash", { day: "2026-10-02", pence: 5000 }),
         transaction(2, 100_000_000, "security-1"),
       ].map((each) => [5, each] as const),
+      [8, taxonomyOf("Asset Allocation", [{ name: "Cash", weight: 10_000 }])],
     ]);
 
-    expect(readPortfolios(file)).toStrictEqual([
+    expect(readPortfolioTargets(file).portfolios).toStrictEqual([
       {
         cash: 710,
         name: "ISA",
@@ -259,7 +259,9 @@ describe("readPortfolios", () => {
   });
 
   it("refuses what it could not read, as reading the targets does", () => {
-    expect(() => readPortfolios(strToU8("Account,Balance\nISA,1000"))).toThrow(
+    expect(() =>
+      readPortfolioTargets(strToU8("Account,Balance\nISA,1000")),
+    ).toThrow(
       new Refusal(
         "The file is not a zip, as a Portfolio Performance file saved in binary is",
       ),
@@ -3701,7 +3703,7 @@ describe("appendTransaction", () => {
       100,
     );
     expect(readTargets(file)[0]?.value).toBe(1200);
-    expect(readPortfolios(file)).toStrictEqual([
+    expect(readPortfolioTargets(file).portfolios).toStrictEqual([
       {
         cash: 1067,
         name: "Northstar ISA",
@@ -4235,7 +4237,13 @@ describe("readPortfolioTargets", () => {
       categories: readTargets(file),
       latestQuoteDate: "2026-09-22",
       latestTransactionDate: "2026-09-12",
-      portfolios: readPortfolios(file),
+      portfolios: [
+        {
+          cash: 750,
+          name: "Northstar ISA",
+          paid: [{ amount: 2000, on: "2026-09-10" }],
+        },
+      ],
     });
   });
 
@@ -4893,6 +4901,8 @@ describe("readPortfolioFeed", () => {
       [12, "GBP"],
     ]);
 
+    const { categories, portfolios } = readPortfolioTargets(file);
+
     expect(readPortfolioFeed(file)).toStrictEqual({
       handoff: {
         securitiesAccounts: [{ id: "port-isa", name: "Northstar ISA" }],
@@ -4906,10 +4916,7 @@ describe("readPortfolioFeed", () => {
       },
       latestQuoteDate: "2026-09-25",
       latestTransactionDate: "2026-09-12",
-      targets: saved({
-        categories: readTargets(file),
-        portfolios: readPortfolios(file),
-      }),
+      targets: saved({ categories, portfolios }),
     });
   });
 

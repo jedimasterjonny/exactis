@@ -19,6 +19,7 @@ interface StatTileProps {
   readonly caption?: string;
   readonly delta?: null | number | undefined;
   readonly deltaFormat?: DeltaFormat;
+  readonly footer?: Slot;
   readonly holds?: string | undefined;
   readonly icon?: LucideIcon;
   readonly isHiddenOnPhone?: boolean;
@@ -42,18 +43,20 @@ interface StatTileProps {
 // opens on the two that matter most in one row rather than four in
 // two, and on the rest of the screen sooner. An action the tile is
 // given sits in its top corner, the label and the figure beside it.
-// A tile waiting on what it will say can hold room for it: a delta to
-// come is an ellipsis in the delta's place, seen but not read, and a
-// caption it holds is kept unseen and unread beneath the one it shows,
-// so the tile keeps that caption's lines at any width. Held, the
-// caption takes a line of its own beneath any delta, so a delta of
-// another width cannot move it, and the tile is the height it lands at
-// before it lands.
+// An optional footer sits at the bottom of the card beneath any delta
+// or caption. A tile waiting on what it will say can hold room for it:
+// a delta to come is an ellipsis in the delta's place, seen but not
+// read, and a caption it holds is kept unseen and unread beneath the
+// one it shows, so the tile keeps that caption's lines at any width.
+// Held, the caption takes a line of its own beneath any delta, so a
+// delta of another width cannot move it, and the tile is the height it
+// lands at before it lands.
 export function StatTile({
   action,
   caption,
   delta,
   deltaFormat,
+  footer,
   holds,
   icon,
   isHiddenOnPhone = false,
@@ -112,6 +115,9 @@ export function StatTile({
             </span>
           )}
         </CardContent>
+      )}
+      {footer !== undefined && (
+        <CardContent className="mt-auto">{footer}</CardContent>
       )}
     </Card>
   );

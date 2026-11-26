@@ -134,6 +134,20 @@ export interface PortfolioFeed {
   }>;
 }
 
+// Active securities accounts and per-category security holdings
+// extracted from the household's .portfolio file so Cogitator can hand
+// off a rebalancing trade directly into the Portfolio transaction
+// dialog.
+export interface PortfolioHandoff {
+  readonly securitiesAccounts: readonly {
+    readonly id: string;
+    readonly name: string;
+  }[];
+  readonly securitiesByCategory: Readonly<
+    Record<string, readonly PortfolioSecurityHandoff[]>
+  >;
+}
+
 // Input for recording a batch of historical quotes dated to one ISO
 // calendar date across one or more catalogued securities.
 export interface PortfolioQuoteBatch {
@@ -264,16 +278,6 @@ interface HoldingsView {
   readonly hasZeroShare: boolean;
   readonly rows: readonly HoldingRow[];
   readonly totalGbp: number;
-}
-
-interface PortfolioHandoff {
-  readonly securitiesAccounts: readonly {
-    readonly id: string;
-    readonly name: string;
-  }[];
-  readonly securitiesByCategory: Readonly<
-    Record<string, readonly PortfolioSecurityHandoff[]>
-  >;
 }
 
 interface PortfolioSecurityHandoff {
