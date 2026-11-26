@@ -554,6 +554,27 @@ export function cashTotalsOf(accounts: readonly CashAccount[]): CashTotals {
   return { excludedCurrencies, totalGbp };
 }
 
+// The ISO date stamped onto synced household targets: the latest
+// known data date from active security quotes or transactions,
+// falling back to the upload/mutation save date when the file carries
+// neither.
+export function effectiveSyncedOn({
+  latestQuoteDate,
+  latestTransactionDate,
+  savedOn,
+}: {
+  readonly latestQuoteDate: null | string;
+  readonly latestTransactionDate: null | string;
+  readonly savedOn: string;
+}): string {
+  if (latestQuoteDate !== null && latestTransactionDate !== null) {
+    return latestQuoteDate >= latestTransactionDate
+      ? latestQuoteDate
+      : latestTransactionDate;
+  }
+  return latestQuoteDate ?? latestTransactionDate ?? savedOn;
+}
+
 // The Holdings section prepared under an account filter and zero-share
 // toggle: aggregates across active securities accounts when accountId
 // is empty, scopes to a single account UUID otherwise, sorts valued
@@ -663,6 +684,17 @@ export function transactionsViewOf(
     }
     return type === "" || transaction.type === type;
   });
+}
+
+// Formats a portfolio mutation's toast description, appending a calm
+// warning when auto-syncing the household target allocation failed.
+export function withSyncNote(
+  description: string,
+  syncWarning: string | undefined,
+): string {
+  return syncWarning === undefined
+    ? description
+    : `${description}. Targets not synced: ${syncWarning}`;
 }
 
 // Valued holdings first (largest sterling value first, then by name),

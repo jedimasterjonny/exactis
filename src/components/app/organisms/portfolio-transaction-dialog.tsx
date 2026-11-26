@@ -29,6 +29,7 @@ import {
   maxPortfolioScaled,
   transactionTypeGroups,
   transactionTypeLabels,
+  withSyncNote,
 } from "@/data/portfolio";
 import { useSender } from "@/hooks/use-sender";
 import { formatDay } from "@/lib/months";
@@ -306,8 +307,11 @@ export function PortfolioTransactionDialog({
       onAccepted: () => {
         onSaved(draft);
       },
-      success: () => ({
-        description: `${typeLabel} · ${subjectName} · ${formatDay(draft.date)}`,
+      success: (result) => ({
+        description: withSyncNote(
+          `${typeLabel} · ${subjectName} · ${formatDay(draft.date)}`,
+          result.syncWarning,
+        ),
         title: "Transaction saved",
       }),
     });

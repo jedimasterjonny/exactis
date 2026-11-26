@@ -255,4 +255,44 @@ describe("PortfolioAccountDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onDismiss).toHaveBeenCalledOnce();
   });
+
+  it("appends syncWarning to the success toast and still completes onSaved", async () => {
+    vi.mocked(addPortfolioAccount).mockResolvedValue(
+      saved({
+        id: "port-warn",
+        savedOn: "2026-09-25",
+        syncWarning: "The household target allocation could not be synced yet",
+        version: 4,
+      }),
+    );
+    const onSaved = vi.fn<(draft: NewPortfolioAccount) => void>();
+    render(
+      <PortfolioAccountDialog
+        cashAccounts={[isaCash]}
+        defaultCurrency="GBP"
+        kind="securities"
+        onDismiss={vi.fn<() => void>()}
+        onSaved={onSaved}
+        version={3}
+      />,
+      { wrapper: Toaster },
+    );
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Name" }), {
+      target: { value: "Harbour SIPP" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Account saved" }),
+      ).toHaveAccessibleDescription(
+        "Harbour SIPP added to the portfolio file. Targets not synced: The household target allocation could not be synced yet",
+      );
+    });
+    expect(onSaved).toHaveBeenCalledExactlyOnceWith({
+      kind: "securities",
+      name: "Harbour SIPP",
+    });
+  });
 });

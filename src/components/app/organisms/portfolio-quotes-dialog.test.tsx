@@ -534,4 +534,45 @@ describe("PortfolioQuotesDialog", () => {
     ).toContain("No securities in this file to price.");
     expect(save).toBeDisabled();
   });
+
+  it("surfaces a target sync warning in the success toast while still calling onSaved", async () => {
+    const onSaved = vi.fn<() => void>();
+    vi.mocked(updatePortfolioQuotes).mockResolvedValue(
+      saved({
+        savedOn: "2026-09-25",
+        syncWarning: "The portfolio file has no Asset Allocation taxonomy",
+        updatedCount: 1,
+        version: 4,
+      }),
+    );
+
+    render(
+      <PortfolioQuotesDialog
+        holdings={[newerPricedB]}
+        onDismiss={vi.fn<() => void>()}
+        onSaved={onSaved}
+        today="2026-09-25"
+        version={3}
+      />,
+      { wrapper: Toaster },
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "Update quotes" });
+    commit(
+      within(dialog).getByRole("textbox", {
+        name: "Global Equity Index (GBP)",
+      }),
+      "215",
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Quotes updated" }),
+      ).toHaveAccessibleDescription(
+        "1 price saved for 25 Sep 2026. Targets not synced: The portfolio file has no Asset Allocation taxonomy",
+      );
+    });
+    expect(onSaved).toHaveBeenCalledOnce();
+  });
 });

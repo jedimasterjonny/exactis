@@ -604,58 +604,7 @@ export function appendTransaction(
 // reference account each read its cash whole; split it by what each
 // bought if a file ever shares one.
 export function readPortfolios(file: Uint8Array): readonly Portfolio[] {
-  const client = messageOf(opened(file).client);
-  const sterling = new Set(
-    messagesAt(client, fields.client.accounts)
-      .filter((each) => textAt(each, fields.account.currency) === "GBP")
-      .map((each) => textOf(each, fields.account.id)),
-  );
-  const references = new Map<string, Set<string>>();
-  for (const portfolio of messagesAt(client, fields.client.portfolios)) {
-    const reference = textAt(portfolio, fields.portfolio.reference);
-    const name = textOf(portfolio, fields.portfolio.name);
-    if (reference !== undefined && name !== "") {
-      references.set(
-        name,
-        (references.get(name) ?? new Set<string>()).add(reference),
-      );
-    }
-  }
-  const inside = new Set([...references.values()].flatMap((each) => [...each]));
-  const transactions = messagesAt(client, fields.client.transactions);
-  return [...references]
-    .filter(([, accounts]) => [...accounts].every((id) => sterling.has(id)))
-    .map(([name, accounts]) => {
-      let cash = 0;
-      const paid = new Map<string, number>();
-      for (const transaction of transactions) {
-        const type = int32At(transaction, fields.transaction.type);
-        const amount =
-          int64At(transaction, fields.transaction.amount) / hundredths;
-        const from = textOf(transaction, fields.transaction.account);
-        const to = textOf(transaction, fields.transaction.otherAccount);
-        const sign =
-          (accounts.has(from) ? (cashSigns.get(type) ?? 0) : 0) +
-          (type === cashTransfer && accounts.has(to) ? 1 : 0);
-        cash += sign * amount;
-        const isPaid =
-          type === deposit ||
-          type === removal ||
-          (type === cashTransfer && !(inside.has(from) && inside.has(to)));
-        if (sign !== 0 && isPaid) {
-          const on = dayOf(transaction);
-          paid.set(on, (paid.get(on) ?? 0) + sign * amount);
-        }
-      }
-      return {
-        cash: Math.round(cash),
-        name,
-        paid: [...paid]
-          .map(([on, amount]) => ({ amount: Math.round(amount), on }))
-          .filter(({ amount }) => amount !== 0)
-          .toSorted((one, other) => one.on.localeCompare(other.on)),
-      };
-    });
+  return readPortfoliosFromClient(messageOf(opened(file).client));
 }
 
 // What a binary Portfolio Performance file holds for the Portfolio
@@ -768,11 +717,43 @@ export function readPortfolioSnapshot(
     categories,
     fileName,
     holdings,
-    latestQuoteDate: latestQuoteDateOf(securities),
+    latestQuoteDate: latestQuoteDateOf(securities, held, activePortfolioIds),
     securitiesAccounts,
     totalCash,
     totalInvested,
     transactions: decodedTransactions,
+  };
+}
+
+// Opens a binary Portfolio Performance file once and reads its Asset
+// Allocation categories (validating share bounds and 100% total),
+// securities accounts' cash and daily paid-in history, and latest
+// active quote and transaction dates in a single pass.
+export function readPortfolioTargets(file: Uint8Array): {
+  readonly categories: readonly Target[];
+  readonly latestQuoteDate: null | string;
+  readonly latestTransactionDate: null | string;
+  readonly portfolios: readonly Portfolio[];
+} {
+  const client = messageOf(opened(file).client);
+  const securities = securitiesOf(client);
+  const held = sharesHeld(client);
+  const categories = targetsOf(
+    classesIn(client),
+    worthOf(client, securities, held),
+  );
+  validateTargetShares(categories);
+  return {
+    categories,
+    latestQuoteDate: latestQuoteDateOf(
+      securities,
+      held,
+      activePortfolioIdsOf(client),
+    ),
+    latestTransactionDate: latestTransactionDateOf(
+      messagesAt(client, fields.client.transactions),
+    ),
+    portfolios: readPortfoliosFromClient(client),
   };
 }
 
@@ -812,8 +793,7 @@ export function readPortfolioSnapshot(
 // Performance knows it, and refused in words saying how it was saved,
 // since saving it again in binary is what makes it read.
 export function readTargets(file: Uint8Array): readonly Target[] {
-  const client = messageOf(opened(file).client);
-  return targetsOf(classesIn(client), worthOf(client));
+  return readTargetsFromClient(messageOf(opened(file).client));
 }
 
 // The file with its Asset Allocation taxonomy's weights set so that
@@ -911,6 +891,21 @@ export function updateQuotes(
     );
   });
   return { content, updatedCount };
+}
+
+// Active (non-retired) securities account ids declared in PClient.
+function activePortfolioIdsOf(client: Message): ReadonlySet<string> {
+  const ids = new Set<string>();
+  for (const portfolio of messagesAt(client, fields.client.portfolios)) {
+    const id = optionalText(portfolio, fields.portfolio.id);
+    if (
+      id !== undefined &&
+      int32At(portfolio, fields.portfolio.isRetired) === 0
+    ) {
+      ids.add(id);
+    }
+  }
+  return ids;
 }
 
 // Record positive GBP FX rates from a transaction's units, filtered to
@@ -1127,7 +1122,7 @@ function dateOf(transaction: Message): number {
 // The day a transaction was made, as an ISO date: the day of its date in
 // UTC, as Portfolio Performance writes the moment.
 function dayOf(transaction: Message): string {
-  return new Date(dateOf(transaction) * 1000).toISOString().slice(0, 10);
+  return isoDateOf(dateOf(transaction));
 }
 
 // One decoded transaction alongside its original index for stable
@@ -1185,7 +1180,7 @@ function decodeTransaction(
       ),
       currency:
         optionalText(entry, fields.transaction.currency) ?? baseCurrency,
-      date: new Date(timestamp * 1000).toISOString().slice(0, 10),
+      date: isoDateOf(timestamp),
       fees,
       id: optionalText(entry, fields.transaction.id) ?? `tx-${String(index)}`,
       ...(note !== undefined && { note }),
@@ -1313,6 +1308,11 @@ function initialPriceFieldOf(
   );
 }
 
+// Formats UTC epoch seconds as an ISO calendar date (YYYY-MM-DD).
+function isoDateOf(timestampSeconds: number): string {
+  return new Date(timestampSeconds * 1000).toISOString().slice(0, 10);
+}
+
 // Converts a validated YYYY-MM-DD calendar date to UTC epoch days.
 function isoDateToEpochDay(date: string): number {
   if (!isIsoCalendarDate(date)) {
@@ -1343,18 +1343,36 @@ function isStrictlyNewerLatest(
   return int64At(latest, fields.price.date) > quoteEpochDay;
 }
 
-// The most recent quote ISO date across every priced security, or null
-// when none has a dated quote.
+// The most recent quote ISO date across active (non-retired)
+// securities with positive shares in at least one active securities
+// account, falling back to all active securities with a quote date
+// when no active held security is priced, or null when none exist.
 function latestQuoteDateOf(
   securities: ReadonlyMap<string, Security>,
+  held: ReadonlyMap<string, ReadonlyMap<string, number>>,
+  activePortfolioIds: ReadonlySet<string>,
 ): null | string {
-  let latest: null | string = null;
-  for (const { quoteDate } of securities.values()) {
-    if (quoteDate !== null && (latest === null || quoteDate > latest)) {
-      latest = quoteDate;
+  let latestHeld: null | string = null;
+  let latestActive: null | string = null;
+  for (const [id, { isRetired, quoteDate }] of securities) {
+    if (isRetired || quoteDate === null) {
+      continue;
+    }
+    if (latestActive === null || quoteDate > latestActive) {
+      latestActive = quoteDate;
+    }
+    const inAccounts = held.get(id);
+    const isActivelyHeld =
+      inAccounts !== undefined &&
+      [...inAccounts].some(
+        ([portfolioId, written]) =>
+          activePortfolioIds.has(portfolioId) && written > 0,
+      );
+    if (isActivelyHeld && (latestHeld === null || quoteDate > latestHeld)) {
+      latestHeld = quoteDate;
     }
   }
-  return latest;
+  return latestHeld ?? latestActive;
 }
 
 // The latest positive quote a security carries, comparing every
@@ -1374,6 +1392,31 @@ function latestQuoteOf(security: Message): {
     (best, quote) => ((quote.date ?? "") >= (best.date ?? "") ? quote : best),
     { date: null, price: 0 },
   );
+}
+
+// The most recent ISO transaction date across known transaction types
+// that carry an explicit in-range timestamp, or null when none do.
+function latestTransactionDateOf(
+  rawTransactions: readonly Message[],
+): null | string {
+  let latest: null | string = null;
+  for (const entry of rawTransactions) {
+    if (
+      !transactionTypes.has(int32At(entry, fields.transaction.type)) ||
+      !entry.has(fields.transaction.date)
+    ) {
+      continue;
+    }
+    const timestamp = dateOf(entry);
+    if (timestamp < minTimestamp || timestamp > maxTimestamp) {
+      continue;
+    }
+    const date = isoDateOf(timestamp);
+    if (latest === null || date > latest) {
+      latest = date;
+    }
+  }
+  return latest;
 }
 
 // The names of the taxonomies with one, as a sentence lists them, or
@@ -1567,6 +1610,67 @@ function rawIdsOf(
     }
   }
   return ids;
+}
+
+function readPortfoliosFromClient(client: Message): readonly Portfolio[] {
+  const sterling = new Set(
+    messagesAt(client, fields.client.accounts)
+      .filter((each) => textAt(each, fields.account.currency) === "GBP")
+      .map((each) => textOf(each, fields.account.id)),
+  );
+  const references = new Map<string, Set<string>>();
+  for (const portfolio of messagesAt(client, fields.client.portfolios)) {
+    const reference = textAt(portfolio, fields.portfolio.reference);
+    const name = textOf(portfolio, fields.portfolio.name);
+    if (reference !== undefined && name !== "") {
+      references.set(
+        name,
+        (references.get(name) ?? new Set<string>()).add(reference),
+      );
+    }
+  }
+  const inside = new Set([...references.values()].flatMap((each) => [...each]));
+  const transactions = messagesAt(client, fields.client.transactions);
+  return [...references]
+    .filter(([, accounts]) => [...accounts].every((id) => sterling.has(id)))
+    .map(([name, accounts]) => {
+      let cash = 0;
+      const paid = new Map<string, number>();
+      for (const transaction of transactions) {
+        const type = int32At(transaction, fields.transaction.type);
+        const amount =
+          int64At(transaction, fields.transaction.amount) / hundredths;
+        const from = textOf(transaction, fields.transaction.account);
+        const to = textOf(transaction, fields.transaction.otherAccount);
+        const sign =
+          (accounts.has(from) ? (cashSigns.get(type) ?? 0) : 0) +
+          (type === cashTransfer && accounts.has(to) ? 1 : 0);
+        cash += sign * amount;
+        const isPaid =
+          type === deposit ||
+          type === removal ||
+          (type === cashTransfer && !(inside.has(from) && inside.has(to)));
+        if (sign !== 0 && isPaid) {
+          const on = dayOf(transaction);
+          paid.set(on, (paid.get(on) ?? 0) + sign * amount);
+        }
+      }
+      return {
+        cash: Math.round(cash),
+        name,
+        paid: [...paid]
+          .map(([on, amount]) => ({ amount: Math.round(amount), on }))
+          .filter(({ amount }) => amount !== 0)
+          .toSorted((one, other) => one.on.localeCompare(other.on)),
+      };
+    });
+}
+
+function readTargetsFromClient(client: Message): readonly Target[] {
+  return targetsOf(
+    classesIn(client),
+    worthOf(client, securitiesOf(client), sharesHeld(client)),
+  );
 }
 
 function resolveCashRef(
@@ -1766,7 +1870,8 @@ function targetsOf(
   ): readonly Target[] => {
     const within = (share * of.weight) / whole;
     const below = beneath(of);
-    if (below.length === 0 && of.name.trim() === "") {
+    const name = of.name.trim();
+    if (below.length === 0 && name === "") {
       throw new Refusal(
         `The ${taxonomy} taxonomy has a category with no name beneath ${above.length === 0 ? "its root" : above.join(" · ")}`,
       );
@@ -1778,7 +1883,7 @@ function targetsOf(
             classes: above,
             id: of.id,
             isImplemented: of.assignments.length > 0,
-            name: of.name,
+            name,
             share: within,
           },
         ]
@@ -2083,6 +2188,24 @@ function upsertHistoricalPrice(
   ];
 }
 
+// Validates that every target category share lies in [0, 1] and all
+// shares sum to 1 within tolerance using NaN-safe comparisons.
+function validateTargetShares(categories: readonly Target[]): void {
+  let sum = 0;
+  for (const { share } of categories) {
+    if (!(share >= 0 && share <= 1)) {
+      throw new Refusal(
+        "Each target category share must be between 0% and 100%",
+      );
+    }
+    sum += share;
+  }
+  const isTotalOne = Math.abs(sum - 1) <= tolerance;
+  if (!isTotalOne) {
+    throw new Refusal("Target category shares must add up to 100%");
+  }
+}
+
 // Resolves and validates every account, portfolio and security id
 // required by a transaction rule against raw protobuf field-1 ids.
 function validateTransactionRefs(
@@ -2233,9 +2356,9 @@ function withAssignedCategory(
 // the reader has no pound for is refused by name.
 function worthOf(
   client: Message,
+  securities: ReadonlyMap<string, Security>,
+  held: ReadonlyMap<string, ReadonlyMap<string, number>>,
 ): (assignments: readonly Assignment[]) => Pick<Target, "accounts" | "value"> {
-  const securities = securitiesOf(client);
-  const held = sharesHeld(client);
   const pounds = poundsPer(client);
   const names = new Map(
     messagesAt(client, fields.client.portfolios).map((portfolio) => [

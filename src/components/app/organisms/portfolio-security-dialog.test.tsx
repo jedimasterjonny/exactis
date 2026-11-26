@@ -226,4 +226,44 @@ describe("PortfolioSecurityDialog", () => {
       "GBP",
     );
   });
+
+  it("appends syncWarning to the success toast and still completes onSaved", async () => {
+    vi.mocked(addPortfolioSecurity).mockResolvedValue(
+      saved({
+        id: "sec-warn",
+        savedOn: "2026-09-25",
+        syncWarning: "The household target allocation could not be synced yet",
+        version: 2,
+      }),
+    );
+    const onSaved = vi.fn<(draft: NewPortfolioSecurity) => void>();
+    render(
+      <PortfolioSecurityDialog
+        categories={[]}
+        onDismiss={vi.fn<() => void>()}
+        onSaved={onSaved}
+        today="2026-09-25"
+        version={1}
+      />,
+      { wrapper: Toaster },
+    );
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Security name" }), {
+      target: { value: "Sterling Index" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Security saved" }),
+      ).toHaveAccessibleDescription(
+        "Sterling Index (GBP) added to the catalogue. Targets not synced: The household target allocation could not be synced yet",
+      );
+    });
+    expect(onSaved).toHaveBeenCalledExactlyOnceWith({
+      currency: "GBP",
+      latestPrice: null,
+      name: "Sterling Index",
+    });
+  });
 });

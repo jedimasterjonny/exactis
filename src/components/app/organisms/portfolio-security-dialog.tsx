@@ -14,7 +14,7 @@ import { PriceField } from "@/components/app/molecules/figure-field";
 import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
 import { EditDialog } from "@/components/app/organisms/edit-dialog";
-import { maxPortfolioScaled } from "@/data/portfolio";
+import { maxPortfolioScaled, withSyncNote } from "@/data/portfolio";
 import { useSender } from "@/hooks/use-sender";
 import { formatDay } from "@/lib/months";
 
@@ -90,8 +90,11 @@ export function PortfolioSecurityDialog({
       onAccepted: () => {
         onSaved(draft);
       },
-      success: () => ({
-        description: `${draft.name} (${draft.currency}) added to the catalogue`,
+      success: (result) => ({
+        description: withSyncNote(
+          `${draft.name} (${draft.currency}) added to the catalogue`,
+          result.syncWarning,
+        ),
         title: "Security saved",
       }),
     });

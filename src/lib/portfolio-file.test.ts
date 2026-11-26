@@ -28,6 +28,7 @@ import {
   appendTransaction,
   readPortfolios,
   readPortfolioSnapshot,
+  readPortfolioTargets,
   readTargets,
   reweighted,
   updateQuotes,
@@ -2496,6 +2497,30 @@ describe("readTargets", () => {
     );
   });
 
+  it("trims leading and trailing spaces from leaf category names", () => {
+    const file = portfolioFile(
+      clientOf([
+        [
+          "Asset Allocation",
+          [
+            {
+              beneath: [{ name: "  Global equity  ", weight: 10_000 }],
+              name: "Equity",
+              weight: 10_000,
+            },
+          ],
+        ],
+      ]),
+    );
+
+    expect(readTargets(file).map(({ name }) => name)).toStrictEqual([
+      "Global equity",
+    ]);
+    expect(
+      readPortfolioTargets(file).categories.map(({ name }) => name),
+    ).toStrictEqual(["Global equity"]);
+  });
+
   // A name of nothing but space is no name to the household either,
   // which trims it.
   it("refuses a category with no name, saying where it sits", () => {
@@ -4086,5 +4111,473 @@ describe("updateQuotes", () => {
       latestPrice: 43,
       latestPriceDate: "1970-01-01",
     });
+  });
+});
+
+describe("readPortfolioTargets", () => {
+  it("reads categories, portfolios, and latest active quote and transaction dates in a single pass", () => {
+    const file = samplePortfolioFile();
+
+    expect(readPortfolioTargets(file)).toStrictEqual({
+      categories: readTargets(file),
+      latestQuoteDate: "2026-09-22",
+      latestTransactionDate: "2026-09-12",
+      portfolios: readPortfolios(file),
+    });
+  });
+
+  it("prefers active held security quotes over retired, zero-share, and retired-account quotes, falling back to active securities then null", () => {
+    // Epoch days: 20_710 = 2026-09-14, 20_715 = 2026-09-19, 20_718 = 2026-09-22, 20_720 = 2026-09-24, 20_725 = 2026-09-29.
+    const taxonomyNode: readonly [number, Written] = [
+      8,
+      [
+        [2, "Asset Allocation"],
+        [5, [[1, "root"]]],
+        [
+          5,
+          [
+            [1, "cat-1"],
+            [2, "root"],
+            [3, "Core"],
+            [6, 10_000],
+          ],
+        ],
+      ],
+    ];
+
+    const withStaleHeld = portfolioFile([
+      // Active held securities: older then newer to cover comparison in both directions.
+      [
+        2,
+        [
+          [1, "sec-held-old"],
+          [3, "Held Old"],
+          [4, "GBP"],
+          [
+            13,
+            [
+              [1, 20_710],
+              [2, 10_000_000_000],
+            ],
+          ],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-held-new"],
+          [3, "Held New"],
+          [4, "GBP"],
+          [
+            13,
+            [
+              [1, 20_715],
+              [2, 10_000_000_000],
+            ],
+          ],
+        ],
+      ],
+      // Active zero-share security (no transactions) with a newer quote must not mask held quotes.
+      [
+        2,
+        [
+          [1, "sec-unheld"],
+          [3, "Watchlist"],
+          [4, "GBP"],
+          [
+            13,
+            [
+              [1, 20_720],
+              [2, 10_000_000_000],
+            ],
+          ],
+        ],
+      ],
+      // Active security sold down to zero shares with a newer quote must not mask held quotes.
+      [
+        2,
+        [
+          [1, "sec-sold"],
+          [3, "Sold Out"],
+          [4, "GBP"],
+          [
+            13,
+            [
+              [1, 20_720],
+              [2, 10_000_000_000],
+            ],
+          ],
+        ],
+      ],
+      // Active security held only in a retired portfolio must not mask active held quotes.
+      [
+        2,
+        [
+          [1, "sec-in-retired-port"],
+          [3, "Retired Account Fund"],
+          [4, "GBP"],
+          [
+            13,
+            [
+              [1, 20_720],
+              [2, 10_000_000_000],
+            ],
+          ],
+        ],
+      ],
+      // Retired security held in an active portfolio with the newest quote must be ignored.
+      [
+        2,
+        [
+          [1, "sec-retired"],
+          [3, "Retired Fund"],
+          [4, "GBP"],
+          [
+            13,
+            [
+              [1, 20_725],
+              [2, 10_000_000_000],
+            ],
+          ],
+          [20, 1],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-active"],
+          [2, "Active ISA"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-retired"],
+          [2, "Closed GIA"],
+          [4, 1],
+        ],
+      ],
+      // Portfolio without field-1 id is skipped by activePortfolioIdsOf.
+      [4, [[2, "Idless Portfolio"]]],
+      [
+        5,
+        [
+          [2, 2],
+          [4, "port-active"],
+          [12, 100_000_000],
+          [14, "sec-held-old"],
+        ],
+      ],
+      [
+        5,
+        [
+          [2, 2],
+          [4, "port-active"],
+          [12, 100_000_000],
+          [14, "sec-held-new"],
+        ],
+      ],
+      [
+        5,
+        [
+          [2, 2],
+          [4, "port-active"],
+          [12, 100_000_000],
+          [14, "sec-sold"],
+        ],
+      ],
+      [
+        5,
+        [
+          [2, 3],
+          [4, "port-active"],
+          [12, 100_000_000],
+          [14, "sec-sold"],
+        ],
+      ],
+      [
+        5,
+        [
+          [2, 2],
+          [4, "port-retired"],
+          [12, 100_000_000],
+          [14, "sec-in-retired-port"],
+        ],
+      ],
+      [
+        5,
+        [
+          [2, 2],
+          [4, "port-active"],
+          [12, 100_000_000],
+          [14, "sec-retired"],
+        ],
+      ],
+      taxonomyNode,
+    ]);
+
+    expect(
+      readPortfolioSnapshot(withStaleHeld, "held.portfolio").latestQuoteDate,
+    ).toBe("2026-09-19");
+    expect(readPortfolioTargets(withStaleHeld).latestQuoteDate).toBe(
+      "2026-09-19",
+    );
+
+    // When no active held security has a quote, fall back to active unheld securities.
+    const fallbackToActive = portfolioFile([
+      [
+        2,
+        [
+          [1, "sec-held-unpriced"],
+          [3, "Unpriced Held"],
+          [4, "GBP"],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-active-watch"],
+          [3, "Watchlist"],
+          [4, "GBP"],
+          [
+            13,
+            [
+              [1, 20_718],
+              [2, 10_000_000_000],
+            ],
+          ],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-retired-newer"],
+          [3, "Retired"],
+          [4, "GBP"],
+          [
+            13,
+            [
+              [1, 20_725],
+              [2, 10_000_000_000],
+            ],
+          ],
+          [20, 1],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-active"],
+          [2, "Active ISA"],
+        ],
+      ],
+      [
+        5,
+        [
+          [2, 2],
+          [4, "port-active"],
+          [12, 100_000_000],
+          [14, "sec-held-unpriced"],
+        ],
+      ],
+      taxonomyNode,
+    ]);
+
+    expect(
+      readPortfolioSnapshot(fallbackToActive, "fallback.portfolio")
+        .latestQuoteDate,
+    ).toBe("2026-09-22");
+    expect(readPortfolioTargets(fallbackToActive).latestQuoteDate).toBe(
+      "2026-09-22",
+    );
+
+    // When only retired securities carry quotes, return null.
+    const onlyRetiredQuoted = portfolioFile([
+      [
+        2,
+        [
+          [1, "sec-retired-only"],
+          [3, "Retired Only"],
+          [4, "GBP"],
+          [
+            13,
+            [
+              [1, 20_725],
+              [2, 10_000_000_000],
+            ],
+          ],
+          [20, 1],
+        ],
+      ],
+      taxonomyNode,
+    ]);
+
+    expect(
+      readPortfolioSnapshot(onlyRetiredQuoted, "retired.portfolio")
+        .latestQuoteDate,
+    ).toBeNull();
+    expect(readPortfolioTargets(onlyRetiredQuoted).latestQuoteDate).toBeNull();
+  });
+
+  it("extracts latestTransactionDate across known dated in-range transactions while skipping unknown, undated, and out-of-range ones", () => {
+    const taxonomyNode: readonly [number, Written] = [
+      8,
+      [
+        [2, "Asset Allocation"],
+        [5, [[1, "root"]]],
+        [
+          5,
+          [
+            [1, "cat-1"],
+            [2, "root"],
+            [3, "Core"],
+            [6, 10_000],
+          ],
+        ],
+      ],
+    ];
+
+    const mixedTransactions = portfolioFile([
+      // Newer dated known transaction (2026-09-12) written before older one (2026-09-10).
+      [
+        5,
+        [
+          [2, 6],
+          [9, [[1, 1_789_200_000]]],
+          [10, "GBP"],
+          [11, 1000],
+        ],
+      ],
+      [
+        5,
+        [
+          [2, 6],
+          [9, [[1, 1_789_000_000]]],
+          [10, "GBP"],
+          [11, 1000],
+        ],
+      ],
+      // Unknown future transaction type carrying a later date is ignored.
+      [
+        5,
+        [
+          [2, 99],
+          [9, [[1, 1_795_000_000]]],
+          [10, "GBP"],
+          [11, 1000],
+        ],
+      ],
+      // Undated known transaction (no field 9) is ignored.
+      [
+        5,
+        [
+          [2, 6],
+          [10, "GBP"],
+          [11, 1000],
+        ],
+      ],
+      // Out-of-range timestamps (too early and too late) are ignored.
+      [
+        5,
+        [
+          [2, 6],
+          [9, [[1, -40_000_000_000]]],
+          [10, "GBP"],
+          [11, 1000],
+        ],
+      ],
+      [
+        5,
+        [
+          [2, 6],
+          [9, [[1, 300_000_000_000]]],
+          [10, "GBP"],
+          [11, 1000],
+        ],
+      ],
+      taxonomyNode,
+    ]);
+
+    expect(readPortfolioTargets(mixedTransactions).latestTransactionDate).toBe(
+      "2026-09-12",
+    );
+
+    const undatedOnly = portfolioFile([
+      [
+        5,
+        [
+          [2, 6],
+          [10, "GBP"],
+          [11, 1000],
+        ],
+      ],
+      taxonomyNode,
+    ]);
+
+    expect(readPortfolioTargets(undatedOnly).latestTransactionDate).toBeNull();
+  });
+
+  it("refuses out-of-range category shares and target totals that do not add up to 100%", () => {
+    const withWeights = (weights: readonly number[]): Uint8Array =>
+      portfolioFile([
+        [
+          8,
+          [
+            [2, "Asset Allocation"],
+            [5, [[1, "root"]]],
+            ...weights.map(
+              (weight, index) =>
+                [
+                  5,
+                  [
+                    [1, `cat-${String(index)}`],
+                    [2, "root"],
+                    [3, `Category ${String(index)}`],
+                    [6, weight],
+                  ],
+                ] as const,
+            ),
+          ],
+        ],
+      ]);
+
+    expect(() => readPortfolioTargets(withWeights([-1000, 11_000]))).toThrow(
+      new Refusal("Each target category share must be between 0% and 100%"),
+    );
+    expect(() => readPortfolioTargets(withWeights([15_000]))).toThrow(
+      new Refusal("Each target category share must be between 0% and 100%"),
+    );
+    expect(() => readPortfolioTargets(withWeights([6000, 3000]))).toThrow(
+      new Refusal("Target category shares must add up to 100%"),
+    );
+    expect(() => readPortfolioTargets(withWeights([6000, 6000]))).toThrow(
+      new Refusal("Target category shares must add up to 100%"),
+    );
+  });
+
+  it("refuses files missing the Asset Allocation taxonomy, holding unconvertible currencies, or not saved in binary", () => {
+    const withoutTaxonomy = portfolioFile(clientOf([]));
+    expect(() => readPortfolioTargets(withoutTaxonomy)).toThrow(
+      new Refusal("The file has no Asset Allocation taxonomy, only none"),
+    );
+
+    const unconvertibleFx = holding(
+      [["usd-fund", 10_000]],
+      [security("usd-fund", "USD", 5_000_000_000)],
+      [transaction(0, 100_000_000, "usd-fund")],
+    );
+    expect(() => readPortfolioTargets(unconvertibleFx)).toThrow(
+      new Refusal(
+        "The file holds Fund usd-fund, priced in USD, and no transaction in pounds gives a rate for it",
+      ),
+    );
+
+    expect(() =>
+      readPortfolioTargets(strToU8("Account,Balance\nISA,1000")),
+    ).toThrow(
+      new Refusal(
+        "The file is not a zip, as a Portfolio Performance file saved in binary is",
+      ),
+    );
   });
 });

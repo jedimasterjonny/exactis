@@ -20,7 +20,7 @@ import type { Database } from "@/db/client";
 
 import { stamped } from "@/data/shapes";
 import { queried } from "@/db/queried";
-import { householdVersions } from "@/db/schema";
+import { householdVersions, portfolioFiles } from "@/db/schema";
 import { Refusal } from "@/lib/answer";
 import { monthsBetween } from "@/lib/months";
 
@@ -134,23 +134,17 @@ export async function dropScenario(db: Database, name: string): Promise<void> {
 
 // Keeps the household as the version after the one the save read on its
 // branch, stamped with the shape it is kept in, so a later app can carry
-// it into its own. When another save has kept that version first, the
-// branch changed under this one after it was read, and what this one
-// worked out is from a household that is gone, so it is refused and
-// nothing is written. A new scenario's first version is kept after none, so a
-// second scenario of the same name is refused the same way.
+// it into its own. When another save has kept that version first, or
+// when portfolioVersion is given and portfolio_files has moved past it,
+// what this one worked out is from state that is gone, so it is refused
+// and nothing is written. A new scenario's first version is kept after
+// none, so a second scenario of the same name is refused the same way.
 export async function keepAfter(
   db: Database,
-  { scenario, version }: Read,
+  read: Read & { readonly portfolioVersion?: number },
   household: Kept,
 ): Promise<void> {
-  const rows = await queried(
-    db
-      .insert(householdVersions)
-      .values({ household: stamped(household), scenario, version: version + 1 })
-      .onConflictDoNothing()
-      .returning({ version: householdVersions.version }),
-  );
+  const rows = await writeAfter(db, read, household);
   if (rows.length === 0) {
     throw new Refusal(
       "The household changed while this was being saved, so nothing was",
@@ -462,4 +456,60 @@ async function readEnd(
     version,
     ...(decision !== null && { decided: { decision, reason, savedAt } }),
   };
+}
+
+// Writes the next household version either unconditionally (guarded by
+// primary key conflict alone) or atomically conditioned on
+// portfolio_files still standing at portfolioVersion.
+async function writeAfter(
+  db: Database,
+  {
+    portfolioVersion,
+    scenario,
+    version,
+  }: Read & { readonly portfolioVersion?: number },
+  household: Kept,
+): Promise<readonly { readonly version: number }[]> {
+  if (portfolioVersion === undefined) {
+    return queried(
+      db
+        .insert(householdVersions)
+        .values({
+          household: stamped(household),
+          scenario,
+          version: version + 1,
+        })
+        .onConflictDoNothing()
+        .returning({ version: householdVersions.version }),
+    );
+  }
+  const currentPortfolio = db
+    .select({
+      latest: sql<number>`coalesce(max(${portfolioFiles.version}), 0)`.as(
+        "latest",
+      ),
+    })
+    .from(portfolioFiles)
+    .as("current_portfolio");
+  return queried(
+    db
+      .insert(householdVersions)
+      .select(
+        db
+          .select({
+            decision: sql<null>`null::text`.as("decision"),
+            household: sql<unknown>`${JSON.stringify(
+              stamped(household),
+            )}::jsonb`.as("household"),
+            reason: sql<null>`null::text`.as("reason"),
+            savedAt: sql<Date>`now()`.as("saved_at"),
+            scenario: sql<string>`${scenario}::text`.as("scenario"),
+            version: sql<number>`${version + 1}::integer`.as("version"),
+          })
+          .from(currentPortfolio)
+          .where(eq(currentPortfolio.latest, portfolioVersion)),
+      )
+      .onConflictDoNothing()
+      .returning({ version: householdVersions.version }),
+  );
 }

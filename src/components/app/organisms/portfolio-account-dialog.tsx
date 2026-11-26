@@ -12,6 +12,7 @@ import { FieldRow } from "@/components/app/atoms/field-row";
 import { SelectField } from "@/components/app/molecules/select-field";
 import { TextField } from "@/components/app/molecules/text-field";
 import { EditDialog } from "@/components/app/organisms/edit-dialog";
+import { withSyncNote } from "@/data/portfolio";
 import { useSender } from "@/hooks/use-sender";
 
 export type AccountKind = "cash" | "securities";
@@ -95,11 +96,13 @@ export function PortfolioAccountDialog({
       onAccepted: () => {
         onSaved(draft);
       },
-      success: () => ({
-        description:
+      success: (result) => ({
+        description: withSyncNote(
           draft.kind === "cash"
             ? `${draft.name} (${draft.currency}) added to the portfolio file`
             : `${draft.name} added to the portfolio file`,
+          result.syncWarning,
+        ),
         title: "Account saved",
       }),
     });
