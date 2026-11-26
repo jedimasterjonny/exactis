@@ -11,7 +11,7 @@ import type {
   SecuritiesAccount,
   TransactionType,
 } from "@/data/portfolio";
-import type { Option } from "@/lib/options";
+import type { Option, OptionGroup } from "@/lib/options";
 
 import { addPortfolioTransaction } from "@/actions/portfolio";
 import { FieldRow } from "@/components/app/atoms/field-row";
@@ -34,6 +34,13 @@ import {
 import { useSender } from "@/hooks/use-sender";
 import { formatDay } from "@/lib/months";
 
+export type PortfolioTransactionDraft = Partial<TransactionFormValues>;
+
+export interface SuggestedCategory {
+  readonly name: string;
+  readonly securityIds: readonly string[];
+}
+
 type AccountsLayout =
   | "cash-and-security"
   | "cash-only"
@@ -48,10 +55,11 @@ interface PortfolioTransactionDialogProps {
   readonly baseCurrency: string;
   readonly cashAccounts: readonly CashAccount[];
   readonly holdings: readonly Holding[];
-  readonly initialDraft?: Partial<TransactionFormValues>;
+  readonly initialDraft?: PortfolioTransactionDraft;
   readonly onDismiss: () => void;
   readonly onSaved: (draft: NewPortfolioTransaction) => void;
   readonly securitiesAccounts: readonly SecuritiesAccount[];
+  readonly suggestedCategory?: SuggestedCategory;
   readonly today: string;
   readonly version: number;
 }
@@ -101,6 +109,7 @@ export function PortfolioTransactionDialog({
   onDismiss,
   onSaved,
   securitiesAccounts,
+  suggestedCategory,
   today,
   version,
 }: PortfolioTransactionDialogProps): JSX.Element {
@@ -192,6 +201,19 @@ export function PortfolioTransactionDialog({
     resolvedSecurity.id,
     "Select a security",
   );
+  const securityGroups = securityGroupsOf(sortedHoldings, suggestedCategory);
+  const shareSecurityOptions = shareSecurityOptionsOf(
+    securityGroups,
+    securitySelectOptions,
+    resolvedSecurity.id,
+  );
+  const shareSecurityHint = shareSecurityHintOf({
+    hasCategoryMatches: securityGroups !== undefined,
+    holdingsCount: sortedHoldings.length,
+    isMissing: resolvedSecurity.isMissing,
+    selectedSecurityId: resolvedSecurity.id,
+    suggestedCategory,
+  });
 
   const amountPence = amount === null ? 0 : Math.round(amount * 100);
   const feesPence = spec.hasCosts && fees !== null ? Math.round(fees * 100) : 0;
@@ -227,10 +249,13 @@ export function PortfolioTransactionDialog({
     (holding) => holding.id === resolvedSecurity.id,
   );
   const typeLabel = transactionTypeLabels[type];
-  const title =
-    hasSecurity && chosenSecurity !== undefined
-      ? `${typeLabel} · ${chosenSecurity.name}`
-      : `New ${typeLabel.toLowerCase()}`;
+  const title = dialogTitleOf({
+    chosenSecurity,
+    hasSecurity,
+    hasShares: spec.hasShares,
+    suggestedCategory,
+    typeLabel,
+  });
   const subjectName =
     (hasSecurity ? chosenSecurity?.name : fromCash?.name) ?? "";
 
@@ -359,6 +384,10 @@ export function PortfolioTransactionDialog({
         otherAccountId={resolvedOtherAccount.id}
         otherPortfolioId={resolvedOtherPortfolio.id}
         portfolioId={resolvedPortfolio.id}
+        portfolioUnselectedHint={portfolioUnselectedHintOf(
+          initialDraft,
+          resolvedPortfolio.id,
+        )}
         securitiesCount={activeSecurities.length}
         securitiesOptions={baseSecuritiesOptions}
         securityCount={sortedHoldings.length}
@@ -369,18 +398,16 @@ export function PortfolioTransactionDialog({
       {spec.hasShares && (
         <FieldRow layout="pair">
           <SelectField
-            hint={requiredSelectHint(sortedHoldings.length, {
-              emptyHint: "Add a security first",
-              isMissing: resolvedSecurity.isMissing,
-              missingHint: "Selected security is no longer available",
-            })}
+            {...(securityGroups !== undefined && { groups: securityGroups })}
+            hint={shareSecurityHint}
             isDisabled={sortedHoldings.length === 0}
             label="Security"
             onValueChange={setSecurityId}
-            options={securitySelectOptions}
+            options={shareSecurityOptions}
             value={resolvedSecurity.id}
           />
           <SharesField
+            hint={sharesHintOf(initialDraft, amount, shares)}
             label="Shares"
             max={maxPortfolioScaled}
             min={0}
@@ -489,6 +516,7 @@ function AccountFields({
   otherAccountId,
   otherPortfolioId,
   portfolioId,
+  portfolioUnselectedHint,
   securitiesCount,
   securitiesOptions,
   securityCount,
@@ -516,6 +544,7 @@ function AccountFields({
   readonly otherAccountId: string;
   readonly otherPortfolioId: string;
   readonly portfolioId: string;
+  readonly portfolioUnselectedHint: string | undefined;
   readonly securitiesCount: number;
   readonly securitiesOptions: readonly Option<string>[];
   readonly securityCount: number;
@@ -626,7 +655,7 @@ function AccountFields({
       return (
         <FieldRow layout="pair">
           <SelectField
-            hint={securitiesHint}
+            hint={securitiesHint ?? portfolioUnselectedHint}
             isDisabled={securitiesCount === 0}
             label="Securities account"
             onValueChange={onTradePortfolioChange}
@@ -752,6 +781,28 @@ function deliveryCurrencyOf(code: string): DeliveryCurrency {
   return deliveryCurrencies.find((currency) => currency === code) ?? "GBP";
 }
 
+function dialogTitleOf({
+  chosenSecurity,
+  hasSecurity,
+  hasShares,
+  suggestedCategory,
+  typeLabel,
+}: {
+  readonly chosenSecurity: Holding | undefined;
+  readonly hasSecurity: boolean;
+  readonly hasShares: boolean;
+  readonly suggestedCategory: SuggestedCategory | undefined;
+  readonly typeLabel: string;
+}): string {
+  if (hasSecurity && chosenSecurity !== undefined) {
+    return `${typeLabel} · ${chosenSecurity.name}`;
+  }
+  if (hasShares && suggestedCategory !== undefined) {
+    return `${typeLabel} · ${suggestedCategory.name}`;
+  }
+  return `New ${typeLabel.toLowerCase()}`;
+}
+
 function distinctOtherCashId(
   fromId: string,
   currentOtherId: string,
@@ -846,7 +897,7 @@ function initialSelectionOf({
 }: {
   readonly activeCash: readonly CashAccount[];
   readonly activeSecurities: readonly SecuritiesAccount[];
-  readonly initialDraft: Partial<TransactionFormValues> | undefined;
+  readonly initialDraft: PortfolioTransactionDraft | undefined;
   readonly sortedHoldings: readonly Holding[];
 }): {
   readonly accountId: string;
@@ -856,9 +907,11 @@ function initialSelectionOf({
   readonly securityId: string;
 } {
   const portfolioId =
-    validOptionId(initialDraft?.portfolioId, activeSecurities) ??
-    activeSecurities[0]?.id ??
-    "";
+    initialDraft?.portfolioId === ""
+      ? ""
+      : (validOptionId(initialDraft?.portfolioId, activeSecurities) ??
+        activeSecurities[0]?.id ??
+        "");
   const otherPortfolioId =
     validOptionId(initialDraft?.otherPortfolioId, activeSecurities) ??
     activeSecurities.find((account) => account.id !== portfolioId)?.id ??
@@ -866,11 +919,14 @@ function initialSelectionOf({
   const referenceCashId = activeSecurities.find(
     (account) => account.id === portfolioId,
   )?.referenceAccountId;
+  const defaultCashId =
+    initialDraft?.portfolioId === "" && activeCash.length !== 1
+      ? ""
+      : (activeCash[0]?.id ?? "");
   const accountId =
     validOptionId(initialDraft?.accountId, activeCash) ??
     validOptionId(referenceCashId, activeCash) ??
-    activeCash[0]?.id ??
-    "";
+    defaultCashId;
   const fromCurrency = activeCash.find(
     (account) => account.id === accountId,
   )?.currency;
@@ -883,9 +939,11 @@ function initialSelectionOf({
     activeCash.find((account) => account.id !== accountId)?.id ??
     "";
   const securityId =
-    validOptionId(initialDraft?.securityId, sortedHoldings) ??
-    sortedHoldings[0]?.id ??
-    "";
+    initialDraft?.securityId === ""
+      ? ""
+      : (validOptionId(initialDraft?.securityId, sortedHoldings) ??
+        sortedHoldings[0]?.id ??
+        "");
   return {
     accountId,
     otherAccountId,
@@ -893,6 +951,15 @@ function initialSelectionOf({
     portfolioId,
     securityId,
   };
+}
+
+function portfolioUnselectedHintOf(
+  initialDraft: PortfolioTransactionDraft | undefined,
+  selectedPortfolioId: string,
+): string | undefined {
+  return initialDraft?.portfolioId === "" && selectedPortfolioId === ""
+    ? "Choose the account for this trade"
+    : undefined;
 }
 
 function requiredSelectHint(
@@ -923,6 +990,93 @@ function resolveSelection(
   return items.some((item) => item.id === selectedId)
     ? { id: selectedId, isMissing: false }
     : { id: "", isMissing: true };
+}
+
+function securityGroupsOf(
+  sortedHoldings: readonly Holding[],
+  suggestedCategory: SuggestedCategory | undefined,
+): readonly OptionGroup[] | undefined {
+  if (suggestedCategory === undefined) {
+    return undefined;
+  }
+  const suggestedIds = new Set(suggestedCategory.securityIds);
+  const inCategoryOptions: Option<string>[] = [];
+  const otherSecurityOptions: Option<string>[] = [];
+  for (const holding of sortedHoldings) {
+    const option = { label: holding.name, value: holding.id };
+    if (suggestedIds.has(holding.id)) {
+      inCategoryOptions.push(option);
+    } else {
+      otherSecurityOptions.push(option);
+    }
+  }
+  if (inCategoryOptions.length === 0) {
+    return undefined;
+  }
+  const otherGroupLabel =
+    suggestedCategory.name === "Other securities"
+      ? "Other"
+      : "Other securities";
+  return [
+    { label: suggestedCategory.name, options: inCategoryOptions },
+    ...(otherSecurityOptions.length > 0
+      ? [{ label: otherGroupLabel, options: otherSecurityOptions }]
+      : []),
+  ];
+}
+
+function shareSecurityHintOf({
+  hasCategoryMatches,
+  holdingsCount,
+  isMissing,
+  selectedSecurityId,
+  suggestedCategory,
+}: {
+  readonly hasCategoryMatches: boolean;
+  readonly holdingsCount: number;
+  readonly isMissing: boolean;
+  readonly selectedSecurityId: string;
+  readonly suggestedCategory: SuggestedCategory | undefined;
+}): string | undefined {
+  const requiredHint = requiredSelectHint(holdingsCount, {
+    emptyHint: "Add a security first",
+    isMissing,
+    missingHint: "Selected security is no longer available",
+  });
+  if (requiredHint !== undefined) {
+    return requiredHint;
+  }
+  if (suggestedCategory !== undefined && selectedSecurityId === "") {
+    return hasCategoryMatches
+      ? `Choose a security in ${suggestedCategory.name}`
+      : `No active security assigned to ${suggestedCategory.name}`;
+  }
+  return undefined;
+}
+
+function shareSecurityOptionsOf(
+  securityGroups: readonly OptionGroup[] | undefined,
+  securitySelectOptions: readonly Option<string>[],
+  selectedSecurityId: string,
+): readonly Option<string>[] {
+  if (securityGroups === undefined) {
+    return securitySelectOptions;
+  }
+  return selectedSecurityId === ""
+    ? [{ label: "Select a security", value: "" }]
+    : [];
+}
+
+function sharesHintOf(
+  initialDraft: PortfolioTransactionDraft | undefined,
+  amount: null | number,
+  shares: null | number,
+): string | undefined {
+  return initialDraft?.amount !== undefined &&
+    amount !== null &&
+    shares === null
+    ? "Enter executed shares"
+    : undefined;
 }
 
 function transferDestinationHint(

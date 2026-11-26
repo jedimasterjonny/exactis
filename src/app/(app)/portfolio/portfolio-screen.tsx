@@ -1,14 +1,22 @@
 "use client";
 
+import type { Route } from "next";
 import type { JSX } from "react";
 
 import { Briefcase, Download } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
 import type { AccountKind } from "@/components/app/organisms/portfolio-account-dialog";
 import type {
+  PortfolioTransactionDraft,
+  SuggestedCategory,
+} from "@/components/app/organisms/portfolio-transaction-dialog";
+import type {
+  Holding,
   NewPortfolioTransaction,
   PortfolioSnapshot,
+  SecuritiesAccount,
   TransactionType,
 } from "@/data/portfolio";
 import type { OwnedPortfolio } from "@/store/portfolio";
@@ -34,10 +42,20 @@ import { formatGbp } from "@/lib/money";
 import { formatDay } from "@/lib/months";
 import { portfolio, sectionLabel, subsectionLabel } from "@/lib/nav";
 
+export interface PortfolioTradeHandoff {
+  readonly amount?: number;
+  readonly categoryId?: string;
+  readonly portfolioId?: string;
+  readonly securityId?: string;
+  readonly type: "purchase" | "sale";
+}
+
 interface OwnedPortfolioTabsProps {
   readonly activeTab: PortfolioTab;
+  readonly initialTrade?: PortfolioTradeHandoff;
   readonly isInScenario: boolean;
   readonly onActiveTabChange: (tab: PortfolioTab) => void;
+  readonly onInitialTradeClosed: () => void;
   readonly scenarioNoteId: string;
   readonly snapshot: PortfolioSnapshot;
   readonly today: string;
@@ -46,12 +64,18 @@ interface OwnedPortfolioTabsProps {
 
 interface PortfolioScreenProps {
   readonly initialTab?: string | undefined;
+  readonly initialTrade?: PortfolioTradeHandoff;
   readonly isInScenario: boolean;
   readonly owned: null | OwnedPortfolio;
   readonly today: string;
 }
 
 type PortfolioTab = "Accounts" | "Holdings" | "Transactions";
+
+interface ResolvedHandoff {
+  readonly draft: PortfolioTransactionDraft;
+  readonly suggestedCategory?: SuggestedCategory;
+}
 
 // The Portfolio screen backed by the household's versioned binary
 // Portfolio Performance (.portfolio) file stored in Postgres. Before a
@@ -65,17 +89,37 @@ type PortfolioTab = "Accounts" | "Holdings" | "Transactions";
 // whole-file replacements reset view state cleanly.
 export function PortfolioScreen({
   initialTab,
+  initialTrade,
   isInScenario,
   owned,
   today,
 }: PortfolioScreenProps): JSX.Element {
+  const router = useRouter();
   const [replaceCount, setReplaceCount] = useState(0);
   const [activeTab, setActiveTab] = useState<PortfolioTab>(() =>
-    initialTabOf(initialTab),
+    initialTabOf(initialTab, owned !== null ? initialTrade : undefined),
+  );
+  const [canOpenInitialTrade, setCanOpenInitialTrade] = useState(
+    () => owned !== null && !isInScenario && initialTrade !== undefined,
   );
   const scenarioNoteId = useId();
   const hasOwned = owned !== null;
   const wasEmptyRef = useRef(!hasOwned);
+  const suppressedTradeUrlRef = useRef<null | Route>(
+    suppressedTradeUrlOf(owned, isInScenario, initialTrade),
+  );
+
+  if (canOpenInitialTrade && isInScenario) {
+    setCanOpenInitialTrade(false);
+  }
+
+  useEffect(() => {
+    const target = suppressedTradeUrlRef.current;
+    if (target !== null) {
+      suppressedTradeUrlRef.current = null;
+      router.replace(target, { scroll: false });
+    }
+  }, [router]);
 
   useEffect(() => {
     if (wasEmptyRef.current && hasOwned) {
@@ -118,6 +162,8 @@ export function PortfolioScreen({
     (holding) => holding.shares > 0,
   ).length;
 
+  const activeInitialTrade = canOpenInitialTrade ? initialTrade : undefined;
+
   return (
     <Screen
       actions={
@@ -138,6 +184,7 @@ export function PortfolioScreen({
             describedBy={isInScenario ? scenarioNoteId : undefined}
             isDisabled={isInScenario}
             onReplaced={() => {
+              setCanOpenInitialTrade(false);
               setReplaceCount((count) => count + 1);
             }}
             version={version}
@@ -177,17 +224,29 @@ export function PortfolioScreen({
         isInScenario={isInScenario}
         key={`${String(replaceCount)}:${snapshot.fileName}`}
         onActiveTabChange={setActiveTab}
+        onInitialTradeClosed={() => {
+          setCanOpenInitialTrade(false);
+        }}
         scenarioNoteId={scenarioNoteId}
         snapshot={snapshot}
         today={today}
         version={version}
+        {...(activeInitialTrade !== undefined && {
+          initialTrade: activeInitialTrade,
+        })}
       />
     </Screen>
   );
 }
 
-// The starting tab from an optional ?tab= query parameter.
-function initialTabOf(tab: string | undefined): PortfolioTab {
+// The starting tab from an optional ?tab= query parameter or trade handoff.
+function initialTabOf(
+  tab: string | undefined,
+  initialTrade: PortfolioTradeHandoff | undefined,
+): PortfolioTab {
+  if (initialTrade !== undefined) {
+    return "Transactions";
+  }
   const normalized = tab?.toLowerCase();
   if (normalized === "accounts") {
     return "Accounts";
@@ -201,13 +260,16 @@ function initialTabOf(tab: string | undefined): PortfolioTab {
 // refreshes, while whole-file replacements reset cleanly.
 function OwnedPortfolioTabs({
   activeTab,
+  initialTrade,
   isInScenario,
   onActiveTabChange,
+  onInitialTradeClosed,
   scenarioNoteId,
   snapshot,
   today,
   version,
 }: OwnedPortfolioTabsProps): JSX.Element {
+  const router = useRouter();
   const [holdingsAccountId, setHoldingsAccountId] = useState("");
   const [isShowingZeroShares, setIsShowingZeroShares] = useState(false);
   const [transactionsAccountId, setTransactionsAccountId] = useState("");
@@ -220,13 +282,29 @@ function OwnedPortfolioTabs({
   const [addingAccount, setAddingAccount] = useState<AccountKind | null>(null);
   const [isAddingSecurity, setIsAddingSecurity] = useState(false);
   const [isAddingTransaction, setIsAddingTransaction] = useState(false);
+  const [handoff, setHandoff] = useState<null | ResolvedHandoff>(() =>
+    initialTrade !== undefined
+      ? resolveTradeHandoff(initialTrade, snapshot)
+      : null,
+  );
   const [isUpdatingQuotes, setIsUpdatingQuotes] = useState(false);
   const [isScenarioOpen, setIsScenarioOpen] = useState(isInScenario);
+  const isHandoffOpen = handoff !== null;
+  const wasHandoffOpenRef = useRef(isHandoffOpen);
+
+  useEffect(() => {
+    if (wasHandoffOpenRef.current && !isHandoffOpen) {
+      document.querySelector<HTMLElement>("h1")?.focus();
+      router.replace(`${portfolio.href}?tab=transactions`, { scroll: false });
+    }
+    wasHandoffOpenRef.current = isHandoffOpen;
+  }, [isHandoffOpen, router]);
 
   if (isScenarioOpen !== isInScenario) {
     setIsScenarioOpen(isInScenario);
     if (isInScenario) {
       setAddingAccount(null);
+      setHandoff(null);
       setIsAddingSecurity(false);
       setIsAddingTransaction(false);
       setIsUpdatingQuotes(false);
@@ -236,6 +314,14 @@ function OwnedPortfolioTabs({
   const activeCashAccounts = snapshot.cashAccounts.filter(
     (account) => !account.isRetired,
   );
+
+  function closeTransactionDialog(): void {
+    if (handoff !== null) {
+      setHandoff(null);
+      onInitialTradeClosed();
+    }
+    setIsAddingTransaction(false);
+  }
 
   function handleAccountSaved(): void {
     setAddingAccount(null);
@@ -266,7 +352,7 @@ function OwnedPortfolioTabs({
     ) {
       setTransactionsSecurityId("");
     }
-    setIsAddingTransaction(false);
+    closeTransactionDialog();
   }
 
   function openCashInTransactions(accountId: string): void {
@@ -387,18 +473,23 @@ function OwnedPortfolioTabs({
           version={version}
         />
       )}
-      {!isInScenario && isAddingTransaction && (
+      {!isInScenario && (isAddingTransaction || handoff !== null) && (
         <PortfolioTransactionDialog
           baseCurrency={snapshot.baseCurrency}
           cashAccounts={snapshot.cashAccounts}
           holdings={snapshot.holdings}
-          onDismiss={() => {
-            setIsAddingTransaction(false);
-          }}
+          key={handoff !== null ? "handoff" : "manual"}
+          onDismiss={closeTransactionDialog}
           onSaved={handleTransactionSaved}
           securitiesAccounts={snapshot.securitiesAccounts}
           today={today}
           version={version}
+          {...(handoff !== null && {
+            initialDraft: handoff.draft,
+            ...(handoff.suggestedCategory !== undefined && {
+              suggestedCategory: handoff.suggestedCategory,
+            }),
+          })}
         />
       )}
       {!isInScenario && isUpdatingQuotes && (
@@ -416,6 +507,113 @@ function OwnedPortfolioTabs({
       )}
     </>
   );
+}
+
+// Resolves a validated trade handoff against the loaded portfolio snapshot
+// into an initial transaction draft and optional suggested category group.
+function resolveTradeHandoff(
+  trade: PortfolioTradeHandoff,
+  snapshot: PortfolioSnapshot,
+): ResolvedHandoff {
+  const activeSecurities = snapshot.securitiesAccounts.filter(
+    (account) => !account.isRetired,
+  );
+  const portfolioId = resolveTradePortfolioId(
+    trade.portfolioId,
+    activeSecurities,
+  );
+  const { securityId, suggestedCategory } = resolveTradeSecurity(
+    trade,
+    snapshot,
+    portfolioId,
+  );
+  return {
+    draft: {
+      ...(trade.amount !== undefined && { amount: trade.amount }),
+      ...(portfolioId !== undefined && { portfolioId }),
+      ...(securityId !== undefined && { securityId }),
+      type: trade.type,
+    },
+    ...(suggestedCategory !== undefined && { suggestedCategory }),
+  };
+}
+
+function resolveTradePortfolioId(
+  requestedPortfolioId: string | undefined,
+  activeSecurities: readonly SecuritiesAccount[],
+): string | undefined {
+  if (requestedPortfolioId !== undefined) {
+    return activeSecurities.some(
+      (account) => account.id === requestedPortfolioId,
+    )
+      ? requestedPortfolioId
+      : "";
+  }
+  return activeSecurities.length > 1 ? "" : undefined;
+}
+
+function resolveTradeSecurity(
+  trade: PortfolioTradeHandoff,
+  snapshot: PortfolioSnapshot,
+  portfolioId: string | undefined,
+): {
+  readonly securityId?: string;
+  readonly suggestedCategory?: SuggestedCategory;
+} {
+  const activeHoldings = snapshot.holdings.filter(
+    (holding) => !holding.isRetired,
+  );
+  if (trade.securityId !== undefined) {
+    return {
+      securityId: activeHoldings.some(
+        (holding) => holding.id === trade.securityId,
+      )
+        ? trade.securityId
+        : "",
+    };
+  }
+  if (trade.categoryId === undefined) {
+    return {};
+  }
+  const category = snapshot.categories.find(
+    (item) => item.id === trade.categoryId,
+  );
+  if (category === undefined) {
+    return { securityId: "" };
+  }
+  const categoryHoldings = activeHoldings.filter((holding) =>
+    category.securityIds.includes(holding.id),
+  );
+  const candidates =
+    trade.type === "sale"
+      ? saleCandidatesOf(categoryHoldings, portfolioId)
+      : categoryHoldings;
+  const [only, second] = candidates;
+  if (only !== undefined && second === undefined) {
+    return { securityId: only.id };
+  }
+  return {
+    securityId: "",
+    suggestedCategory: {
+      name: category.name,
+      securityIds: candidates.map((holding) => holding.id),
+    },
+  };
+}
+
+function saleCandidatesOf(
+  categoryHoldings: readonly Holding[],
+  portfolioId: string | undefined,
+): readonly Holding[] {
+  const held =
+    portfolioId !== undefined && portfolioId !== ""
+      ? categoryHoldings.filter((holding) =>
+          holding.sharesByAccount.some(
+            (entry) => entry.portfolioId === portfolioId && entry.shares > 0,
+          ),
+        )
+      : categoryHoldings.filter((holding) => holding.shares > 0);
+  return held.length > 0 ? held : categoryHoldings;
 }
 
 // The opening card shown before a household .portfolio file has been uploaded.
@@ -450,4 +648,20 @@ function SectionCardUpload({
       </CardFooter>
     </SectionCard>
   );
+}
+
+// The clean URL to replace on arrival when a trade handoff is suppressed
+// because no portfolio file is stored yet or a scenario is open.
+function suppressedTradeUrlOf(
+  owned: null | OwnedPortfolio,
+  isInScenario: boolean,
+  initialTrade: PortfolioTradeHandoff | undefined,
+): null | Route {
+  if (initialTrade === undefined) {
+    return null;
+  }
+  if (owned === null) {
+    return portfolio.href;
+  }
+  return isInScenario ? `${portfolio.href}?tab=transactions` : null;
 }
