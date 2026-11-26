@@ -296,6 +296,7 @@
   --muted-foreground: var(--grey-300);
   --positive: var(--jade-300);
   --destructive: var(--red-300);
+  --ring: var(--primary-foreground);
 }
 
 .dark [data-tone="inverse"] {

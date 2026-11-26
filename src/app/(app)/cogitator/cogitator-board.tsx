@@ -1,17 +1,26 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
+import type { Route } from "next";
 import type { JSX } from "react";
 
 import { cn } from "cn";
-import { Ban, ChartPie, FolderSync, TriangleAlert } from "lucide-react";
+import {
+  ArrowUpRight,
+  Ban,
+  ChartPie,
+  FolderSync,
+  TriangleAlert,
+} from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useId, useState } from "react";
 
+import type { PortfolioHandoff } from "@/data/portfolio";
 import type { Target, Targets } from "@/data/targets";
 import type { Ladder, Rung } from "@/lib/trades";
 
 import { DeltaValue } from "@/components/app/atoms/delta-value";
+import { PortfolioSync } from "@/components/app/atoms/portfolio-sync";
 import { TileGrid } from "@/components/app/atoms/tile-grid";
 import { Caution } from "@/components/app/molecules/caution";
 import { EmptyState } from "@/components/app/molecules/empty-state";
@@ -36,15 +45,24 @@ import {
   formatPoints,
   formatWholePercent,
 } from "@/lib/money";
-import { assumptions, cogitator, subsectionLabel } from "@/lib/nav";
+import {
+  assumptions,
+  cogitator,
+  portfolio as portfolioScreen,
+  subsectionLabel,
+} from "@/lib/nav";
 import { ladderOf, minimumTrade } from "@/lib/trades";
+
+import type { CogitatorPortfolio } from "./cogitator-screen";
 
 interface CogitatorBoardProps {
   readonly account: string;
   readonly amount: number;
   readonly bonds?: { readonly now: number; readonly targeted: number };
+  readonly branch: null | string;
   readonly held: number;
   readonly isReady: boolean;
+  readonly portfolio: CogitatorPortfolio | null;
   readonly sales: number;
   readonly targets: null | Targets;
 }
@@ -72,37 +90,50 @@ const unimplemented = "No fund assigned";
 // allocation holds in all and whether any of it can be bought toward.
 // Beneath, a tile a trade of the rung recommended, the purchases
 // first, the largest set apart, each saying what it puts into or
-// takes out of its category and where that takes its share; then the
-// ladder, a row a count of trades, saying what each count buys and
-// sells, how far off target it leaves the allocation and how much
-// nearer it brings it than the rung before it, which with sales may
-// make two fewer trades, or stand nearer, with the rung recommended
-// saying so and those past it or with a trade under the minimum muted,
-// since neither is worth placing, which the card's caption says in
-// pounds once one is recommended; then where the recommended trades
-// leave each category against its target. A sale is written in pounds
-// below nothing. Before an amount or a sale is typed the tile says
-// so, and the ledger reads as the allocation stands.
+// takes out of its category, where that takes its share, and — outside
+// a scenario when an owned portfolio file is stored — a handoff link
+// to record the trade on Portfolio; then the ladder, a row a count of
+// trades, saying what each count buys and sells, how far off target it
+// leaves the allocation and how much nearer it brings it than the rung
+// before it, which with sales may make two fewer trades, or stand
+// nearer, with the rung recommended saying so and those past it or
+// with a trade under the minimum muted, since neither is worth
+// placing, which the card's caption says in pounds once one is
+// recommended; then where the recommended trades leave each category
+// against its target. A sale is written in pounds below nothing.
+// Before an amount or a sale is typed the tile says so, and the ledger
+// reads as the allocation stands.
+// When the household's owned portfolio file has refused or unsynced
+// targets beside saved ones (outside a scenario for unsynced updates),
+// a caution above the board explains the state and offers a sync
+// button (disabled with the live-CMA blocker when applicable).
 // While the plan holds a share in bonds now other than the target
 // allocation's, as one retargeted from a fund all in equities leaves it
 // once the glide path reaches bonds, a caution above everything says
 // both, since every trade then buys toward a split the plan no longer
 // holds; there is none unless the two are given.
-// There is nothing to lay out until an allocation is imported, until
-// what it holds has been read, which an older import has not, and
-// while no category has both a fund and a share to fill, and the
-// screen says which, pointing to where the allocation is imported.
+// There is nothing to lay out until an allocation is synced, until
+// what it holds has been read, and while no category has both a fund
+// and a share to fill, and the screen says which, pointing to
+// Portfolio or Assumptions › Target allocation, or offering to sync
+// inline.
 export function CogitatorBoard({
   account,
   amount,
   bonds,
+  branch,
   held,
   isReady,
+  portfolio,
   sales,
   targets,
 }: CogitatorBoardProps): JSX.Element {
+  const isInScenario = branch !== null;
   return (
     <>
+      {portfolio !== null && targets !== null && (
+        <PortfolioCaution branch={branch} portfolio={portfolio} />
+      )}
       {bonds !== undefined && (
         <Caution
           title={`The target allocation holds ${formatWholePercent(bonds.targeted)} in bonds; the plan holds ${formatWholePercent(bonds.now)} now`}
@@ -110,34 +141,23 @@ export function CogitatorBoard({
           {`The trades buy toward the target allocation's split. Retarget on ${assumptions.label} › Target allocation to buy toward the plan's.`}
         </Caution>
       )}
-      {targets === null && (
-        <Unready
-          description="Import a Portfolio Performance file."
-          icon={ChartPie}
-          title="No allocation imported yet"
-        />
-      )}
-      {targets !== null && held === 0 && (
-        <Unready
-          description="Reload the Portfolio Performance file."
-          icon={FolderSync}
-          title="Nothing held yet"
-        />
-      )}
-      {targets !== null && held > 0 && !isReady && (
-        <Unready
-          description="No category has both a fund and a target."
-          icon={Ban}
-          title="Nothing to buy toward"
-        />
-      )}
-      {targets !== null && isReady && (
+      {targets !== null && isReady ? (
         <Trades
           account={account}
           amount={amount}
           categories={targets.categories}
+          handoff={
+            isInScenario || portfolio === null ? null : portfolio.handoff
+          }
           held={held}
           sales={sales}
+        />
+      ) : (
+        <UnreadyBoard
+          branch={branch}
+          held={held}
+          portfolio={portfolio}
+          targets={targets}
         />
       )}
     </>
@@ -158,6 +178,56 @@ function lineOf(rung: Rung): string {
 // What a rung is called: no trade, or its count of trades.
 function nameOf(rung: Rung): string {
   return rung.count === 0 ? "No trade" : counted(rung.count, "trade");
+}
+
+// Caution shown above the board when saved targets exist alongside an
+// owned portfolio file whose targets are refused or (outside a
+// scenario) unsynced.
+function PortfolioCaution({
+  branch,
+  portfolio,
+}: {
+  readonly branch: null | string;
+  readonly portfolio: CogitatorPortfolio;
+}): JSX.Element | null {
+  const syncCautionId = useId();
+  switch (portfolio.syncState) {
+    case "refused":
+      return (
+        <Caution title="Portfolio file could not be synced">
+          {portfolio.syncRefusal}
+        </Caution>
+      );
+    case "retargeted":
+    case "synced":
+      return null;
+    case "unsynced":
+      if (branch !== null) {
+        return null;
+      }
+      return (
+        <Caution
+          action={
+            <PortfolioSync
+              branch={branch}
+              {...(portfolio.blockedReason !== undefined && {
+                describedBy: syncCautionId,
+                isDisabled: true,
+              })}
+            />
+          }
+          id={syncCautionId}
+          title={
+            portfolio.blockedReason !== undefined
+              ? "Portfolio file has unsynced changes"
+              : "Portfolio file has newer targets or holdings"
+          }
+        >
+          {portfolio.blockedReason ??
+            "Sync from Portfolio to plan trades from the latest file."}
+        </Caution>
+      );
+  }
 }
 
 // Why the rung recommended is the one: before an amount or a sale is
@@ -218,6 +288,59 @@ function saidOf({ recommended }: Ladder, reason: string): string {
   return `${nameOf(recommended)}: ${listed.format(trades)}.`;
 }
 
+// Builds the Portfolio transactions handoff URL for one recommended
+// trade: whole-pound positive amount, purchase/sale type, unique
+// account UUID when a named account resolves unambiguously, and either
+// a single resolved security UUID (narrowed to held securities across
+// the matching accounts for sales) or the Asset Allocation category id
+// when multiple or none match.
+function tradeHandoffHref(
+  trade: { readonly category: Target; readonly pounds: number },
+  account: string,
+  handoff: PortfolioHandoff,
+): Route {
+  const type = trade.pounds > 0 ? "purchase" : "sale";
+  const params = new URLSearchParams({
+    amount: String(Math.abs(trade.pounds)),
+    tab: "transactions",
+    trade: type,
+  });
+  const matchingAccounts =
+    account === ""
+      ? []
+      : handoff.securitiesAccounts.filter((item) => item.name === account);
+  const [onlyAccount, secondAccount] = matchingAccounts;
+  const portfolioId =
+    onlyAccount !== undefined && secondAccount === undefined
+      ? onlyAccount.id
+      : undefined;
+  if (portfolioId !== undefined) {
+    params.set("portfolio", portfolioId);
+  }
+  const assigned =
+    new Map(Object.entries(handoff.securitiesByCategory)).get(
+      trade.category.id,
+    ) ?? [];
+  let candidates = assigned;
+  if (type === "sale") {
+    const scopedAccountIds = new Set(matchingAccounts.map((item) => item.id));
+    const heldInScope =
+      scopedAccountIds.size > 0
+        ? assigned.filter((item) =>
+            item.heldInAccountIds.some((id) => scopedAccountIds.has(id)),
+          )
+        : assigned.filter((item) => item.heldInAccountIds.length > 0);
+    candidates = heldInScope.length > 0 ? heldInScope : assigned;
+  }
+  const [onlySecurity, secondSecurity] = candidates;
+  if (onlySecurity !== undefined && secondSecurity === undefined) {
+    params.set("security", onlySecurity.id);
+  } else {
+    params.set("category", trade.category.id);
+  }
+  return `${portfolioScreen.href}?${params.toString()}`;
+}
+
 // The tiles, the ladder and the ledger over an allocation that can be
 // bought toward, for the amount and the sales typed and the account
 // chosen; and a status saying what the tiles lay, empty from the first
@@ -228,12 +351,14 @@ function Trades({
   account,
   amount,
   categories,
+  handoff,
   held,
   sales,
 }: {
   readonly account: string;
   readonly amount: number;
   readonly categories: readonly Target[];
+  readonly handoff: null | PortfolioHandoff;
   readonly held: number;
   readonly sales: number;
 }): JSX.Element {
@@ -275,6 +400,22 @@ function Trades({
             <StatTile
               caption={`${formatPercent(category.value / held)} → ${formatPercent((category.value + pounds) / total)} of ${formatPercent(category.share)}`}
               key={category.id}
+              {...(handoff !== null && {
+                footer: (
+                  <Link
+                    aria-label={`Record ${pounds > 0 ? "purchase" : "sale"} of ${category.name} in Portfolio`}
+                    className="inline-flex items-center gap-1 rounded-sm text-xs font-medium text-card-foreground underline decoration-current/60 underline-offset-4 hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring pointer-coarse:-mb-2.5 pointer-coarse:min-h-11"
+                    href={tradeHandoffHref(
+                      { category, pounds },
+                      account,
+                      handoff,
+                    )}
+                  >
+                    {pounds > 0 ? "Record purchase" : "Record sale"}
+                    <ArrowUpRight aria-hidden className="size-3.5 shrink-0" />
+                  </Link>
+                ),
+              })}
               label={category.name}
               tone={at === 0 ? "inverse" : "default"}
               value={formatGbp(pounds)}
@@ -432,13 +573,14 @@ function Trades({
 }
 
 // The screen with nothing to lay out, saying why where the ladder
-// would be, and where the allocation is imported, by a link 44px tall
-// on a touch screen.
+// would be and offering the next action.
 function Unready({
+  action,
   description,
   icon,
   title,
 }: {
+  readonly action: JSX.Element;
   readonly description: string;
   readonly icon: LucideIcon;
   readonly title: string;
@@ -447,14 +589,105 @@ function Unready({
     <SectionCard label={subsectionLabel(cogitator, 1)} title="How many trades">
       <CardContent>
         <EmptyState description={description} icon={icon} title={title}>
-          <Link
-            className="underline underline-offset-4 pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center"
-            href={`${assumptions.href}?tab=target-allocation`}
-          >
-            {`${assumptions.label} › Target allocation`}
-          </Link>
+          {action}
         </EmptyState>
       </CardContent>
     </SectionCard>
+  );
+}
+
+// Chooses the unready empty state when no allocation is ready to trade
+// toward: missing file, refused file, unsynced targets, zero holdings,
+// or no implemented category with a positive share.
+function UnreadyBoard({
+  branch,
+  held,
+  portfolio,
+  targets,
+}: {
+  readonly branch: null | string;
+  readonly held: number;
+  readonly portfolio: CogitatorPortfolio | null;
+  readonly targets: null | Targets;
+}): JSX.Element {
+  if (targets === null) {
+    if (portfolio === null) {
+      return (
+        <Unready
+          action={
+            <UnreadyLink
+              href={portfolioScreen.href}
+              label="Upload on Portfolio"
+            />
+          }
+          description="Upload a binary Portfolio Performance file on Portfolio to plan trades."
+          icon={ChartPie}
+          title="No portfolio file uploaded yet"
+        />
+      );
+    }
+    if (portfolio.syncState === "refused") {
+      return (
+        <Unready
+          action={
+            <UnreadyLink href={portfolioScreen.href} label="Open Portfolio" />
+          }
+          description={portfolio.syncRefusal}
+          icon={ChartPie}
+          title="Portfolio file could not be synced"
+        />
+      );
+    }
+    return (
+      <Unready
+        action={<PortfolioSync branch={branch} variant="default" />}
+        description="Sync the stored portfolio file to plan trades."
+        icon={ChartPie}
+        title="No allocation synced yet"
+      />
+    );
+  }
+  if (held === 0) {
+    return (
+      <Unready
+        action={
+          <UnreadyLink href={portfolioScreen.href} label="Open Portfolio" />
+        }
+        description="Record holdings or update quotes on Portfolio."
+        icon={FolderSync}
+        title="Nothing held yet"
+      />
+    );
+  }
+  return (
+    <Unready
+      action={
+        <UnreadyLink
+          href={`${assumptions.href}?tab=target-allocation`}
+          label={`${assumptions.label} › Target allocation`}
+        />
+      }
+      description="No category has both a fund and a target."
+      icon={Ban}
+      title="Nothing to buy toward"
+    />
+  );
+}
+
+// An unready link sized at least 44px tall on a touch screen.
+function UnreadyLink({
+  href,
+  label,
+}: {
+  readonly href: Route;
+  readonly label: string;
+}): JSX.Element {
+  return (
+    <Link
+      className="underline underline-offset-4 pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center"
+      href={href}
+    >
+      {label}
+    </Link>
   );
 }

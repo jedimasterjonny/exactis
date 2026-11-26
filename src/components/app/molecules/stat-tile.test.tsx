@@ -118,6 +118,51 @@ describe("StatTile", () => {
     expect(screen.queryByText(bySlot("card-content"))).not.toBeInTheDocument();
   });
 
+  it("renders a bottom footer alongside delta and caption, on its own, and omits it when undefined", () => {
+    const { rerender } = render(
+      <StatTile
+        caption="vs Jul run"
+        delta={231906}
+        footer={<button type="button">Record trade</button>}
+        label="Invested"
+        value="£420,000"
+      />,
+    );
+
+    const [details, footerSlot] = screen.getAllByText(bySlot("card-content"));
+
+    expect(details).toHaveTextContent("vs Jul run");
+    expect(details).not.toHaveClass("mt-auto");
+    expect(footerSlot).toHaveClass("mt-auto");
+    expect(footerSlot).toContainElement(
+      screen.getByRole("button", { name: "Record trade" }),
+    );
+
+    rerender(
+      <StatTile
+        footer={<button type="button">Record trade</button>}
+        label="Invested"
+        value="£420,000"
+      />,
+    );
+
+    const alone = screen.getByText(bySlot("card-content"));
+
+    expect(alone).toHaveClass("mt-auto");
+    expect(alone).toContainElement(
+      screen.getByRole("button", { name: "Record trade" }),
+    );
+
+    rerender(
+      <StatTile caption="vs Jul run" label="Invested" value="£420,000" />,
+    );
+
+    expect(screen.getByText(bySlot("card-content"))).not.toHaveClass("mt-auto");
+    expect(
+      screen.queryByRole("button", { name: "Record trade" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("marks the inverse tone on the card for the stylesheet to scope", () => {
     render(
       <StatTile

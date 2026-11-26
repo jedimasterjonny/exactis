@@ -6,7 +6,7 @@ import * as z from "zod";
 import { mappings } from "@/data/cma.fixture";
 import { blank, kept as reference, today } from "@/data/household.fixture";
 import { stamped } from "@/data/shapes";
-import { portfolios, targets } from "@/data/targets.fixture";
+import { targets } from "@/data/targets.fixture";
 import { getDb } from "@/db/client";
 import { decideScenario, keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
@@ -23,12 +23,7 @@ import {
 import { openedScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
 
-import {
-  importTargets,
-  mapByName,
-  mapCategory,
-  syncTargetsFromPortfolio,
-} from "./targets";
+import { mapByName, mapCategory, syncTargetsFromPortfolio } from "./targets";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ refresh: vi.fn() }));
@@ -39,112 +34,7 @@ vi.mock("@/lib/session", () => ({ requireSession: vi.fn() }));
 const memory = inMemory();
 const { db } = memory;
 
-// The reference categories, read on the day the store is stood up on.
-const importedToday = { ...targets, importedOn: "2026-09-15", portfolios: [] };
-
 standUp(memory, { today });
-
-describe("importTargets", () => {
-  it("writes nothing without a session", async () => {
-    vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
-
-    await expect(importTargets(targets.categories, [])).rejects.toThrow(
-      "redirected",
-    );
-    expect(await readLatest(db, "")).toBeNull();
-  });
-
-  it("keeps the categories as imported today, draws the page again and hands them back", async () => {
-    expect(await importTargets(targets.categories, [])).toStrictEqual(
-      saved(importedToday),
-    );
-    expect(await readLatest(db, "")).toStrictEqual({
-      household: stamped({ ...blank, targets: importedToday }),
-      version: 1,
-    });
-    expect(refresh).toHaveBeenCalledOnce();
-  });
-
-  it("keeps an import over the one the household held, with each account's cash and what was paid in, and nothing else", async () => {
-    await keepAfter(db, { scenario: "", version: 0 }, reference);
-    const [first, second, ...rest] = targets.categories;
-    const moved = [
-      ...(first === undefined ? [] : [{ ...first, share: 0.5 }]),
-      ...(second === undefined ? [] : [{ ...second, share: 0.1 }]),
-      ...rest,
-    ];
-
-    await importTargets(moved, portfolios);
-
-    expect(await readLatest(db, "")).toStrictEqual({
-      household: stamped({
-        ...reference,
-        targets: { categories: moved, importedOn: "2026-09-15", portfolios },
-      }),
-      version: 2,
-    });
-  });
-
-  // Japan takes five points from the developed world and has no class.
-  it("refuses an allocation the CMA's rates cannot be derived from while they are live, saying how to import it, and keeps nothing", async () => {
-    const [developed, ...rest] = targets.categories;
-    const adding = [
-      ...(developed === undefined ? [] : [{ ...developed, share: 0.43 }]),
-      ...rest,
-      {
-        classes: ["Equity"],
-        id: "Asset Allocation/Equity/Japan",
-        isImplemented: true,
-        name: "Japan",
-        share: 0.05,
-        value: 0,
-      },
-    ];
-    await keepAfter(
-      db,
-      { scenario: "", version: 0 },
-      { ...reference, rateSet: "cma" },
-    );
-
-    expect(await importTargets(adding, [])).toStrictEqual(
-      refused(
-        "Japan has no CMA class, so this allocation cannot be imported while the plan runs on the CMA's rates. Choose custom rates, import it and give its new categories a class, then choose From CMA again",
-      ),
-    );
-    expect(await importTargets(targets.categories, [])).toStrictEqual(
-      saved(importedToday),
-    );
-    expect(await readLatest(db, "")).toMatchObject({ version: 2 });
-
-    await keepAfter(db, { scenario: "", version: 2 }, reference);
-
-    expect(await importTargets(adding, [])).toMatchObject({ kind: "saved" });
-  });
-
-  it("refuses categories that do not add up to the whole, and keeps nothing", async () => {
-    expect(await importTargets(targets.categories.slice(1), [])).toStrictEqual(
-      refused("A target allocation's categories add up to 100%"),
-    );
-    expect(await readLatest(db, "")).toBeNull();
-  });
-
-  // Only a bug or a forgery sends a category or an account the reader
-  // could not have read, so it fails loudly rather than being refused.
-  it("fails on a category or an account the reader could not have sent, and keeps nothing", async () => {
-    const unnamed = targets.categories.map((category) => ({
-      ...category,
-      id: "",
-    }));
-
-    await expect(importTargets(unnamed, [])).rejects.toThrow(z.ZodError);
-    await expect(
-      importTargets(targets.categories, [
-        { cash: 0, name: "ISA", paid: [{ amount: 0.5, on: "2026-09-25" }] },
-      ]),
-    ).rejects.toThrow(z.ZodError);
-    expect(await readLatest(db, "")).toBeNull();
-  });
-});
 
 describe("mapCategory", () => {
   // FTSE USA, which the reference maps onto nothing, and UK equity,

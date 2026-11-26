@@ -2,13 +2,14 @@
 
 import type { JSX } from "react";
 
-import { FolderSync } from "lucide-react";
+import { Briefcase } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
+import type { PortfolioHandoff } from "@/data/portfolio";
 import type { Month } from "@/data/schedule";
 import type { Targets } from "@/data/targets";
 
-import { PortfolioImport } from "@/components/app/atoms/portfolio-import";
 import {
   CountField,
   MoneyField,
@@ -16,60 +17,83 @@ import {
 import { SelectField } from "@/components/app/molecules/select-field";
 import { Screen } from "@/components/app/templates/screen";
 import { Badge } from "@/components/kit/badge";
+import { buttonVariants } from "@/components/kit/button";
 import { formatGbp } from "@/lib/money";
-import { formatDated, monthName } from "@/lib/months";
-import { cogitator, sectionLabel } from "@/lib/nav";
+import { formatDated, formatDay, monthName } from "@/lib/months";
+import {
+  cogitator,
+  portfolio as portfolioScreen,
+  sectionLabel,
+} from "@/lib/nav";
 
 import { CogitatorBoard } from "./cogitator-board";
 
+// How the household's owned .portfolio file stands for Cogitator: its
+// handoff lookups and freshness dates together with whether its target
+// allocation is synced, intentionally retargeted in a scenario, refused,
+// or unsynced (with an optional live-CMA sync blocker).
+export type CogitatorPortfolio = (
+  | { readonly blockedReason?: string; readonly syncState: "unsynced" }
+  | { readonly syncRefusal: string; readonly syncState: "refused" }
+  | { readonly syncState: "retargeted" | "synced" }
+) & {
+  readonly handoff: PortfolioHandoff;
+  readonly latestQuoteDate: null | string;
+  readonly savedOn: string;
+};
+
 interface CogitatorScreenProps {
   readonly bonds?: { readonly now: number; readonly targeted: number };
+  readonly branch: null | string;
   readonly offered?: {
     readonly account?: string;
     readonly amount: number;
     readonly month: Month;
   };
   readonly planned?: { readonly amount: number; readonly month: Month };
+  readonly portfolio: CogitatorPortfolio | null;
   readonly targets: null | Targets;
   readonly today: string;
 }
 
 // The next best trades for the pounds typed in the header. The header
-// says when the targets were imported and how long ago, on the day the
-// page was drawn, and what they hold in all, beside the import that
-// takes them afresh, as the month end's does, or that import alone
-// before any are; and it takes the amount to invest and the most sales
-// to make once there is something to buy toward, the sales held to a
-// few, since every choice of them is tried; and, once the allocation
-// says what each securities account holds, which account the trades are
-// placed in, all of them until one is chosen, the accounts listed by
-// name. All three are the screen's own and forgotten when it is left,
-// since they are chosen afresh at each visit to the broker, so they are
-// held here, beside the route, where both the header that takes them
-// and the board beneath that lays out the trades for them can reach
-// them. All accounts is the choice of no name, so an account read
-// from a file with none is not offered. An account chosen that the
-// allocation no longer lists, as one does once a scenario with
-// another is opened, which keeps the screen, is all accounts again,
-// and stays so should it be listed again, as the choice by then
-// shows. The amount and sales fields show those held, and the account
-// choice opens on the account held, so each says what the ladder is
-// making when it comes back after the allocation had nothing to buy
-// toward. An amount the month end offered opens the amount at it rather
-// than at nothing, and the field says what it was and which month's close
-// it came from, so a figure is never there unexplained; it is typed over
-// as any amount is, and the field still says what was offered, so the
-// line stays true and the header keeps its height. Without an offer, what
-// the plan pays into the ISAs and GIA in its first month opens the amount
-// where the page hands it on, and the field says so, its figure and for
-// which month, the same way. One offered in an account opens the account
-// choice on it, or on all accounts where the allocation does not list it.
-// The fields line up by their labels, so the amount's hint beneath its
-// box sets the others no lower.
+// shows how fresh the household's owned portfolio file is (or when a
+// legacy allocation was synced before a file is uploaded), what the
+// allocation holds in all, and a link to Portfolio; and it takes the
+// amount to invest and the most sales to make once there is something
+// to buy toward, the sales held to a few, since every choice of them is
+// tried; and, once the allocation says what each securities account
+// holds, which account the trades are placed in, all of them until one
+// is chosen, the accounts listed by name. All three are the screen's
+// own and forgotten when it is left, since they are chosen afresh at
+// each visit to the broker, so they are held here, beside the route,
+// where both the header that takes them and the board beneath that lays
+// out the trades for them can reach them. All accounts is the choice of
+// no name, so an account read from a file with none is not offered. An
+// account chosen that the allocation no longer lists, as one does once
+// a scenario with another is opened, which keeps the screen, is all
+// accounts again, and stays so should it be listed again, as the choice
+// by then shows. The amount and sales fields show those held, and the
+// account choice opens on the account held, so each says what the
+// ladder is making when it comes back after the allocation had nothing
+// to buy toward. An amount the month end offered opens the amount at it
+// rather than at nothing, and the field says what it was and which
+// month's close it came from, so a figure is never there unexplained;
+// it is typed over as any amount is, and the field still says what was
+// offered, so the line stays true and the header keeps its height.
+// Without an offer, what the plan pays into the ISAs and GIA in its
+// first month opens the amount where the page hands it on, and the
+// field says so, its figure and for which month, the same way. One
+// offered in an account opens the account choice on it, or on all
+// accounts where the allocation does not list it. The fields line up by
+// their labels, so the amount's hint beneath its box sets the others no
+// lower.
 export function CogitatorScreen({
   bonds,
+  branch,
   offered,
   planned,
+  portfolio,
   targets,
   today,
 }: CogitatorScreenProps): JSX.Element {
@@ -128,16 +152,45 @@ export function CogitatorScreen({
       }
       label={sectionLabel(cogitator)}
       meta={
-        targets === null ? (
-          <PortfolioImport />
+        portfolio !== null ? (
+          <>
+            <Badge
+              className="h-auto max-w-full whitespace-normal"
+              variant="secondary"
+            >
+              <Briefcase aria-hidden />
+              {portfolio.latestQuoteDate !== null
+                ? `Quotes to ${formatPortfolioDate(portfolio.latestQuoteDate, today)}`
+                : `Saved ${formatPortfolioDate(portfolio.savedOn, today)}`}
+            </Badge>
+            {targets !== null && `${formatGbp(held)} held`}
+            <Link
+              className={buttonVariants({ size: "sm", variant: "outline" })}
+              href={portfolioScreen.href}
+            >
+              Open Portfolio
+            </Link>
+          </>
         ) : (
           <>
-            <Badge variant="secondary">
-              <FolderSync aria-hidden />
-              {`Imported ${formatDated(targets.importedOn, today)}`}
-            </Badge>
-            {`${formatGbp(held)} held`}
-            <PortfolioImport />
+            {targets !== null && (
+              <>
+                <Badge
+                  className="h-auto max-w-full whitespace-normal"
+                  variant="secondary"
+                >
+                  <Briefcase aria-hidden />
+                  {`Synced ${formatPortfolioDate(targets.importedOn, today)}`}
+                </Badge>
+                {`${formatGbp(held)} held`}
+              </>
+            )}
+            <Link
+              className={buttonVariants({ size: "sm", variant: "outline" })}
+              href={portfolioScreen.href}
+            >
+              Upload on Portfolio
+            </Link>
           </>
         )
       }
@@ -147,13 +200,22 @@ export function CogitatorScreen({
         account={account}
         amount={amount}
         {...(bonds !== undefined && { bonds })}
+        branch={branch}
         held={held}
         isReady={isReady}
+        portfolio={portfolio}
         sales={sales}
         targets={targets}
       />
     </Screen>
   );
+}
+
+// Formats a portfolio freshness date with relative age unless timezone
+// skew puts the date ahead of today, in which case the date is shown
+// plainly rather than with a negative day count.
+function formatPortfolioDate(date: string, today: string): string {
+  return date > today ? formatDay(date) : formatDated(date, today);
 }
 
 // What the amount field says of the figure it opened on: the close it

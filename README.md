@@ -26,19 +26,22 @@ in Postgres on Neon and the app on Vercel.
   house revalued by the Land Registry's house price index.
 - Assumptions — the rates, typed or derived from the Bank of England's implied
   inflation curve, BlackRock's capital market assumptions and a target
-  allocation imported from Portfolio Performance; the glide path; and each
-  owner's State Pension.
+  allocation synced from the household's stored `.portfolio` file, with
+  server-side in-place retargeting of LifeStrategy weights back to the file; the
+  glide path; and each owner's State Pension.
 - Month end — the balances cut on the 25th, or the working day before, with
-  BlackRock's assumptions, the inflation curve and the house price index offered
-  to pull first, each marked stale once a newer one should be out, checked
-  against what the plan expected, which records a progress point, then what
-  moved the plan since the close before, as a waterfall, where the invested
-  balances landed among the futures of the oldest close in the year before that
-  can be read, that reading kept month after month as the plan's track record
-  beside how retirement has moved, and the cash each account holds uninvested,
-  as Portfolio Performance says, to invest.
+  BlackRock's assumptions, the inflation curve, the house price index and the
+  stored `.portfolio` file checked first for freshness and sync, each marked
+  stale once a newer one should be out, checked against what the plan expected,
+  which records a progress point, then what moved the plan since the close
+  before, as a waterfall, where the invested balances landed among the futures
+  of the oldest close in the year before that can be read, that reading kept
+  month after month as the plan's track record beside how retirement has moved,
+  and the cash each account holds uninvested, from the stored `.portfolio` file,
+  to invest.
 - Cogitator — what to buy and sell next in an account, towards that target
-  allocation.
+  allocation, with trade handoff links into Portfolio to record each recommended
+  purchase or sale.
 - Portfolio — the household's stored binary Portfolio Performance file, its
   holdings, paired securities and cash accounts, and transactions, with upload,
   replacement, byte-preserving write-back for new accounts, securities,
@@ -52,10 +55,12 @@ is where it is adopted or decided against, with a line on why. Adopting one
 makes its plan the household's, keeping the household's own bookkeeping:
 balances, progress points and house prices. So the month is closed and house
 prices are pulled in the household alone, and both are refused while a scenario
-is open. For BlackRock's assumptions, the inflation curve and the holdings
-imported from Portfolio Performance, adopting keeps whichever is newer, the
-household's or the scenario's. A decided scenario is kept, with its decision,
-and takes no more edits; it is changed by making a new scenario from it.
+is open. For BlackRock's assumptions, the inflation curve and the target
+allocation synced from Portfolio, adopting keeps whichever is newer, the
+household's or the scenario's; adopting a retargeted scenario also updates the
+household's stored `.portfolio` file weights in place. A decided scenario is
+kept, with its decision, and takes no more edits; it is changed by making a new
+scenario from it.
 
 ## Getting started
 
