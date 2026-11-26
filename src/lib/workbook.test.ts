@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { zipSync } from "fflate";
+import { strFromU8, zipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 
 import { Refusal } from "@/lib/answer";
@@ -45,6 +45,30 @@ function storedListed(content: Uint8Array, times: number): Uint8Array {
   tail.setUint16(10, times, true);
   tail.setUint32(12, entry.length * times, true);
   return listed;
+}
+
+// The zip given with the file named rewritten as nothing here can read
+// it: its entry says it unzips to the size given, and names a
+// compression no reader inflates, so a reader counting the file refuses
+// the zip over the first and one opening it fails on the second. The
+// directory's end is the last 22 bytes of a zip with no comment, and
+// says where the directory starts and how many files it lists; each
+// file's entry names its compression 10 bytes in, gives its unzipped
+// size 24 and its name's length 28, and runs 46 bytes and that name
+// long.
+function unreadable(zip: Uint8Array, path: string, size: number): Uint8Array {
+  const view = new DataView(zip.buffer);
+  const end = zip.length - 22;
+  let entry = view.getUint32(end + 16, true);
+  for (let left = view.getUint16(end + 10, true); left > 0; left--) {
+    const length = view.getUint16(entry + 28, true);
+    if (strFromU8(zip.subarray(entry + 46, entry + 46 + length)) === path) {
+      view.setUint16(entry + 10, 99, true);
+      view.setUint32(entry + 24, size, true);
+    }
+    entry += 46 + length;
+  }
+  return zip;
 }
 
 // A zip of the files given, its directory saying each unzips to the
@@ -218,6 +242,27 @@ describe("readSheet", () => {
     expect(readSheet(workbook, "Sheet1")).toStrictEqual([new Map([[0, 2]])]);
   });
 
+  // BlackRock's workbook carries the values cached from every workbook
+  // it links to, which the reader never opens and which came to more
+  // than the ceiling on their own.
+  it("reads a workbook carrying a part it never opens, whatever that part says of itself", () => {
+    const workbook = unreadable(
+      workbookFrom({
+        "xl/_rels/workbook.xml.rels":
+          '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>',
+        "xl/externalLinks/externalLink1.xml": "<externalLink/>",
+        "xl/workbook.xml":
+          '<workbook><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>',
+        "xl/worksheets/sheet1.xml":
+          '<worksheet><sheetData><row r="1"><c r="A1"><v>2</v></c></row></sheetData></worksheet>',
+      }),
+      "xl/externalLinks/externalLink1.xml",
+      32_000_001,
+    );
+
+    expect(readSheet(workbook, "Sheet1")).toStrictEqual([new Map([[0, 2]])]);
+  });
+
   // A refusal rather than a failure, since the screen says why.
   it("refuses a file that is no zip", () => {
     const read = (): unknown => readSheet(new Uint8Array([1, 2, 3]), "Sheet1");
@@ -337,5 +382,57 @@ describe("unzipped", () => {
     expect(unzipped(zip, "The file is not a zip")).toStrictEqual({
       part: new Uint8Array(1000),
     });
+  });
+
+  // A file not wanted costs nothing: it is left out of the tally, so
+  // one saying it unzips to more than the ceiling does not refuse the
+  // zip, and it is never unzipped, so a compression nothing here
+  // inflates does not fail it either.
+  it("leaves a file not wanted out of the tally and never unzips it", () => {
+    const kept = new Uint8Array([7]);
+    const zip = unreadable(
+      zipSync({ kept, skipped: new Uint8Array([9]) }, { level: 0 }),
+      "skipped",
+      32_000_001,
+    );
+
+    expect(
+      unzipped(zip, "The file is not a zip", (path) => path === "kept"),
+    ).toStrictEqual({ kept });
+  });
+
+  it("refuses a zip whose files wanted say they unzip to more than 32 MB together", () => {
+    const zip = zipSaying(
+      {
+        one: new Uint8Array(8),
+        three: new Uint8Array(8),
+        two: new Uint8Array(8),
+      },
+      16_000_001,
+    );
+
+    expect(() =>
+      unzipped(zip, "The file is not a zip", (path) => path !== "three"),
+    ).toThrow(
+      new Refusal(
+        "The zip unzips to more than 32 MB, far past any file read from one",
+      ),
+    );
+  });
+
+  // The most files bounds the walk of the zip's directory, and every
+  // entry is walked whether its file is wanted or not.
+  it("counts every file a zip lists against the most, wanted or not", () => {
+    expect(() =>
+      unzipped(
+        storedListed(new Uint8Array([7]), 1001),
+        "The file is not a zip",
+        () => false,
+      ),
+    ).toThrow(
+      new Refusal(
+        "The zip lists more than 1,000 files, far more than any read here",
+      ),
+    );
   });
 });
