@@ -15,6 +15,7 @@ import { homePart, homeValues } from "@/data/houses.fixture";
 import { incomeLines } from "@/data/income.fixture";
 import { atAge } from "@/data/milestones";
 import { owners } from "@/data/owners.fixture";
+import { netWorthOf, pointOf } from "@/data/progress";
 import { upcast } from "@/data/shapes";
 import { keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
@@ -23,6 +24,7 @@ import { refused, saved } from "@/lib/answer";
 import { bandOf, landedSince } from "@/lib/landed";
 import { cutOf } from "@/lib/months";
 import { standingOf } from "@/lib/moved";
+import { plannedOf } from "@/lib/planned";
 import { found } from "@/lib/records";
 import { openedScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
@@ -1534,6 +1536,179 @@ describe("the account actions", () => {
         ...kept.points,
         { ...read, month: { month: 8, year: 2026 } },
       ]);
+    });
+
+    // On the 25th of September, September is closed after August's
+    // point with a note typed: it lands, trimmed, on September's point,
+    // in the write that has August keep where the plan stood, as a close
+    // with no note has it.
+    it("keeps the note sent on the point a month closed after the latest records, trimmed", async () => {
+      vi.setSystemTime(new Date("2026-09-25T12:00:00Z"));
+
+      expect(
+        await closeBalances({
+          asOf: { month: 8, year: 2026 },
+          balances: [],
+          note: "  Car serviced from savings ",
+        }),
+      ).toStrictEqual(
+        saved({ asOf: { month: 8, year: 2026 }, isRecorded: true }),
+      );
+      expect(soundKept(await latest()).kept.points.slice(-2)).toStrictEqual([
+        { ...kept.points[5], standing: standingOf(kept) },
+        {
+          ...read,
+          month: { month: 8, year: 2026 },
+          note: "Car serviced from savings",
+        },
+      ]);
+      expect(await versions()).toBe(2);
+    });
+
+    // August's point keeps an invented note, and August is closed again:
+    // the point written over it keeps the note sent, and then, closed
+    // again with none sent or a blank one, each over a point keeping a
+    // note, keeps none, as the field showed it cleared. The points
+    // before it are never touched.
+    it("writes the note sent over the latest's on a month closed again, and none where none is sent", async () => {
+      await keepAfter(
+        db,
+        { scenario: "", version: 1 },
+        {
+          ...kept,
+          points: kept.points.map((point, index) =>
+            index === 5
+              ? { ...point, note: "Boiler replaced from savings" }
+              : point,
+          ),
+        },
+      );
+      const august = { month: 7, year: 2026 };
+      const closedAgain = saved({ asOf: august, isRecorded: true });
+
+      for (const note of [undefined, "   "]) {
+        expect(
+          await closeBalances({
+            asOf: august,
+            balances: [],
+            note: "Boiler replaced, invoice paid",
+          }),
+        ).toStrictEqual(closedAgain);
+        expect(soundKept(await latest()).kept.points).toStrictEqual([
+          ...kept.points.slice(0, -1),
+          { ...read, month: august, note: "Boiler replaced, invoice paid" },
+        ]);
+        expect(
+          await closeBalances({
+            asOf: august,
+            balances: [],
+            ...(note !== undefined && { note }),
+          }),
+        ).toStrictEqual(closedAgain);
+        expect(soundKept(await latest()).kept.points.at(-1)).toStrictEqual({
+          ...read,
+          month: august,
+        });
+      }
+    });
+
+    // March is before August, the latest point's month, so records no
+    // point to keep a note on: one sent with it is refused, naming
+    // August, and nothing is written; none sent closes March as before.
+    it("refuses a note sent with a month before the latest point's, naming the latest's month, and writes nothing", async () => {
+      expect(
+        await closeBalances({
+          asOf: { month: 2, year: 2026 },
+          balances: [{ balance: 275000, id: 2 }],
+          note: "Car serviced",
+        }),
+      ).toStrictEqual(
+        refused(
+          "A month before August 2026 records no progress point, so it keeps no note",
+        ),
+      );
+      expect(await versions()).toBe(1);
+      expect(refresh).not.toHaveBeenCalled();
+    });
+
+    // A person can type a note past its rule, so it is refused in the
+    // rule's words, before the store is read, rather than failing.
+    it("refuses a note past its rule in its words, before the store is read", async () => {
+      for (const note of ["x".repeat(201), "Car\tserviced"]) {
+        expect(
+          await closeBalances({
+            asOf: { month: 7, year: 2026 },
+            balances: [],
+            note,
+          }),
+        ).toStrictEqual(refused("A note is one line of up to 200 characters"));
+      }
+      expect(openedScenario).not.toHaveBeenCalled();
+      expect(await versions()).toBe(1);
+    });
+
+    // The reference with August's point read off the accounts, as a
+    // close records one, rather than the sheet's, which carries no cash
+    // or GIAs and so gives no year planned. Closing September after it,
+    // August keeps the twelve months the plan carried the household the
+    // page reads over, each what net worth moved by from August's, so
+    // laid back on August they are what plannedOf gave; September keeps
+    // none.
+    it("keeps the plan's year ahead on the latest point once the month after is closed, as plannedOf gave it", async () => {
+      const august = pointOf(kept.accounts, kept.asOf);
+      await keepAfter(
+        db,
+        { scenario: "", version: 1 },
+        { ...kept, points: [...kept.points.slice(0, -1), august] },
+      );
+      vi.setSystemTime(new Date("2026-09-25T12:00:00Z"));
+      const ahead = plannedOf(soundKept(await latest()).household);
+
+      expect(ahead).toHaveLength(12);
+
+      await moveTo({ month: 8, year: 2026 });
+      const { points } = soundKept(await latest()).kept;
+      const planned = points[5]?.planned ?? [];
+
+      expect(planned).toStrictEqual(
+        ahead.map(({ worth }) => worth - netWorthOf(august)),
+      );
+      expect(planned.map((move) => move + netWorthOf(august))).toStrictEqual(
+        ahead.map(({ worth }) => worth),
+      );
+      expect(points.at(-1)).not.toHaveProperty("planned");
+    });
+
+    // The same August closed again, and then March closed back and
+    // September closed after it: neither freezes a year, since a month
+    // closed again is no month after, and after a close back the
+    // balances are no longer as of August.
+    it("keeps no year planned on a month closed again, or one closed after a close back", async () => {
+      await keepAfter(
+        db,
+        { scenario: "", version: 1 },
+        {
+          ...kept,
+          points: [
+            ...kept.points.slice(0, -1),
+            pointOf(kept.accounts, kept.asOf),
+          ],
+        },
+      );
+
+      await moveTo({ month: 7, year: 2026 });
+
+      expect(soundKept(await latest()).kept.points[5]).not.toHaveProperty(
+        "planned",
+      );
+
+      await moveTo({ month: 2, year: 2026 });
+      vi.setSystemTime(new Date("2026-09-25T12:00:00Z"));
+      await moveTo({ month: 8, year: 2026 });
+
+      expect(
+        soundKept(await latest()).kept.points.map(({ planned }) => planned),
+      ).toStrictEqual(Array.from({ length: 7 }, () => undefined));
     });
 
     // It is 15 September 2026: August is cut, September is not until

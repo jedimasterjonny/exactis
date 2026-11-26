@@ -7,6 +7,7 @@ import type { Kept } from "@/data/household";
 import { accounts as listed } from "@/data/accounts.fixture";
 import { balancesSheet } from "@/data/balances-sheet";
 import { blank, kept as reference, today } from "@/data/household.fixture";
+import { noted } from "@/data/progress.fixture";
 import { stamped } from "@/data/shapes";
 import { keepAfter } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
@@ -55,6 +56,16 @@ describe("GET /export", () => {
     );
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await bodyOf(response)).toStrictEqual(stamped(reference));
+  });
+
+  it("hands out the note and the year planned a point keeps", async () => {
+    const noting = {
+      ...reference,
+      points: [noted, ...reference.points.slice(1)],
+    };
+    await keepFirst("", noting);
+
+    expect(await bodyOf(await GET(asked()))).toStrictEqual(stamped(noting));
   });
 
   it("hands out the scenario open, named for it", async () => {

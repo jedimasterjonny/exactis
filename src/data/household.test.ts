@@ -47,7 +47,7 @@ import { atAge } from "@/data/milestones";
 import { milestones } from "@/data/milestones.fixture";
 import { owners, sam } from "@/data/owners.fixture";
 import { drawdowns } from "@/data/plan";
-import { points } from "@/data/progress.fixture";
+import { noted, points } from "@/data/progress.fixture";
 import { planRate } from "@/data/rates";
 import { allocation, rates } from "@/data/rates.fixture";
 import { currentShape, stamped } from "@/data/shapes";
@@ -828,6 +828,34 @@ const held: readonly Case[] = [
       recorded(given, (point) => ({
         ...point,
         standing: { ...reading.standing, liquid: 512_300.5 },
+      })),
+  ],
+  ...["  ", "x".repeat(201), "Paid\tin", "Paid\u2028in"].map((note): Case => [
+    "A note is one line of up to 200 characters",
+    (given): Inputs => recorded(given, (point) => ({ ...point, note })),
+  ]),
+  [
+    "Too small: expected array to have exactly 12 items",
+    (given): Inputs =>
+      recorded(given, (point) => ({
+        ...point,
+        planned: noted.planned.slice(0, 11),
+      })),
+  ],
+  [
+    "Too big: expected array to have exactly 12 items",
+    (given): Inputs =>
+      recorded(given, (point) => ({
+        ...point,
+        planned: [...noted.planned, 19_100],
+      })),
+  ],
+  [
+    "Invalid input: expected int, received number",
+    (given): Inputs =>
+      recorded(given, (point) => ({
+        ...point,
+        planned: [1420.5, ...noted.planned.slice(1)],
       })),
   ],
   [
@@ -1727,6 +1755,41 @@ describe("soundKept", () => {
     ]);
     expect(soundKept(kept).household.points[0]).not.toHaveProperty("landed");
     expect(soundKept(kept).household.points[0]).not.toHaveProperty("standing");
+  });
+
+  // A note is kept as typed less the space around it, and counted as
+  // zod counts a string, by code point, so two hundred characters from
+  // beyond the Basic Multilingual Plane are kept, at twice that many
+  // UTF-16 units.
+  it("keeps a point's note trimmed and the year planned, or neither", () => {
+    const [, second] = points;
+    const cars = "\u{1F697}".repeat(200);
+    const read = soundKept({
+      ...kept,
+      points: [
+        { ...noted, note: `  ${noted.note} ` },
+        { ...second, note: cars },
+        ...points.slice(2),
+      ],
+    }).household.points;
+
+    expect(read.slice(0, 2)).toStrictEqual([noted, { ...second, note: cars }]);
+    expect(soundKept(kept).household.points[0]).not.toHaveProperty("note");
+    expect(soundKept(kept).household.points[0]).not.toHaveProperty("planned");
+  });
+
+  // Only a file edited by hand can hold a blank note, and it is refused
+  // as one past the rule is, in the rule's own words rather than the
+  // map's.
+  it("refuses a note kept blank or past the rule, in the rule's words", () => {
+    for (const note of ["", "\u{1F697}".repeat(201)]) {
+      expect(() =>
+        soundKept({
+          ...kept,
+          points: [{ ...noted, note }, ...points.slice(1)],
+        }),
+      ).toThrow(/^A note is one line of up to 200 characters$/);
+    }
   });
 
   // A household kept before the plan chose a drawdown holds none, which

@@ -4,11 +4,19 @@ import type { Month } from "@/data/schedule";
 import { isAsset, isPension } from "@/data/accounts";
 import { isOnOrBefore, monthsBetween } from "@/lib/months";
 
-// A progress point as the household keeps it: its balances, and, once
-// the month after it is closed, the month end's reading of the plan. A
-// point kept before the readings were, and the latest, carry neither.
+// A progress point as the household keeps it: its balances; the note
+// its month end kept on it, in the household's own words as typed less
+// the space around it, absent where none was typed; and, once the month
+// after it is closed, the month end's reading of the plan, and the
+// twelve months after the point as the plan carried the household then:
+// each what net worth moved by, from the accounts as they then stood,
+// to that month's end, in whole pounds of that month's money, the first
+// being the month after the point's. A point kept before the readings
+// were, or before the year was, and the latest, carry none of them.
 export type KeptPoint = ProgressPoint & {
   readonly landed?: KeptLanded;
+  readonly note?: string;
+  readonly planned?: readonly number[];
   readonly standing?: KeptStanding;
 };
 
@@ -107,9 +115,9 @@ export type Balance = (typeof balances)[number];
 // begin in it; the points kept in it, oldest first; and the last of
 // them, which it is read to.
 export interface KeptYear {
-  readonly from: ProgressPoint;
-  readonly points: readonly ProgressPoint[];
-  readonly to: ProgressPoint;
+  readonly from: KeptPoint;
+  readonly points: readonly KeptPoint[];
+  readonly to: KeptPoint;
   readonly year: number;
 }
 
@@ -235,7 +243,7 @@ export function sumOf(moves: readonly Move[], sign: -1 | 1): number {
 // kept no point at all is read from its
 // own first point, as the first year is, so no row carries the move of
 // a year it does not name.
-export function yearsOf(points: readonly ProgressPoint[]): KeptYear[] {
+export function yearsOf(points: readonly KeptPoint[]): KeptYear[] {
   const years: KeptYear[] = [];
   for (const point of points) {
     const last = years.at(-1);

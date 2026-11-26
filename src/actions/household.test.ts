@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Kept } from "@/data/household";
 
 import { blank, kept as reference, today } from "@/data/household.fixture";
+import { noted } from "@/data/progress.fixture";
 import { rules } from "@/data/rules";
 import { currentShape, stamped } from "@/data/shapes";
 import { keepAfter, readLatest } from "@/db/household";
@@ -107,6 +108,38 @@ describe("importHousehold", () => {
     expect(
       await importHousehold(fileOf({ ...blank, owners: [] })),
     ).toStrictEqual(refused(rules.somebodys));
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
+  });
+
+  // A file exported before a point could keep a note or a year planned
+  // keeps neither, and reads as it is; one exported since keeps both.
+  it("keeps a file of the fourth shape as it is, and one of the fifth with a point's note and year planned", async () => {
+    const noting = { ...longer, points: [noted, ...longer.points.slice(1)] };
+
+    expect(
+      await importHousehold(JSON.stringify({ ...stamped(longer), shape: 4 })),
+    ).toStrictEqual(saved(undefined));
+    expect(await readLatest(db, "")).toStrictEqual({
+      household: stamped(longer),
+      version: 2,
+    });
+    expect(await importHousehold(fileOf(noting))).toStrictEqual(
+      saved(undefined),
+    );
+    expect(await readLatest(db, "")).toStrictEqual({
+      household: stamped(noting),
+      version: 3,
+    });
+  });
+
+  it("refuses a file whose note breaks the rule, in the rule's words, and writes nothing", async () => {
+    const tabbed = { ...noted, note: "Boiler\treplaced" };
+
+    expect(
+      await importHousehold(
+        fileOf({ ...longer, points: [tabbed, ...longer.points.slice(1)] }),
+      ),
+    ).toStrictEqual(refused("A note is one line of up to 200 characters"));
     expect(await readLatest(db, "")).toMatchObject({ version: 1 });
   });
 

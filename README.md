@@ -22,8 +22,9 @@ in Postgres on Neon and the app on Vercel.
   debt.
 - Income & expenses — the income and expense lines, the milestones, and what a
   month of each year puts by or draws.
-- Progress — the balances month by month from the progress points, with the
-  house revalued by the Land Registry's house price index.
+- Progress — the balances month by month from the progress points and the notes
+  kept on them, with the house revalued by the Land Registry's house price
+  index.
 - Assumptions — the rates, typed or derived from the Bank of England's implied
   inflation curve, BlackRock's capital market assumptions and a target
   allocation imported from Portfolio Performance; the glide path; and each
@@ -31,12 +32,12 @@ in Postgres on Neon and the app on Vercel.
 - Month end — the balances cut on the 25th, or the working day before, with
   BlackRock's assumptions, the inflation curve and the house price index offered
   to pull first, each marked stale once a newer one should be out, checked
-  against what the plan expected, which records a progress point, then what
-  moved the plan since the close before, as a waterfall, where the invested
-  balances landed among the futures of the oldest close in the year before that
-  can be read, that reading kept month after month as the plan's track record
-  beside how retirement has moved, and the cash each account holds uninvested,
-  as Portfolio Performance says, to invest.
+  against what the plan expected, which records a progress point, with any note
+  written on the month, then what moved the plan since the close before, as a
+  waterfall, where the invested balances landed among the futures of the oldest
+  close in the year before that can be read, that reading kept month after month
+  as the plan's track record beside how retirement has moved, and the cash each
+  account holds uninvested, as Portfolio Performance says, to invest.
 - Cogitator — what to buy and sell next in an account, towards that target
   allocation.
 - Portfolio — the household's stored binary Portfolio Performance file, its

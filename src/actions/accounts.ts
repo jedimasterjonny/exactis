@@ -34,12 +34,27 @@ import {
 import { account as heldAccount } from "@/data/household";
 import { isSound, statuses, toRecords } from "@/data/houses";
 import { moving } from "@/data/milestones";
-import { pointOf } from "@/data/progress";
-import { month, named, pounds, recordId, target } from "@/data/schemas";
-import { Refusal } from "@/lib/answer";
+import { netWorthOf, pointOf } from "@/data/progress";
+import {
+  month,
+  named,
+  noted,
+  pounds,
+  recordId,
+  sentNote,
+  target,
+} from "@/data/schemas";
+import { Refusal, refused } from "@/lib/answer";
 import { keptOf, landedSince } from "@/lib/landed";
-import { cutOf, isOnOrBefore, monthsBetween, today } from "@/lib/months";
+import {
+  cutOf,
+  formatMonth,
+  isOnOrBefore,
+  monthsBetween,
+  today,
+} from "@/lib/months";
 import { standingOf } from "@/lib/moved";
+import { plannedOf } from "@/lib/planned";
 import { found, holdUnchanged, replaced, written } from "@/lib/records";
 import { openedScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
@@ -192,17 +207,20 @@ const openedAsset = z
   .nullable() satisfies z.ZodType<null | Secured>;
 
 // A month end as the worksheet sends it: the month the balances are now
-// as of, and each balance checked against it, by the account's id.
+// as of, each balance checked against it, by the account's id, and the
+// note on the month, where one is written.
 interface Closed {
   readonly asOf: Month;
   readonly balances: readonly {
     readonly balance: number;
     readonly id: number;
   }[];
+  readonly note?: string;
 }
 
 // What a month end may carry: a month, and each balance whole pounds,
-// each account once.
+// each account once. The note is parsed apart, since a person can type
+// one past its rule, and is refused in words rather than failing.
 const closed = z.object({
   asOf: month,
   balances: z
@@ -235,12 +253,19 @@ const order = z
 // it otherwise; a month before the latest moves the balances and
 // records nothing, since the balances read now are not what the
 // accounts held then, and the points before the latest are never
-// touched. A point recorded after the latest, while the balances are
+// touched. The note sent lands on the point recorded, what is sent
+// being what it keeps, so a month closed again keeps the note sent with
+// it or none; a month that records no point keeps no note, and one sent
+// with it is refused, in words naming the latest's month, as a note
+// past its rule is before anything is read, so a note is never dropped
+// unsaid. A point recorded after the latest, while the balances are
 // still as of the latest's month, has the latest keep the month end's
 // reading of the household as it stands before this close: where the
 // invested balances landed among the futures of the oldest close in the
-// year before it that gives a reading, as VII.iii reads it, and where
-// the plan stands. The latest is still the latest when it is given
+// year before it that gives a reading, as VII.iii reads it, where the
+// plan stands, and the twelve months after it as the plan carries the
+// household then, as what net worth moves by from the latest's, where
+// the plan gives them. The latest is still the latest when it is given
 // them. The closes are read only then, once nothing above has refused,
 // so a month closed again or closed back reads none and keeps nothing;
 // and a month may keep a reading VII.iii never drew, since What moved's
@@ -262,6 +287,11 @@ export async function closeBalances(
 ): Promise<Answer<{ readonly asOf: Month; readonly isRecorded: boolean }>> {
   await requireSession();
   const { asOf, balances } = closed.parse(draft);
+  const sent = sentNote.safeParse(draft.note);
+  if (!sent.success) {
+    return refused(noted);
+  }
+  const note = sent.data;
   const scenario = await openedScenario();
   return amend(async ({ household, kept }) => {
     if (scenario !== null) {
@@ -288,19 +318,24 @@ export async function closeBalances(
     );
     const latest = kept.points.at(-1);
     const isRecorded = latest === undefined || isOnOrBefore(latest.month, asOf);
+    if (!isRecorded && note !== undefined) {
+      throw new Refusal(
+        `A month before ${formatMonth(latest.month)} records no progress point, so it keeps no note`,
+      );
+    }
     const held =
       latest !== undefined &&
       monthsBetween(latest.month, asOf) > 0 &&
       monthsBetween(kept.asOf, latest.month) === 0
         ? [
             ...kept.points.slice(0, -1),
-            { ...latest, ...(await readingOf(kept)) },
+            { ...latest, ...(await readingOf({ household, kept }, latest)) },
           ]
         : kept.points;
     const points = isRecorded
       ? [
           ...held.filter((point) => monthsBetween(point.month, asOf) > 0),
-          pointOf(accounts, asOf),
+          { ...pointOf(accounts, asOf), ...(note !== undefined && { note }) },
         ]
       : kept.points;
     return {
@@ -531,16 +566,23 @@ function loanIn(
 }
 
 // The month end's reading of the household as held, for its latest
-// point to keep: where the invested balances landed among the futures
-// of the oldest close in the year before that gives a reading, as
-// VII.iii reads it, read only where one does, and where the plan
-// stands.
+// point, the one given, to keep: where the invested balances landed
+// among the futures of the oldest close in the year before that gives a
+// reading, as VII.iii reads it, read only where one does; where the plan
+// stands; and the year planned, the twelve months plannedOf carries the
+// household over, each what net worth moves by from the point's, kept
+// only where plannedOf gives them.
 async function readingOf(
-  kept: Kept,
-): Promise<Pick<KeptPoint, "landed" | "standing">> {
+  { household, kept }: Held,
+  latest: KeptPoint,
+): Promise<Pick<KeptPoint, "landed" | "planned" | "standing">> {
   const { landed } = landedSince(await readClosesBefore(kept.asOf), kept);
+  const ahead = plannedOf(household);
   return {
     ...(landed !== null && { landed: keptOf(landed) }),
+    ...(ahead.length > 0 && {
+      planned: ahead.map(({ worth }) => worth - netWorthOf(latest)),
+    }),
     standing: standingOf(kept),
   };
 }
