@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
@@ -916,5 +922,403 @@ describe("PortfolioTransactionDialog", () => {
       taxes: 0,
       type: "purchase",
     });
+  });
+
+  it("preserves explicit blank trade selections with handoff hints until account, security, and shares are filled", () => {
+    render(
+      <PortfolioTransactionDialog
+        baseCurrency="GBP"
+        cashAccounts={cashAccounts}
+        holdings={holdings}
+        initialDraft={{
+          amount: 500,
+          portfolioId: "",
+          securityId: "",
+          type: "purchase",
+        }}
+        onDismiss={vi.fn<() => void>()}
+        onSaved={vi.fn<(draft: NewPortfolioTransaction) => void>()}
+        securitiesAccounts={securitiesAccounts}
+        today="2026-09-25"
+        version={1}
+      />,
+      { wrapper: Toaster },
+    );
+
+    const portfolioSelect = screen.getByRole("combobox", {
+      name: "Securities account",
+    });
+    const cashSelect = screen.getByRole("combobox", { name: "Cash account" });
+    const securitySelect = screen.getByRole("combobox", { name: "Security" });
+    const sharesInput = screen.getByRole("textbox", { name: "Shares" });
+    const save = screen.getByRole("button", { name: "Save" });
+
+    expect(portfolioSelect).toHaveValue("");
+    expect(
+      within(portfolioSelect).getByRole("option", {
+        name: "Select an account",
+      }),
+    ).toBeInTheDocument();
+    expect(portfolioSelect).toHaveAccessibleDescription(
+      "Choose the account for this trade",
+    );
+    expect(cashSelect).toHaveValue("");
+    expect(
+      within(cashSelect).getByRole("option", { name: "Select an account" }),
+    ).toBeInTheDocument();
+    expect(securitySelect).toHaveValue("");
+    expect(sharesInput).toHaveValue("");
+    expect(sharesInput).toHaveAccessibleDescription("Enter executed shares");
+    expect(save).toBeDisabled();
+
+    // Selecting a securities account pulls in its reference cash account and clears the account hint.
+    fireEvent.change(portfolioSelect, { target: { value: "port-isa" } });
+    expect(cashSelect).toHaveValue("cash-isa");
+    expect(portfolioSelect).toHaveAccessibleDescription("");
+    expect(save).toBeDisabled();
+
+    // Choosing a security leaves Save disabled until executed shares are entered.
+    fireEvent.change(securitySelect, { target: { value: "sec-world" } });
+    expect(save).toBeDisabled();
+
+    fireEvent.change(sharesInput, { target: { value: "4" } });
+    expect(sharesInput).toHaveAccessibleDescription("");
+    expect(save).toBeEnabled();
+  });
+
+  it("clears the executed shares handoff hint when switching transaction type resets amount", () => {
+    render(
+      <PortfolioTransactionDialog
+        baseCurrency="GBP"
+        cashAccounts={cashAccounts}
+        holdings={holdings}
+        initialDraft={{
+          amount: 500,
+          portfolioId: "port-isa",
+          securityId: "sec-world",
+          type: "purchase",
+        }}
+        onDismiss={vi.fn<() => void>()}
+        onSaved={vi.fn<(draft: NewPortfolioTransaction) => void>()}
+        securitiesAccounts={securitiesAccounts}
+        today="2026-09-25"
+        version={1}
+      />,
+      { wrapper: Toaster },
+    );
+
+    expect(screen.getByRole("textbox", { name: "Total paid" })).toHaveValue(
+      "£500.00",
+    );
+    expect(
+      screen.getByRole("textbox", { name: "Shares" }),
+    ).toHaveAccessibleDescription("Enter executed shares");
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Type" }), {
+      target: { value: "sale" },
+    });
+
+    expect(screen.getByRole("textbox", { name: "Net proceeds" })).toHaveValue(
+      "",
+    );
+    expect(
+      screen.getByRole("textbox", { name: "Shares" }),
+    ).toHaveAccessibleDescription("");
+  });
+
+  it("auto-selects the sole active cash account when portfolioId is explicitly blank", () => {
+    render(
+      <PortfolioTransactionDialog
+        baseCurrency="GBP"
+        cashAccounts={cashAccounts.slice(1, 2)}
+        holdings={holdings}
+        initialDraft={{
+          amount: 500,
+          portfolioId: "",
+          securityId: "",
+          type: "purchase",
+        }}
+        onDismiss={vi.fn<() => void>()}
+        onSaved={vi.fn<(draft: NewPortfolioTransaction) => void>()}
+        securitiesAccounts={securitiesAccounts}
+        today="2026-09-25"
+        version={1}
+      />,
+      { wrapper: Toaster },
+    );
+
+    expect(
+      screen.getByRole("combobox", { name: "Securities account" }),
+    ).toHaveValue("");
+    expect(
+      screen.getByRole("combobox", { name: "Securities account" }),
+    ).toHaveAccessibleDescription("Choose the account for this trade");
+    expect(screen.getByRole("combobox", { name: "Cash account" })).toHaveValue(
+      "cash-isa",
+    );
+  });
+
+  it("groups securities under the suggested category with category title and hint until a security is chosen", () => {
+    render(
+      <PortfolioTransactionDialog
+        baseCurrency="GBP"
+        cashAccounts={cashAccounts}
+        holdings={holdings}
+        initialDraft={{
+          amount: 500,
+          portfolioId: "",
+          securityId: "",
+          type: "purchase",
+        }}
+        onDismiss={vi.fn<() => void>()}
+        onSaved={vi.fn<(draft: NewPortfolioTransaction) => void>()}
+        securitiesAccounts={securitiesAccounts}
+        suggestedCategory={{
+          name: "Global Equities",
+          securityIds: ["sec-world"],
+        }}
+        today="2026-09-25"
+        version={1}
+      />,
+      { wrapper: Toaster },
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Purchase · Global Equities" }),
+    ).toBeInTheDocument();
+
+    const securitySelect = screen.getByRole("combobox", { name: "Security" });
+    expect(securitySelect).toHaveValue("");
+    expect(
+      within(securitySelect).getByRole("option", { name: "Select a security" }),
+    ).toBeInTheDocument();
+    expect(securitySelect).toHaveAccessibleDescription(
+      "Choose a security in Global Equities",
+    );
+    expect(
+      within(securitySelect)
+        .getAllByRole("group")
+        .map((group) => group.getAttribute("label")),
+    ).toStrictEqual(["Global Equities", "Other securities"]);
+    expect(
+      within(
+        within(securitySelect).getByRole("group", { name: "Global Equities" }),
+      )
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toStrictEqual(["Global Equity Index"]);
+    expect(
+      within(
+        within(securitySelect).getByRole("group", { name: "Other securities" }),
+      )
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toStrictEqual(["UK Gilts Fund"]);
+
+    // Switching to dividend keeps AccountFields flat without category grouping or title.
+    fireEvent.change(screen.getByRole("combobox", { name: "Type" }), {
+      target: { value: "dividend" },
+    });
+    expect(
+      screen.getByRole("heading", { name: "New dividend" }),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("combobox", { name: "Security" })).queryByRole(
+        "group",
+      ),
+    ).not.toBeInTheDocument();
+
+    // Switching back to purchase and selecting a security removes placeholder and hint and updates title.
+    fireEvent.change(screen.getByRole("combobox", { name: "Type" }), {
+      target: { value: "purchase" },
+    });
+    const tradeSecuritySelect = screen.getByRole("combobox", {
+      name: "Security",
+    });
+    fireEvent.change(tradeSecuritySelect, { target: { value: "sec-world" } });
+    expect(
+      screen.getByRole("heading", { name: "Purchase · Global Equity Index" }),
+    ).toBeInTheDocument();
+    expect(
+      within(tradeSecuritySelect).queryByRole("option", {
+        name: "Select a security",
+      }),
+    ).not.toBeInTheDocument();
+    expect(tradeSecuritySelect).toHaveAccessibleDescription("");
+  });
+
+  it("avoids duplicate group labels, empty second groups, and empty optgroups across suggested category edge cases", () => {
+    const { rerender } = render(
+      <PortfolioTransactionDialog
+        baseCurrency="GBP"
+        cashAccounts={cashAccounts}
+        holdings={holdings}
+        initialDraft={{ portfolioId: "", securityId: "", type: "purchase" }}
+        key="literal-other"
+        onDismiss={vi.fn<() => void>()}
+        onSaved={vi.fn<(draft: NewPortfolioTransaction) => void>()}
+        securitiesAccounts={securitiesAccounts}
+        suggestedCategory={{
+          name: "Other securities",
+          securityIds: ["sec-world"],
+        }}
+        today="2026-09-25"
+        version={1}
+      />,
+      { wrapper: Toaster },
+    );
+
+    expect(
+      within(screen.getByRole("combobox", { name: "Security" }))
+        .getAllByRole("group")
+        .map((group) => group.getAttribute("label")),
+    ).toStrictEqual(["Other securities", "Other"]);
+
+    // When every active holding is in the suggested category, render only that group.
+    rerender(
+      <PortfolioTransactionDialog
+        baseCurrency="GBP"
+        cashAccounts={cashAccounts}
+        holdings={holdings}
+        initialDraft={{ portfolioId: "", securityId: "", type: "purchase" }}
+        key="all-in-category"
+        onDismiss={vi.fn<() => void>()}
+        onSaved={vi.fn<(draft: NewPortfolioTransaction) => void>()}
+        securitiesAccounts={securitiesAccounts}
+        suggestedCategory={{
+          name: "Core Portfolio",
+          securityIds: ["sec-world", "sec-gilts"],
+        }}
+        today="2026-09-25"
+        version={1}
+      />,
+    );
+
+    expect(
+      within(screen.getByRole("combobox", { name: "Security" }))
+        .getAllByRole("group")
+        .map((group) => group.getAttribute("label")),
+    ).toStrictEqual(["Core Portfolio"]);
+
+    // When zero active holdings belong to the category, render flat options with no optgroup and an explanatory hint.
+    rerender(
+      <PortfolioTransactionDialog
+        baseCurrency="GBP"
+        cashAccounts={cashAccounts}
+        holdings={holdings}
+        initialDraft={{ portfolioId: "", securityId: "", type: "purchase" }}
+        key="zero-in-category"
+        onDismiss={vi.fn<() => void>()}
+        onSaved={vi.fn<(draft: NewPortfolioTransaction) => void>()}
+        securitiesAccounts={securitiesAccounts}
+        suggestedCategory={{
+          name: "Commodities",
+          securityIds: ["sec-retired"],
+        }}
+        today="2026-09-25"
+        version={1}
+      />,
+    );
+
+    const flatSecuritySelect = screen.getByRole("combobox", {
+      name: "Security",
+    });
+    expect(
+      within(flatSecuritySelect).queryByRole("group"),
+    ).not.toBeInTheDocument();
+    expect(flatSecuritySelect).toHaveValue("");
+    expect(
+      within(flatSecuritySelect).getByRole("option", {
+        name: "Select a security",
+      }),
+    ).toBeInTheDocument();
+    expect(flatSecuritySelect).toHaveAccessibleDescription(
+      "No active security assigned to Commodities",
+    );
+  });
+
+  it("prioritizes empty-catalog and missing-selection hints over suggested category and unselected account hints", () => {
+    const { rerender } = render(
+      <PortfolioTransactionDialog
+        baseCurrency="GBP"
+        cashAccounts={cashAccounts}
+        holdings={[]}
+        initialDraft={{ portfolioId: "", securityId: "", type: "purchase" }}
+        key="empty-holdings"
+        onDismiss={vi.fn<() => void>()}
+        onSaved={vi.fn<(draft: NewPortfolioTransaction) => void>()}
+        securitiesAccounts={[]}
+        suggestedCategory={{
+          name: "Global Equities",
+          securityIds: ["sec-world"],
+        }}
+        today="2026-09-25"
+        version={1}
+      />,
+      { wrapper: Toaster },
+    );
+
+    expect(
+      screen.getByRole("combobox", { name: "Securities account" }),
+    ).toHaveAccessibleDescription("Add a securities account first");
+    expect(
+      screen.getByRole("combobox", { name: "Security" }),
+    ).toHaveAccessibleDescription("Add a security first");
+
+    // A vanished security after a stale refresh overrides the suggestedCategory hint.
+    rerender(
+      <PortfolioTransactionDialog
+        baseCurrency="GBP"
+        cashAccounts={cashAccounts}
+        holdings={holdings}
+        initialDraft={{
+          portfolioId: "port-isa",
+          securityId: "sec-world",
+          type: "purchase",
+        }}
+        key="missing-security"
+        onDismiss={vi.fn<() => void>()}
+        onSaved={vi.fn<(draft: NewPortfolioTransaction) => void>()}
+        securitiesAccounts={securitiesAccounts}
+        suggestedCategory={{
+          name: "Global Equities",
+          securityIds: ["sec-world", "sec-gilts"],
+        }}
+        today="2026-09-25"
+        version={1}
+      />,
+    );
+
+    rerender(
+      <PortfolioTransactionDialog
+        baseCurrency="GBP"
+        cashAccounts={cashAccounts}
+        holdings={holdings.filter((holding) => holding.id !== "sec-world")}
+        initialDraft={{
+          portfolioId: "port-isa",
+          securityId: "sec-world",
+          type: "purchase",
+        }}
+        key="missing-security"
+        onDismiss={vi.fn<() => void>()}
+        onSaved={vi.fn<(draft: NewPortfolioTransaction) => void>()}
+        securitiesAccounts={securitiesAccounts}
+        suggestedCategory={{
+          name: "Global Equities",
+          securityIds: ["sec-world", "sec-gilts"],
+        }}
+        today="2026-09-25"
+        version={2}
+      />,
+    );
+
+    const securitySelect = screen.getByRole("combobox", { name: "Security" });
+    expect(securitySelect).toHaveValue("");
+    expect(
+      within(securitySelect).getByRole("option", { name: "Select a security" }),
+    ).toBeInTheDocument();
+    expect(securitySelect).toHaveAccessibleDescription(
+      "Selected security is no longer available",
+    );
   });
 });
