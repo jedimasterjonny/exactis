@@ -8,11 +8,25 @@ import type { Answer } from "@/lib/answer";
 
 import { suggestedMappings } from "@/data/class-table";
 import { holdWhileLive } from "@/data/household";
-import { categoryValues, named, portfolioValues } from "@/data/schemas";
+import { effectiveSyncedOn } from "@/data/portfolio";
+import {
+  categoryValues,
+  named,
+  portfolioValues,
+  scenarioName,
+} from "@/data/schemas";
+import { getDb } from "@/db/client";
+import { readLatestPortfolio } from "@/db/portfolio";
 import { Refusal } from "@/lib/answer";
-import { today } from "@/lib/months";
+import { dayOf, today } from "@/lib/months";
+import { readPortfolioTargets } from "@/lib/portfolio-file";
 import { requireSession } from "@/lib/session";
 import { amend } from "@/store/household";
+
+// The branch a target sync names as the one its page was drawn on, the
+// household as null or a scenario by name, or none to sync whichever
+// branch is open.
+const branch = scenarioName.nullable().optional();
 
 // What an import carries: the categories as the reader read them out of
 // the file, each as the model holds one.
@@ -81,7 +95,7 @@ export async function mapByName(): Promise<Answer<readonly Mapping[]>> {
   return amend(({ kept }) => {
     if (kept.cma === null || kept.targets === null) {
       throw new Refusal(
-        "Categories are mapped by name once a CMA is pulled and a target allocation imported",
+        "Categories are mapped by name once a CMA is pulled and a target allocation synced",
       );
     }
     const suggested = suggestedMappings(
@@ -120,7 +134,7 @@ export async function mapCategory(draft: {
   return amend(({ kept }) => {
     const listed = kept.targets?.categories ?? [];
     if (!listed.some(({ id }) => id === category)) {
-      throw new Refusal("A category is mapped once it is imported");
+      throw new Refusal("A category is mapped once it is synced");
     }
     const priced = kept.cma?.latest.assets ?? [];
     if (asset !== null && !priced.some(({ name }) => name === asset)) {
@@ -132,4 +146,45 @@ export async function mapCategory(draft: {
     const mappings = asset === null ? others : [...others, { asset, category }];
     return { kept: { ...kept, mappings }, result: mappings };
   });
+}
+
+// Syncs the open branch's target allocation from the household's stored
+// .portfolio file, stamping importedOn from the file's latest quote or
+// transaction date (falling back to its UK save date) without modifying
+// portfolio_files. When a branch is named, refuses if another branch
+// was opened since the screen was drawn. Refuses before a file is
+// uploaded, when the file's targets cannot be read, or when syncing
+// would leave live CMA rates without a blend.
+export async function syncTargetsFromPortfolio(
+  on?: null | string,
+): Promise<Answer<Targets>> {
+  await requireSession();
+  const drawnOn = branch.parse(on);
+  return amend(async ({ kept }) => {
+    const stored = await readLatestPortfolio(getDb());
+    if (stored === null) {
+      throw new Refusal("Upload a portfolio file before syncing");
+    }
+    const {
+      categories: readCategories,
+      latestQuoteDate,
+      latestTransactionDate,
+      portfolios: readPortfolios,
+    } = readPortfolioTargets(stored.content);
+    const targets: Targets = {
+      categories: readCategories,
+      importedOn: effectiveSyncedOn({
+        latestQuoteDate,
+        latestTransactionDate,
+        savedOn: dayOf(stored.savedAt),
+      }),
+      portfolios: readPortfolios,
+    };
+    const next = { ...kept, targets };
+    holdWhileLive(next, {
+      cannot: "this allocation cannot be synced",
+      then: "sync it and give its new categories a class",
+    });
+    return { kept: next, result: targets };
+  }, drawnOn);
 }

@@ -108,9 +108,10 @@ const sourceNames: Record<Source, string> = {
 // Each category's share of the whole is scaled with its sleeve's, and
 // what moved the rates is read at the same split.
 //
-// Before a vintage is pulled, or a target allocation imported on its
-// tab, there is nothing to work out, and the body says so; while the
-// vintage makes no blend, it says what is missing in the caution tone.
+// Before a vintage is pulled, or a target allocation is uploaded or
+// synced on its tab, there is nothing to work out, and the body says so;
+// while the vintage makes no blend, it says what is missing in the
+// caution tone.
 export function CmaWorksheet({
   before,
   cma,
@@ -142,9 +143,9 @@ export function CmaWorksheet({
         )}
         {cma !== null && targets === null && (
           <EmptyState
-            description="Import one on the Target allocation tab."
+            description="Upload a portfolio file on Portfolio, or sync it on the Target allocation tab."
             icon={ChartPie}
-            title="No allocation imported yet"
+            title="No target allocation yet"
           />
         )}
         {cma !== null && targets !== null && (

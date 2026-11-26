@@ -1054,7 +1054,16 @@ export function balancesIn(value: unknown): KeptBalances | null {
 // refuse a change the plan's own years would let through, and choosing
 // the rates typed lets it through.
 export function holdWhileLive(
-  kept: Kept,
+  kept: Pick<
+    Kept,
+    | "cma"
+    | "curve"
+    | "deductions"
+    | "glide"
+    | "mappings"
+    | "rateSet"
+    | "targets"
+  >,
   change: { readonly cannot: string; readonly then: string },
 ): void {
   if (kept.rateSet === "custom") {

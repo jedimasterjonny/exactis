@@ -60,6 +60,31 @@ interface Paid {
   readonly on: string;
 }
 
+// Whether a stored target allocation matches live categories and
+// portfolios on every non-share bookkeeping field (category ids, names,
+// classes, implementation, values, per-account holdings, and portfolios'
+// cash and paid-in history), independent of object key order, category
+// order, target shares, and importedOn. Treats legacy records without
+// portfolios as unequal so older records upgrade once.
+export function areTargetBookkeepingEqual(
+  kept: Targets,
+  live: {
+    readonly categories: readonly Target[];
+    readonly portfolios: readonly Portfolio[];
+  },
+): boolean {
+  if (kept.portfolios === undefined) {
+    return false;
+  }
+  return (
+    areTargetSetsEqual(
+      kept.categories,
+      live.categories,
+      isSameTargetBookkeeping,
+    ) && areEqualArrays(kept.portfolios, live.portfolios, isSamePortfolio)
+  );
+}
+
 // Whether a stored target allocation structurally matches live
 // categories and portfolios read from a Portfolio Performance file,
 // independent of object key order, category order, and importedOn.
@@ -76,7 +101,7 @@ export function areTargetsEquivalent(
     return false;
   }
   return (
-    areTargetSetsEqual(kept.categories, live.categories) &&
+    areTargetSetsEqual(kept.categories, live.categories, isSameTarget) &&
     areEqualArrays(kept.portfolios, live.portfolios, isSamePortfolio)
   );
 }
@@ -114,6 +139,7 @@ function areHeldEqual(
 function areTargetSetsEqual(
   left: readonly Target[],
   right: readonly Target[],
+  isSame: (one: Target, other: Target) => boolean,
 ): boolean {
   if (left.length !== right.length) {
     return false;
@@ -125,7 +151,7 @@ function areTargetSetsEqual(
       return false;
     }
     byId.delete(target.id);
-    return isSameTarget(matched, target);
+    return isSame(matched, target);
   });
 }
 
@@ -142,10 +168,13 @@ function isSamePortfolio(one: Portfolio, other: Portfolio): boolean {
 }
 
 function isSameTarget(one: Target, other: Target): boolean {
+  return one.share === other.share && isSameTargetBookkeeping(one, other);
+}
+
+function isSameTargetBookkeeping(one: Target, other: Target): boolean {
   return (
     one.name === other.name &&
     one.isImplemented === other.isImplemented &&
-    one.share === other.share &&
     one.value === other.value &&
     areEqualArrays(
       one.classes,

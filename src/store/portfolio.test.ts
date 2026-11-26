@@ -18,6 +18,7 @@ import { dayOf } from "@/lib/months";
 import {
   appendAccount,
   appendTransaction,
+  readPortfolioFeed,
   readPortfolioSnapshot,
   readPortfolioTargets,
   updateQuotes,
@@ -36,6 +37,7 @@ import { takeConsoleOutput } from "../../vitest.setup";
 import {
   amendPortfolio,
   getPortfolio,
+  getPortfolioFeed,
   readStoredPortfolio,
   storePortfolio,
 } from "./portfolio";
@@ -109,6 +111,71 @@ describe("the portfolio store", () => {
         savedOn: "2026-09-25",
         snapshot: readPortfolioSnapshot(secondBytes, "northstar-v2.portfolio"),
         version: 2,
+      });
+    });
+  });
+
+  describe("getPortfolioFeed", () => {
+    it("reads nothing without a session", async () => {
+      vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+
+      await expect(getPortfolioFeed()).rejects.toThrow("redirected");
+      expect(getDb).not.toHaveBeenCalled();
+    });
+
+    it("returns null before any portfolio file is stored", async () => {
+      expect(await getPortfolioFeed()).toBeNull();
+    });
+
+    it("returns the lightweight feed with UK savedOn, no raw bytes, and scenario readability", async () => {
+      const bytes = samplePortfolioFile();
+      // 23:30 UTC in British Summer Time falls on the next UK calendar day.
+      await db
+        .insert(portfolioFiles)
+        .values({
+          content: bytes,
+          fileName: "northstar.portfolio",
+          savedAt: new Date("2026-07-01T23:30:00Z"),
+          version: 1,
+        });
+      vi.mocked(openedScenario).mockResolvedValue("Retire early");
+
+      const owned = await getPortfolioFeed();
+      expect(owned).toStrictEqual({
+        feed: readPortfolioFeed(bytes),
+        fileName: "northstar.portfolio",
+        savedOn: "2026-07-02",
+        version: 1,
+      });
+      expect(owned).not.toHaveProperty("content");
+    });
+
+    it("surfaces target taxonomy refusals inside feed.targets without throwing", async () => {
+      const withoutTaxonomy = portfolioFile(clientOf([]));
+      await db
+        .insert(portfolioFiles)
+        .values({
+          content: withoutTaxonomy,
+          fileName: "plain.portfolio",
+          savedAt: new Date("2026-09-20T12:00:00Z"),
+          version: 1,
+        });
+
+      expect(await getPortfolioFeed()).toStrictEqual({
+        feed: {
+          handoff: {
+            securitiesAccounts: [{ id: "portfolio-1", name: "Brokerage" }],
+            securitiesByCategory: {},
+          },
+          latestQuoteDate: "2024-10-05",
+          latestTransactionDate: null,
+          targets: refused(
+            "The file has no Asset Allocation taxonomy, only none",
+          ),
+        },
+        fileName: "plain.portfolio",
+        savedOn: "2026-09-20",
+        version: 1,
       });
     });
   });

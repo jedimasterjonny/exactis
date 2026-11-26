@@ -7,13 +7,28 @@ import { mappings } from "@/data/cma.fixture";
 import { blank, kept as reference, today } from "@/data/household.fixture";
 import { stamped } from "@/data/shapes";
 import { portfolios, targets } from "@/data/targets.fixture";
-import { keepAfter, readLatest } from "@/db/household";
+import { getDb } from "@/db/client";
+import { decideScenario, keepAfter, readLatest } from "@/db/household";
 import { inMemory } from "@/db/memory.fixture";
+import { readLatestPortfolio } from "@/db/portfolio";
+import { portfolioFiles } from "@/db/schema";
 import { standUp } from "@/db/store.fixture";
 import { refused, saved } from "@/lib/answer";
+import { readPortfolioTargets } from "@/lib/portfolio-file";
+import {
+  clientOf,
+  portfolioFile,
+  samplePortfolioFile,
+} from "@/lib/portfolio-file.fixture";
+import { openedScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
 
-import { importTargets, mapByName, mapCategory } from "./targets";
+import {
+  importTargets,
+  mapByName,
+  mapCategory,
+  syncTargetsFromPortfolio,
+} from "./targets";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ refresh: vi.fn() }));
@@ -200,14 +215,14 @@ describe("mapCategory", () => {
         asset: "UK cash",
         category: "Asset Allocation/Cash",
       }),
-    ).toStrictEqual(refused("A category is mapped once it is imported"));
+    ).toStrictEqual(refused("A category is mapped once it is synced"));
     expect(await readLatest(db, "")).toMatchObject({ version: 1 });
   });
 
-  it("refuses any category before a target allocation is imported", async () => {
+  it("refuses any category before a target allocation is synced", async () => {
     expect(
       await mapCategory({ asset: null, category: ukEquity ?? "" }),
-    ).toStrictEqual(refused("A category is mapped once it is imported"));
+    ).toStrictEqual(refused("A category is mapped once it is synced"));
     expect(await readLatest(db, "")).toBeNull();
   });
 
@@ -310,9 +325,9 @@ describe("mapByName", () => {
     expect(await readLatest(db, "")).toMatchObject({ version: 1 });
   });
 
-  it("refuses before a CMA is pulled or a target allocation imported", async () => {
+  it("refuses before a CMA is pulled or a target allocation synced", async () => {
     const refusal = refused(
-      "Categories are mapped by name once a CMA is pulled and a target allocation imported",
+      "Categories are mapped by name once a CMA is pulled and a target allocation synced",
     );
 
     expect(await mapByName()).toStrictEqual(refusal);
@@ -333,5 +348,276 @@ describe("mapByName", () => {
 
     expect(await mapByName()).toStrictEqual(refusal);
     expect(await readLatest(db, "")).toMatchObject({ version: 2 });
+  });
+});
+
+describe("syncTargetsFromPortfolio", () => {
+  it("writes nothing without a session", async () => {
+    vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+
+    await expect(syncTargetsFromPortfolio()).rejects.toThrow("redirected");
+    expect(getDb).not.toHaveBeenCalled();
+    expect(await readLatest(db, "")).toBeNull();
+  });
+
+  it("refuses before a portfolio file is uploaded and writes nothing", async () => {
+    expect(await syncTargetsFromPortfolio()).toStrictEqual(
+      refused("Upload a portfolio file before syncing"),
+    );
+    expect(await readLatest(db, "")).toBeNull();
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("refuses cleanly when the stored file has no Asset Allocation taxonomy or unbalanced shares", async () => {
+    await db
+      .insert(portfolioFiles)
+      .values({
+        content: portfolioFile(clientOf([])),
+        fileName: "plain.portfolio",
+        savedAt: new Date("2026-09-14T12:00:00Z"),
+        version: 1,
+      });
+
+    expect(await syncTargetsFromPortfolio()).toStrictEqual(
+      refused("The file has no Asset Allocation taxonomy, only none"),
+    );
+    expect(await readLatest(db, "")).toBeNull();
+
+    const halfWeighted = portfolioFile([
+      [1, 66],
+      [
+        8,
+        [
+          [1, "tax-aa"],
+          [2, "Asset Allocation"],
+          [
+            5,
+            [
+              [1, "aa-root"],
+              [3, "Asset Allocation"],
+              [6, 10_000],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "aa-half"],
+              [2, "aa-root"],
+              [3, "Half only"],
+              [6, 5000],
+            ],
+          ],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+    await db
+      .insert(portfolioFiles)
+      .values({
+        content: halfWeighted,
+        fileName: "half.portfolio",
+        savedAt: new Date("2026-09-15T12:00:00Z"),
+        version: 2,
+      });
+
+    expect(await syncTargetsFromPortfolio()).toStrictEqual(
+      refused("Target category shares must add up to 100%"),
+    );
+    expect(await readLatest(db, "")).toBeNull();
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("refuses under live CMA when a synced category has no class and keeps nothing", async () => {
+    await keepAfter(
+      db,
+      { scenario: "", version: 0 },
+      { ...reference, rateSet: "cma" },
+    );
+    await db
+      .insert(portfolioFiles)
+      .values({
+        content: samplePortfolioFile(),
+        fileName: "northstar.portfolio",
+        savedAt: new Date("2026-09-15T12:00:00Z"),
+        version: 1,
+      });
+
+    expect(await syncTargetsFromPortfolio()).toStrictEqual(
+      refused(
+        "Global equity has no CMA class, so this allocation cannot be synced while the plan runs on the CMA's rates. Choose custom rates, sync it and give its new categories a class, then choose From CMA again",
+      ),
+    );
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("stamps importedOn from the file's latest quote or transaction date, falling back to UK save date when undated, without mutating portfolio_files", async () => {
+    const datedBytes = samplePortfolioFile();
+    const savedAt = new Date("2026-07-01T23:30:00Z");
+    await db
+      .insert(portfolioFiles)
+      .values({
+        content: datedBytes,
+        fileName: "northstar.portfolio",
+        savedAt,
+        version: 1,
+      });
+    const { categories: datedCategories, portfolios: datedPortfolios } =
+      readPortfolioTargets(datedBytes);
+    const expectedDated = {
+      categories: datedCategories,
+      importedOn: "2026-09-22",
+      portfolios: datedPortfolios,
+    };
+
+    expect(await syncTargetsFromPortfolio(null)).toStrictEqual(
+      saved(expectedDated),
+    );
+    expect(await readLatest(db, "")).toStrictEqual({
+      household: stamped({ ...blank, targets: expectedDated }),
+      version: 1,
+    });
+    expect(await readLatestPortfolio(db)).toStrictEqual({
+      content: datedBytes,
+      fileName: "northstar.portfolio",
+      savedAt,
+      version: 1,
+    });
+    expect(refresh).toHaveBeenCalledOnce();
+
+    // Without dated quotes or transactions, importedOn falls back to
+    // the file's UK save date (23:30 UTC in BST is the next UK day).
+    const undatedBytes = portfolioFile([
+      [1, 66],
+      [
+        8,
+        [
+          [1, "tax-aa"],
+          [2, "Asset Allocation"],
+          [
+            5,
+            [
+              [1, "aa-root"],
+              [3, "Asset Allocation"],
+              [6, 10_000],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "aa-all"],
+              [2, "aa-root"],
+              [3, "All equity"],
+              [6, 10_000],
+            ],
+          ],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+    await db
+      .insert(portfolioFiles)
+      .values({
+        content: undatedBytes,
+        fileName: "undated.portfolio",
+        savedAt,
+        version: 2,
+      });
+    const { categories: undatedCategories, portfolios: undatedPortfolios } =
+      readPortfolioTargets(undatedBytes);
+    const expectedUndated = {
+      categories: undatedCategories,
+      importedOn: "2026-07-02",
+      portfolios: undatedPortfolios,
+    };
+
+    expect(await syncTargetsFromPortfolio(null)).toStrictEqual(
+      saved(expectedUndated),
+    );
+    expect(await readLatest(db, "")).toStrictEqual({
+      household: stamped({ ...blank, targets: expectedUndated }),
+      version: 2,
+    });
+  });
+
+  it("refuses a sync naming a branch other than the one open, and keeps nothing", async () => {
+    await db
+      .insert(portfolioFiles)
+      .values({
+        content: samplePortfolioFile(),
+        fileName: "northstar.portfolio",
+        savedAt: new Date("2026-09-14T12:00:00Z"),
+        version: 1,
+      });
+
+    expect(await syncTargetsFromPortfolio("Retire early")).toStrictEqual(
+      refused(
+        "Another branch was opened before this was saved, so nothing was; make the change again",
+      ),
+    );
+    expect(await readLatest(db, "")).toBeNull();
+    expect(refresh).not.toHaveBeenCalled();
+
+    await keepAfter(db, { scenario: "", version: 0 }, reference);
+    await keepAfter(db, { scenario: "Retire early", version: 0 }, reference);
+    vi.mocked(openedScenario).mockResolvedValue("Retire early");
+
+    expect(await syncTargetsFromPortfolio(null)).toStrictEqual(
+      refused(
+        "Another branch was opened before this was saved, so nothing was; make the change again",
+      ),
+    );
+    expect(await readLatest(db, "Retire early")).toMatchObject({ version: 1 });
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("syncs into an open scenario without mutating the household or portfolio_files, and refuses decided scenarios", async () => {
+    const bytes = samplePortfolioFile();
+    const savedAt = new Date("2026-09-14T12:00:00Z");
+    await keepAfter(db, { scenario: "", version: 0 }, reference);
+    await keepAfter(db, { scenario: "Retire early", version: 0 }, reference);
+    await db
+      .insert(portfolioFiles)
+      .values({
+        content: bytes,
+        fileName: "northstar.portfolio",
+        savedAt,
+        version: 1,
+      });
+    vi.mocked(openedScenario).mockResolvedValue("Retire early");
+
+    const { categories: readCategories, portfolios: readPortfolios } =
+      readPortfolioTargets(bytes);
+    const expected = {
+      categories: readCategories,
+      importedOn: "2026-09-22",
+      portfolios: readPortfolios,
+    };
+
+    expect(await syncTargetsFromPortfolio("Retire early")).toStrictEqual(
+      saved(expected),
+    );
+    expect(await readLatest(db, "Retire early")).toStrictEqual({
+      household: stamped({ ...reference, targets: expected }),
+      version: 2,
+    });
+    expect(await readLatest(db, "")).toMatchObject({ version: 1 });
+    expect((await readLatestPortfolio(db))?.version).toBe(1);
+    expect(refresh).toHaveBeenCalledOnce();
+
+    await decideScenario(
+      db,
+      { scenario: "Retire early", version: 2 },
+      { decision: "rejected", reason: null },
+    );
+    vi.mocked(refresh).mockClear();
+
+    expect(await syncTargetsFromPortfolio("Retire early")).toStrictEqual(
+      refused(
+        "This scenario is decided, so it takes no edits; make a new scenario from it to change it",
+      ),
+    );
+    expect(await readLatest(db, "Retire early")).toMatchObject({ version: 3 });
+    expect(refresh).not.toHaveBeenCalled();
   });
 });
