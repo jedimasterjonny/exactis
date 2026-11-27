@@ -11,6 +11,7 @@ import { areTargetsEquivalent } from "@/data/targets";
 import { answerOf } from "@/lib/answer";
 import { closingOn, cutOf, today } from "@/lib/months";
 import { monthEnd } from "@/lib/nav";
+import { portfolioBalancesFor } from "@/lib/portfolio-balances";
 import {
   getClosesBack,
   getHousehold,
@@ -54,6 +55,10 @@ export default async function Close({
     isComparing ? getSinceClose() : null,
     opened === null ? getPortfolioFeed() : null,
   ]);
+  const portfolioBalances =
+    owned === null
+      ? undefined
+      : portfolioBalancesFor(household.accounts, owned.feed);
   return (
     <CloseScreen
       closes={since === null ? null : getClosesBack()}
@@ -62,6 +67,7 @@ export default async function Close({
       isUpdating={isUpdating}
       month={month}
       portfolio={portfolioOf(owned, household, month)}
+      portfolioBalances={portfolioBalances}
       since={since}
       today={day}
     />
