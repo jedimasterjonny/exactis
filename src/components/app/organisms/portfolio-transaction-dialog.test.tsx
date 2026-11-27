@@ -156,13 +156,18 @@ describe("PortfolioTransactionDialog", () => {
     const save = screen.getByRole("button", { name: "Save" });
     expect(save).toBeDisabled();
 
-    // Live typing updates state before blur so Save enables immediately.
+    // Live typing updates state before blur; cross-currency USD cash + GBP security also requires Gross value (GBP).
     fireEvent.change(screen.getByRole("textbox", { name: "Shares" }), {
       target: { value: "4.5" },
     });
     fireEvent.change(screen.getByRole("textbox", { name: "Total paid" }), {
       target: { value: "10" },
     });
+    expect(save).toBeDisabled();
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "Gross value (GBP)" }),
+      { target: { value: "8" } },
+    );
     expect(save).toBeEnabled();
 
     // Rollover calendar date (2026-02-31) disables Save cleanly.
@@ -175,15 +180,15 @@ describe("PortfolioTransactionDialog", () => {
     });
     expect(save).toBeEnabled();
 
-    // Fees + taxes exceeding total paid shows inline Field error and locks Save.
+    // Fees + taxes reaching total paid on a cross-currency purchase shows strict inline Field error and locks Save.
     commit(screen.getByRole("textbox", { name: "Fees" }), "6");
-    commit(screen.getByRole("textbox", { name: "Taxes" }), "5");
+    commit(screen.getByRole("textbox", { name: "Taxes" }), "4");
     expect(screen.getByRole("textbox", { name: "Total paid" })).toHaveAttribute(
       "aria-invalid",
       "true",
     );
     expect(
-      screen.getByText("Fees and taxes cannot exceed total paid"),
+      screen.getByText("Fees and taxes must be less than total paid"),
     ).toBeInTheDocument();
     expect(save).toBeDisabled();
 
@@ -197,6 +202,7 @@ describe("PortfolioTransactionDialog", () => {
     commit(screen.getByRole("textbox", { name: "Total paid" }), "");
     expect(save).toBeDisabled();
     commit(screen.getByRole("textbox", { name: "Total paid" }), "500");
+    commit(screen.getByRole("textbox", { name: "Gross value (GBP)" }), "390");
     fireEvent.change(screen.getByRole("textbox", { name: "Note" }), {
       target: { value: "  Dollar buy  " },
     });
@@ -216,6 +222,7 @@ describe("PortfolioTransactionDialog", () => {
       currency: "USD",
       date: "2026-09-24",
       fees: 2,
+      fxAmount: 390,
       note: "Dollar buy",
       portfolioId: "port-gia",
       securityId: "sec-world",
@@ -226,7 +233,7 @@ describe("PortfolioTransactionDialog", () => {
     expect(onSaved).toHaveBeenCalledOnce();
   });
 
-  it("adapts fields across sale, delivery, dividend, cash-only, and transfer types while enforcing same-currency cash transfers", async () => {
+  it("adapts fields across sale, delivery, dividend, cash-only, and transfer types including cross-currency transfers", async () => {
     vi.mocked(addPortfolioTransaction).mockResolvedValue(
       saved({ id: "tx-ok", savedOn: "2026-09-25", version: 2 }),
     );
@@ -247,22 +254,35 @@ describe("PortfolioTransactionDialog", () => {
 
     const typeSelect = screen.getByRole("combobox", { name: "Type" });
 
+    // Same-currency purchase checks non-strict cost bound copy.
+    commit(screen.getByRole("textbox", { name: "Total paid" }), "20");
+    commit(screen.getByRole("textbox", { name: "Fees" }), "25");
+    expect(
+      screen.getByText("Fees and taxes cannot exceed total paid"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+
     // Sale
     fireEvent.change(typeSelect, { target: { value: "sale" } });
     expect(
       screen.getByRole("textbox", { name: "Net proceeds" }),
     ).toBeInTheDocument();
 
-    // Inbound delivery validates fees+taxes against Total value with distinct error copy.
+    // Inbound delivery validates same-currency and cross-currency cost bounds with distinct copy.
     fireEvent.change(typeSelect, { target: { value: "inbound-delivery" } });
     const currencySelect = screen.getByRole("combobox", { name: "Currency" });
     expect(currencySelect).toHaveValue("GBP");
-    fireEvent.change(currencySelect, { target: { value: "EUR" } });
     commit(screen.getByRole("textbox", { name: "Total value" }), "20");
     commit(screen.getByRole("textbox", { name: "Fees" }), "25");
     commit(screen.getByRole("textbox", { name: "Shares" }), "3");
     expect(
       screen.getByText("Fees and taxes cannot exceed total value"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+
+    fireEvent.change(currencySelect, { target: { value: "EUR" } });
+    expect(
+      screen.getByText("Fees and taxes must be less than total value"),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
 
@@ -275,7 +295,7 @@ describe("PortfolioTransactionDialog", () => {
     );
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
 
-    // Dividend then cash transfer: prefers same-currency destination and blocks cross-currency transfers.
+    // Dividend then cash transfer: prefers same-currency destination and supports cross-currency transfers.
     fireEvent.change(typeSelect, { target: { value: "dividend" } });
     expect(
       screen.getByRole("heading", { name: "Dividend · Global Equity Index" }),
@@ -291,11 +311,14 @@ describe("PortfolioTransactionDialog", () => {
     expect(toCashSelect).toHaveValue("cash-isa");
     commit(screen.getByRole("textbox", { name: "Amount" }), "150");
 
-    // Cross-currency destination hints and disables Save.
+    // Cross-currency destination switches to Amount sent / Amount received and disables Save until Amount received is entered.
     fireEvent.change(toCashSelect, { target: { value: "cash-usd" } });
-    expect(toCashSelect).toHaveAccessibleDescription(
-      "Transfers must share a currency",
-    );
+    expect(
+      screen.getByRole("textbox", { name: "Amount sent (GBP)" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "Amount received (USD)" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
 
     // Same account destination hints and disables Save.
@@ -715,7 +738,7 @@ describe("PortfolioTransactionDialog", () => {
       "cash-gbp",
     );
 
-    // Switching to cash-transfer with only mismatched currencies selects the distinct USD account and hints currency mismatch.
+    // Switching to cash-transfer with only mismatched currencies selects the distinct USD account and reveals Amount received.
     fireEvent.change(screen.getByRole("combobox", { name: "Type" }), {
       target: { value: "cash-transfer" },
     });
@@ -723,8 +746,8 @@ describe("PortfolioTransactionDialog", () => {
       screen.getByRole("combobox", { name: "To cash account" }),
     ).toHaveValue("cash-usd");
     expect(
-      screen.getByRole("combobox", { name: "To cash account" }),
-    ).toHaveAccessibleDescription("Transfers must share a currency");
+      screen.getByRole("textbox", { name: "Amount received (USD)" }),
+    ).toBeInTheDocument();
   });
 
   it("re-picks a live destination when switching to cash-transfer or security-transfer after a stale destination vanished", () => {
@@ -771,9 +794,9 @@ describe("PortfolioTransactionDialog", () => {
     });
     const toCash = screen.getByRole("combobox", { name: "To cash account" });
     expect(toCash).toHaveValue("cash-usd");
-    expect(toCash).toHaveAccessibleDescription(
-      "Transfers must share a currency",
-    );
+    expect(
+      screen.getByRole("textbox", { name: "Amount received (USD)" }),
+    ).toBeInTheDocument();
 
     // Switching to security-transfer picks port-sipp instead of leaving destination stuck on "".
     fireEvent.change(screen.getByRole("combobox", { name: "Type" }), {
@@ -1319,6 +1342,367 @@ describe("PortfolioTransactionDialog", () => {
     ).toBeInTheDocument();
     expect(securitySelect).toHaveAccessibleDescription(
       "Selected security is no longer available",
+    );
+  });
+
+  it("syncs cross-currency Gross value and Exchange rate loop-free, resets on currency-pair change, and saves only fxAmount", async () => {
+    vi.mocked(addPortfolioTransaction).mockResolvedValue(
+      saved({ id: "tx-fx", savedOn: "2026-09-25", version: 2 }),
+    );
+    const onSaved = vi.fn<(draft: NewPortfolioTransaction) => void>();
+    const fxHoldings: readonly Holding[] = [
+      {
+        currency: "USD",
+        gbpRate: 0.7874,
+        id: "sec-us",
+        isRetired: false,
+        latestPrice: 100,
+        latestPriceDate: "2026-09-22",
+        name: "US Equity ETF",
+        shares: 5,
+        sharesByAccount: [{ portfolioId: "port-isa", shares: 5 }],
+      },
+      {
+        currency: "EUR",
+        gbpRate: 0.85,
+        id: "sec-eu",
+        isRetired: false,
+        latestPrice: 50,
+        latestPriceDate: "2026-09-22",
+        name: "Europe Equity ETF",
+        shares: 0,
+        sharesByAccount: [],
+      },
+      {
+        currency: "GBX",
+        gbpRate: 0.01,
+        id: "sec-uk-pence",
+        isRetired: false,
+        latestPrice: 250,
+        latestPriceDate: "2026-09-22",
+        name: "UK Pence Fund",
+        shares: 0,
+        sharesByAccount: [],
+      },
+    ];
+    const gbpRates = Object.fromEntries([
+      ["EUR", 0.85],
+      ["GBP", 1],
+      ["USD", 0.7874],
+    ]);
+
+    render(
+      <PortfolioTransactionDialog
+        baseCurrency="GBP"
+        cashAccounts={cashAccounts}
+        gbpRates={gbpRates}
+        holdings={fxHoldings}
+        initialDraft={{
+          portfolioId: "port-isa",
+          securityId: "sec-us",
+          type: "purchase",
+        }}
+        onDismiss={vi.fn<() => void>()}
+        onSaved={onSaved}
+        securitiesAccounts={securitiesAccounts}
+        today="2026-09-25"
+        version={1}
+      />,
+      { wrapper: Toaster },
+    );
+
+    const rateInput = screen.getByRole("textbox", {
+      name: "Exchange rate (GBP per USD)",
+    });
+    const fxAmountInput = screen.getByRole("textbox", {
+      name: "Gross value (USD)",
+    });
+    const save = screen.getByRole("button", { name: "Save" });
+
+    // Before entering FX values, shows last known rate from gbpRates.
+    expect(rateInput).toHaveAccessibleDescription(
+      "Last known rate: 1 USD = £0.7874",
+    );
+
+    commit(screen.getByRole("textbox", { name: "Shares" }), "10");
+    commit(screen.getByRole("textbox", { name: "Total paid" }), "800");
+    commit(screen.getByRole("textbox", { name: "Fees" }), "12.6");
+    // Gross settlement hint shows Total paid minus fees/taxes.
+    expect(fxAmountInput).toHaveAccessibleDescription(
+      "Gross settlement £787.40",
+    );
+
+    // Editing Exchange rate derives Gross value without a loop.
+    commit(rateInput, "0.7874");
+    expect(fxAmountInput).toHaveValue("US$1,000.00");
+    expect(rateInput).toHaveAccessibleDescription(
+      "1 USD = £0.7874 (1 GBP = US$1.270003)",
+    );
+    expect(save).toBeEnabled();
+
+    // Changing Total paid while rate is the driver keeps rate fixed and updates Gross value.
+    commit(screen.getByRole("textbox", { name: "Total paid" }), "1587.4");
+    expect(rateInput).toHaveValue("0.7874");
+    expect(fxAmountInput).toHaveValue("US$2,000.00");
+
+    // Out-of-range derived Gross value (< 0.01) shows inline error and disables Save cleanly.
+    commit(rateInput, "500000");
+    expect(fxAmountInput).toHaveValue("");
+    expect(fxAmountInput).toHaveAttribute("aria-invalid", "true");
+    expect(
+      screen.getByText("Exchange rate produces an out-of-range amount"),
+    ).toBeInTheDocument();
+    expect(save).toBeDisabled();
+
+    // Zero/cleared rate clears the out-of-range error and keeps Save disabled.
+    commit(rateInput, "0");
+    expect(save).toBeDisabled();
+    commit(rateInput, "");
+    expect(save).toBeDisabled();
+
+    // Switching driver to Gross value derives Exchange rate (rounded to 6dp) and tabbing past Exchange rate does not flip fxDriver.
+    commit(screen.getByRole("textbox", { name: "Total paid" }), "10012.6");
+    commit(fxAmountInput, "12700");
+    expect(rateInput).toHaveValue("0.787402");
+    fireEvent.focus(rateInput);
+    fireEvent.blur(rateInput);
+    expect(fxAmountInput).toHaveValue("US$12,700.00");
+    // Changing Total paid while Gross value is still the driver updates Exchange rate rather than rewriting Gross value.
+    commit(screen.getByRole("textbox", { name: "Total paid" }), "800");
+    expect(fxAmountInput).toHaveValue("US$12,700.00");
+    expect(rateInput).toHaveValue("0.062");
+
+    // Tiny derived rate that rounds to 0 at 6dp leaves Exchange rate blank rather than showing 0.00.
+    commit(screen.getByRole("textbox", { name: "Fees" }), "");
+    commit(screen.getByRole("textbox", { name: "Total paid" }), "0.01");
+    commit(fxAmountInput, "1000000");
+    expect(rateInput).toHaveValue("");
+
+    // Restore normal trade and clear Gross value.
+    commit(screen.getByRole("textbox", { name: "Total paid" }), "800");
+    commit(screen.getByRole("textbox", { name: "Fees" }), "12.6");
+    commit(fxAmountInput, "1000");
+    expect(rateInput).toHaveValue("0.7874");
+    expect(save).toBeEnabled();
+
+    // Clearing Gross value clears both FX fields and disables Save.
+    commit(fxAmountInput, "");
+    expect(rateInput).toHaveValue("");
+    expect(save).toBeDisabled();
+
+    // Switching security currency pair resets FX state cleanly.
+    commit(fxAmountInput, "1000");
+    fireEvent.change(screen.getByRole("combobox", { name: "Security" }), {
+      target: { value: "sec-eu" },
+    });
+    expect(
+      screen.getByRole("textbox", { name: "Gross value (EUR)" }),
+    ).toHaveValue("");
+
+    // Switching to GBX security under GBP cash shows automatic conversion note and saves without fxAmount.
+    fireEvent.change(screen.getByRole("combobox", { name: "Security" }), {
+      target: { value: "sec-uk-pence" },
+    });
+    expect(screen.getByRole("dialog")).toHaveTextContent(
+      "Converted automatically between GBP and GBX (pence).",
+    );
+    expect(
+      screen.queryByRole("textbox", { name: /Gross value/ }),
+    ).not.toBeInTheDocument();
+    expect(save).toBeEnabled();
+    fireEvent.click(save);
+
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledWith({
+        accountId: "cash-isa",
+        amount: 800,
+        currency: "GBP",
+        date: "2026-09-25",
+        fees: 12.6,
+        portfolioId: "port-isa",
+        securityId: "sec-uk-pence",
+        shares: 10,
+        taxes: 0,
+        type: "purchase",
+      });
+    });
+
+    // Save a cross-currency sale (where gross = amount + fees + taxes) driven by Exchange rate.
+    fireEvent.change(screen.getByRole("combobox", { name: "Type" }), {
+      target: { value: "sale" },
+    });
+    fireEvent.change(screen.getByRole("combobox", { name: "Security" }), {
+      target: { value: "sec-us" },
+    });
+    commit(screen.getByRole("textbox", { name: "Shares" }), "10");
+    commit(screen.getByRole("textbox", { name: "Net proceeds" }), "780");
+    commit(screen.getByRole("textbox", { name: "Fees" }), "7.4");
+    expect(
+      screen.getByRole("textbox", { name: "Gross value (USD)" }),
+    ).toHaveAccessibleDescription("Gross settlement £787.40");
+    commit(
+      screen.getByRole("textbox", { name: "Exchange rate (GBP per USD)" }),
+      "0.7874",
+    );
+    fireEvent.click(save);
+
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenLastCalledWith({
+        accountId: "cash-isa",
+        amount: 780,
+        currency: "GBP",
+        date: "2026-09-25",
+        fees: 7.4,
+        fxAmount: 1000,
+        portfolioId: "port-isa",
+        securityId: "sec-us",
+        shares: 10,
+        taxes: 0,
+        type: "sale",
+      });
+    });
+  });
+
+  it("supports cross-currency cash transfers, dividends, non-GBP cross-rates, and manual USD-to-GBX trades", async () => {
+    vi.mocked(addPortfolioTransaction).mockResolvedValue(
+      saved({ id: "tx-fx-move", savedOn: "2026-09-25", version: 2 }),
+    );
+    const onSaved = vi.fn<(draft: NewPortfolioTransaction) => void>();
+    const fxHoldings: readonly Holding[] = [
+      {
+        currency: "EUR",
+        gbpRate: 0.85,
+        id: "sec-eu",
+        isRetired: false,
+        latestPrice: 50,
+        latestPriceDate: "2026-09-22",
+        name: "Europe Equity ETF",
+        shares: 0,
+        sharesByAccount: [],
+      },
+      {
+        currency: "GBX",
+        gbpRate: 0.01,
+        id: "sec-uk-pence",
+        isRetired: false,
+        latestPrice: 250,
+        latestPriceDate: "2026-09-22",
+        name: "UK Pence Fund",
+        shares: 0,
+        sharesByAccount: [],
+      },
+    ];
+    const gbpRates = Object.fromEntries([
+      ["EUR", 0.85],
+      ["GBP", 1],
+      ["USD", 0.8],
+    ]);
+
+    render(
+      <PortfolioTransactionDialog
+        baseCurrency="GBP"
+        cashAccounts={cashAccounts}
+        gbpRates={gbpRates}
+        holdings={fxHoldings}
+        initialDraft={{
+          accountId: "cash-isa",
+          otherAccountId: "cash-usd",
+          type: "cash-transfer",
+        }}
+        onDismiss={vi.fn<() => void>()}
+        onSaved={onSaved}
+        securitiesAccounts={securitiesAccounts}
+        today="2026-09-25"
+        version={1}
+      />,
+      { wrapper: Toaster },
+    );
+
+    const sentInput = screen.getByRole("textbox", {
+      name: "Amount sent (GBP)",
+    });
+    const receivedInput = screen.getByRole("textbox", {
+      name: "Amount received (USD)",
+    });
+    const save = screen.getByRole("button", { name: "Save" });
+
+    expect(receivedInput).toHaveAccessibleDescription(
+      "Last known rate: 1 USD = £0.80",
+    );
+    expect(save).toBeDisabled();
+
+    commit(sentInput, "800");
+    expect(save).toBeDisabled();
+    commit(receivedInput, "1000");
+    expect(receivedInput).toHaveAccessibleDescription(
+      "1 USD = £0.80 (1 GBP = US$1.25)",
+    );
+    expect(save).toBeEnabled();
+
+    fireEvent.click(save);
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledExactlyOnceWith({
+        accountId: "cash-isa",
+        amount: 800,
+        currency: "GBP",
+        date: "2026-09-25",
+        fees: 0,
+        fxAmount: 1000,
+        otherAccountId: "cash-usd",
+        shares: 0,
+        taxes: 0,
+        type: "cash-transfer",
+      });
+    });
+
+    // Cross-currency dividend settled in USD for a EUR security uses non-GBP cross-rate (0.85 / 0.80 = 1.0625).
+    fireEvent.change(screen.getByRole("combobox", { name: "Type" }), {
+      target: { value: "dividend" },
+    });
+    fireEvent.change(screen.getByRole("combobox", { name: "Cash account" }), {
+      target: { value: "cash-usd" },
+    });
+    fireEvent.change(screen.getByRole("combobox", { name: "Security" }), {
+      target: { value: "sec-eu" },
+    });
+    const divRateInput = screen.getByRole("textbox", {
+      name: "Exchange rate (USD per EUR)",
+    });
+    expect(divRateInput).toHaveAccessibleDescription(
+      "Last known rate: 1 EUR = US$1.0625",
+    );
+    commit(screen.getByRole("textbox", { name: "Net received" }), "40");
+    commit(screen.getByRole("textbox", { name: "Taxes" }), "2.5");
+    commit(screen.getByRole("textbox", { name: "Gross value (EUR)" }), "40");
+    expect(divRateInput).toHaveValue("1.0625");
+    fireEvent.click(save);
+
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenLastCalledWith({
+        accountId: "cash-usd",
+        amount: 40,
+        currency: "USD",
+        date: "2026-09-25",
+        fees: 0,
+        fxAmount: 40,
+        securityId: "sec-eu",
+        shares: 0,
+        taxes: 2.5,
+        type: "dividend",
+      });
+    });
+
+    // Non-GBP cash (USD) + GBX security requires manual FX (never automatic GBP-to-GBX note).
+    fireEvent.change(screen.getByRole("combobox", { name: "Security" }), {
+      target: { value: "sec-uk-pence" },
+    });
+    expect(
+      screen.getByRole("textbox", { name: "Gross value (GBX)" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: "Dividend · UK Pence Fund" }),
+    ).not.toHaveTextContent(
+      "Converted automatically between GBP and GBX (pence).",
     );
   });
 });

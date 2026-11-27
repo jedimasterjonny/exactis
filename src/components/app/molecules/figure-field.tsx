@@ -37,6 +37,13 @@ const presets = {
   // A count is whole, a fraction typed rounded to one. One at a time,
   // five with shift.
   count: { format: { maximumFractionDigits: 0 }, largeStep: 5, step: 1 },
+  // An exchange rate (settlement currency per unit of foreign currency),
+  // written to between two and six decimal places.
+  exchangeRate: {
+    format: { maximumFractionDigits: 6, minimumFractionDigits: 2 },
+    largeStep: 0.05,
+    step: 0.001,
+  },
   // Whole pounds are formatted by Intl, so the £ and the thousands
   // separators are the field's own and never typed.
   money: {
@@ -91,6 +98,17 @@ export function CurrencyField({
       step={1}
     />
   );
+}
+
+// An exchange rate input accepting two to six decimal places, stepping
+// by 0.001 or 0.05 with shift and supporting clearing.
+export function ExchangeRateField(
+  props: PresetProps<ClearableBounds> & {
+    readonly error?: string | undefined;
+    readonly hint?: string | undefined;
+  },
+): JSX.Element {
+  return <FigureField {...props} {...presets.exchangeRate} />;
 }
 
 // A money input, under a hint that carries the derivation. The figure is

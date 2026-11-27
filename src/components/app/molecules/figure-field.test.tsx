@@ -6,6 +6,7 @@ import { commit } from "@/test/dom";
 import {
   CountField,
   CurrencyField,
+  ExchangeRateField,
   MoneyField,
   MultipleField,
   PriceField,
@@ -411,5 +412,45 @@ describe("SharesField", () => {
       [1],
       [0.12345678],
     ]);
+  });
+});
+
+describe("ExchangeRateField", () => {
+  it("formats up to six decimal places, steps by 0.001 and 0.05, and reports clearing", () => {
+    const onCleared = vi.fn<() => void>();
+    const onValueChange = vi.fn<(value: null | number) => void>();
+    const onValueCommitted = vi.fn<(value: number) => void>();
+    render(
+      <ExchangeRateField
+        defaultValue={0.7874}
+        hint="1 USD = £0.7874"
+        label="Exchange rate"
+        min={0}
+        onCleared={onCleared}
+        onValueChange={onValueChange}
+        onValueCommitted={onValueCommitted}
+      />,
+    );
+
+    const input = screen.getByRole("textbox", { name: "Exchange rate" });
+    expect(input).toHaveValue("0.7874");
+    expect(input).toHaveAccessibleDescription("1 USD = £0.7874");
+
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    expect(input).toHaveValue("0.7884");
+    expect(onValueChange).toHaveBeenLastCalledWith(0.7884);
+    fireEvent.keyDown(input, { key: "ArrowDown", shiftKey: true });
+    expect(input).toHaveValue("0.7384");
+
+    commit(input, "1");
+    expect(input).toHaveValue("1.00");
+    expect(onValueCommitted).toHaveBeenLastCalledWith(1);
+
+    commit(input, "1.275625");
+    expect(input).toHaveValue("1.275625");
+    expect(onValueCommitted).toHaveBeenLastCalledWith(1.275625);
+
+    commit(input, "");
+    expect(onCleared).toHaveBeenCalledOnce();
   });
 });

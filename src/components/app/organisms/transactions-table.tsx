@@ -28,6 +28,11 @@ interface TransactionsTableProps {
   readonly transactions: readonly PortfolioTransaction[];
 }
 
+const rateFormat = new Intl.NumberFormat("en-GB", {
+  maximumFractionDigits: 6,
+  minimumFractionDigits: 2,
+});
+
 // Directional prefix before fee/tax breakdown for every PP transaction type.
 const costPrefixes: Record<TransactionType, "" | "after " | "incl. "> = {
   "cash-transfer": "",
@@ -81,6 +86,7 @@ export function TransactionsTable({
           const isPositive = direction === "in" && transaction.amount > 0;
           const isMutedAmount = transaction.amount === 0;
           const costsText = costsLabelOf(transaction);
+          const fxText = fxLabelOf(transaction);
           const foldedName =
             transaction.securityName === undefined
               ? typeLabel
@@ -99,6 +105,7 @@ export function TransactionsTable({
               >
                 <span>{`${dateText} · ${accountText}`}</span>
                 {transaction.shares > 0 && <span>{shareCount}</span>}
+                {fxText !== "" && <span>{fxText}</span>}
                 {costsText !== "" && <span>{costsText}</span>}
                 {transaction.note !== undefined && (
                   <span>{transaction.note}</span>
@@ -153,6 +160,11 @@ export function TransactionsTable({
                 >
                   {amountText}
                 </div>
+                {fxText !== "" && (
+                  <div className="mt-0.5 figure text-xs text-muted-foreground">
+                    {fxText}
+                  </div>
+                )}
                 {costsText !== "" && (
                   <div className="mt-0.5 figure text-xs text-muted-foreground">
                     {costsText}
@@ -201,6 +213,27 @@ function costsLabelOf(transaction: PortfolioTransaction): string {
   return parts.length === 0
     ? ""
     : `${costPrefixes[transaction.type]}${parts.join(" · ")}`;
+}
+
+// Calm cross-currency detail line beneath an amount (omitting trivial
+// GBP <-> GBX pence pairs so UK fund rows stay uncluttered).
+function fxLabelOf({ grossValue, type }: PortfolioTransaction): string {
+  if (grossValue === undefined) {
+    return "";
+  }
+  const isSterlingPence =
+    (grossValue.currency === "GBP" && grossValue.fxCurrency === "GBX") ||
+    (grossValue.currency === "GBX" && grossValue.fxCurrency === "GBP");
+  if (isSterlingPence) {
+    return "";
+  }
+  const foreign = formatCurrency(grossValue.fxAmount, grossValue.fxCurrency);
+  if (type === "cash-transfer") {
+    return `→ ${foreign}`;
+  }
+  return grossValue.exchangeRate === undefined
+    ? foreign
+    : `${foreign} @ ${rateFormat.format(grossValue.exchangeRate)}`;
 }
 
 function transferLabel(
