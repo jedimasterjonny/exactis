@@ -20,6 +20,7 @@ import type {
   Holding,
   NewPortfolioTransaction,
   PortfolioSnapshot,
+  PortfolioTransaction,
   SecuritiesAccount,
   TransactionType,
 } from "@/data/portfolio";
@@ -28,6 +29,7 @@ import type { OwnedPortfolio } from "@/store/portfolio";
 import {
   deletePortfolioAccount,
   deletePortfolioSecurity,
+  deletePortfolioTransaction,
 } from "@/actions/portfolio";
 import { PortfolioSummary } from "@/components/app/atoms/portfolio-summary";
 import { Caution } from "@/components/app/molecules/caution";
@@ -46,7 +48,7 @@ import { SectionCard } from "@/components/app/organisms/section-card";
 import { Screen } from "@/components/app/templates/screen";
 import { buttonVariants } from "@/components/kit/button";
 import { CardContent, CardFooter } from "@/components/kit/card";
-import { withSyncNote } from "@/data/portfolio";
+import { transactionTypeLabels, withSyncNote } from "@/data/portfolio";
 import { useSender } from "@/hooks/use-sender";
 import { counted } from "@/lib/count";
 import { formatGbp } from "@/lib/money";
@@ -65,8 +67,9 @@ interface DeleteTarget {
   readonly cancelFocusIds?: readonly string[];
   readonly fallbackFocusIds: readonly string[];
   readonly id: string;
-  readonly kind: "cash" | "securities" | "security";
+  readonly kind: "cash" | "securities" | "security" | "transaction";
   readonly name: string;
+  readonly title: string;
 }
 
 interface OwnedPortfolioTabsProps {
@@ -265,6 +268,38 @@ export function PortfolioScreen({
   );
 }
 
+function deleteCopyOf(target: DeleteTarget): {
+  readonly confirmBody: string;
+  readonly failure: string;
+  readonly successBody: string;
+  readonly successTitle: string;
+} {
+  switch (target.kind) {
+    case "cash":
+    case "securities":
+      return {
+        confirmBody: `Removes ${target.name} from the portfolio file. It cannot be brought back.`,
+        failure: "Account not deleted",
+        successBody: `${target.name} removed from the portfolio file`,
+        successTitle: "Account deleted",
+      };
+    case "security":
+      return {
+        confirmBody: `Removes ${target.name} from the catalogue. It cannot be brought back.`,
+        failure: "Security not deleted",
+        successBody: `${target.name} removed from the catalogue`,
+        successTitle: "Security deleted",
+      };
+    case "transaction":
+      return {
+        confirmBody: `Removes ${target.name} from the portfolio file. It cannot be brought back.`,
+        failure: "Transaction not deleted",
+        successBody: `${target.name} removed from the portfolio file`,
+        successTitle: "Transaction deleted",
+      };
+  }
+}
+
 // The starting tab from an optional ?tab= query parameter or trade handoff.
 function initialTabOf(
   tab: string | undefined,
@@ -328,6 +363,8 @@ function OwnedPortfolioTabs({
   const [editingSecurity, setEditingSecurity] = useState<Holding | null>(null);
   const [deleting, setDeleting] = useState<DeleteTarget | null>(null);
   const [isAddingTransaction, setIsAddingTransaction] = useState(false);
+  const [editingTransaction, setEditingTransaction] =
+    useState<null | PortfolioTransaction>(null);
   const [handoff, setHandoff] = useState<null | ResolvedHandoff>(() =>
     initialTrade !== undefined
       ? resolveTradeHandoff(initialTrade, snapshot)
@@ -354,6 +391,7 @@ function OwnedPortfolioTabs({
     deleting !== null ||
     editingAccount !== null ||
     editingSecurity !== null ||
+    editingTransaction !== null ||
     handoff !== null ||
     isAddingSecurity ||
     isAddingTransaction ||
@@ -392,6 +430,7 @@ function OwnedPortfolioTabs({
       setDeleting(null);
       setEditingAccount(null);
       setEditingSecurity(null);
+      setEditingTransaction(null);
       setHandoff(null);
       setIsAddingSecurity(false);
       setIsAddingTransaction(false);
@@ -408,19 +447,24 @@ function OwnedPortfolioTabs({
   }
 
   function confirmDelete(target: DeleteTarget): void {
+    const copy = deleteCopyOf(target);
     sendDelete(
-      async () =>
-        target.kind === "security"
-          ? deletePortfolioSecurity(version, { id: target.id })
-          : deletePortfolioAccount(version, {
+      async () => {
+        switch (target.kind) {
+          case "cash":
+          case "securities":
+            return deletePortfolioAccount(version, {
               id: target.id,
               kind: target.kind,
-            }),
+            });
+          case "security":
+            return deletePortfolioSecurity(version, { id: target.id });
+          case "transaction":
+            return deletePortfolioTransaction(version, { id: target.id });
+        }
+      },
       {
-        failure:
-          target.kind === "security"
-            ? "Security not deleted"
-            : "Account not deleted",
+        failure: copy.failure,
         onAccepted: (result) => {
           pendingFocusRef.current = {
             afterVersion: result.version,
@@ -430,14 +474,8 @@ function OwnedPortfolioTabs({
           setDeleting(null);
         },
         success: (result) => ({
-          description: withSyncNote(
-            target.kind === "security"
-              ? `${target.name} removed from the catalogue`
-              : `${target.name} removed from the portfolio file`,
-            result.syncWarning,
-          ),
-          title:
-            target.kind === "security" ? "Security deleted" : "Account deleted",
+          description: withSyncNote(copy.successBody, result.syncWarning),
+          title: copy.successTitle,
         }),
       },
     );
@@ -514,6 +552,14 @@ function OwnedPortfolioTabs({
     setEditingSecurity(holding);
   }
 
+  function openTransactionEditor(
+    transaction: PortfolioTransaction,
+    fallbackFocusIds: readonly string[],
+  ): void {
+    editFallbackFocusRef.current = fallbackFocusIds;
+    setEditingTransaction(transaction);
+  }
+
   function requestSecurityDelete(
     holding: Holding,
     fallbackFocusIds: readonly string[],
@@ -523,6 +569,20 @@ function OwnedPortfolioTabs({
       id: holding.id,
       kind: "security",
       name: holding.name,
+      title: holding.name,
+    });
+  }
+
+  function requestTransactionDelete(
+    transaction: PortfolioTransaction,
+    fallbackFocusIds: readonly string[],
+  ): void {
+    setDeleting({
+      fallbackFocusIds,
+      id: transaction.id,
+      kind: "transaction",
+      name: transactionSummaryOf(transaction),
+      title: transactionTypeLabels[transaction.type].toLowerCase(),
     });
   }
 
@@ -631,6 +691,8 @@ function OwnedPortfolioTabs({
                 onAddTransaction={() => {
                   setIsAddingTransaction(true);
                 }}
+                onDeleteTransaction={requestTransactionDelete}
+                onEditTransaction={openTransactionEditor}
                 onSecurityChange={setTransactionsSecurityId}
                 onShowingInactiveChange={setIsShowingInactiveTransactions}
                 onTypeChange={setTransactionsType}
@@ -678,6 +740,7 @@ function OwnedPortfolioTabs({
               id: target.account.id,
               kind: target.kind,
               name: target.account.name,
+              title: target.account.name,
             });
           }}
           onDismiss={() => {
@@ -719,6 +782,7 @@ function OwnedPortfolioTabs({
               id: target.id,
               kind: "security",
               name: target.name,
+              title: target.name,
             });
           }}
           onDismiss={() => {
@@ -748,11 +812,9 @@ function OwnedPortfolioTabs({
           onConfirm={() => {
             confirmDelete(deleting);
           }}
-          title={`Delete ${deleting.name}?`}
+          title={`Delete ${deleting.title}?`}
         >
-          {deleting.kind === "security"
-            ? `Removes ${deleting.name} from the catalogue. It cannot be brought back.`
-            : `Removes ${deleting.name} from the portfolio file. It cannot be brought back.`}
+          {deleteCopyOf(deleting).confirmBody}
         </ConfirmDialog>
       )}
       {!isInScenario && (isAddingTransaction || handoff !== null) && (
@@ -776,6 +838,49 @@ function OwnedPortfolioTabs({
               suggestedCategory: handoff.suggestedCategory,
             }),
           })}
+        />
+      )}
+      {!isInScenario && editingTransaction !== null && (
+        <PortfolioTransactionDialog
+          baseCurrency={snapshot.baseCurrency}
+          cashAccounts={snapshot.cashAccounts}
+          gbpRates={snapshot.gbpRates}
+          holdings={snapshot.holdings}
+          key={editingTransaction.id}
+          onDelete={() => {
+            const target = editingTransaction;
+            setEditingTransaction(null);
+            setDeleting({
+              cancelFocusIds: [
+                `transaction:${target.id}`,
+                ...editFallbackFocusRef.current,
+              ],
+              fallbackFocusIds: editFallbackFocusRef.current,
+              id: target.id,
+              kind: "transaction",
+              name: transactionSummaryOf(target),
+              title: transactionTypeLabels[target.type].toLowerCase(),
+            });
+          }}
+          onDismiss={() => {
+            setEditingTransaction(null);
+          }}
+          onSaved={(draft, nextVersion) => {
+            pendingFocusRef.current = {
+              afterVersion: nextVersion,
+              tab: activeTab,
+              targets: [
+                `transaction:${editingTransaction.id}`,
+                ...editFallbackFocusRef.current,
+              ],
+            };
+            handleTransactionSaved(draft);
+            setEditingTransaction(null);
+          }}
+          securitiesAccounts={snapshot.securitiesAccounts}
+          today={today}
+          transaction={editingTransaction}
+          version={version}
         />
       )}
       {!isInScenario && isUpdatingQuotes && (
@@ -975,4 +1080,16 @@ function suppressedTradeUrlOf(
     return portfolio.href;
   }
   return isInScenario ? `${portfolio.href}?tab=transactions` : null;
+}
+
+function transactionSummaryOf(transaction: PortfolioTransaction): string {
+  const typeLabel = transactionTypeLabels[transaction.type];
+  const subject =
+    transaction.securityName ??
+    transaction.accountName ??
+    transaction.portfolioName;
+  const dateText = formatDay(transaction.date);
+  return subject === undefined
+    ? `${typeLabel} · ${dateText}`
+    : `${typeLabel} · ${subject} · ${dateText}`;
 }

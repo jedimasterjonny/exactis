@@ -17,8 +17,10 @@ import {
   addPortfolioTransaction,
   deletePortfolioAccount,
   deletePortfolioSecurity,
+  deletePortfolioTransaction,
   editPortfolioAccount,
   editPortfolioSecurity,
+  editPortfolioTransaction,
   updatePortfolioQuotes,
   uploadPortfolio,
 } from "@/actions/portfolio";
@@ -39,8 +41,10 @@ vi.mock("@/actions/portfolio", () => ({
   addPortfolioTransaction: vi.fn(),
   deletePortfolioAccount: vi.fn(),
   deletePortfolioSecurity: vi.fn(),
+  deletePortfolioTransaction: vi.fn(),
   editPortfolioAccount: vi.fn(),
   editPortfolioSecurity: vi.fn(),
+  editPortfolioTransaction: vi.fn(),
   fetchPortfolioQuotes: vi.fn(),
   updatePortfolioQuotes: vi.fn(),
   uploadPortfolio: vi.fn(),
@@ -2328,5 +2332,231 @@ describe("PortfolioScreen", () => {
     );
     unmount();
     await Promise.resolve();
+  });
+
+  it("edits and deletes transactions, restores focus to surviving rows, and closes edit dialog when a scenario opens", async () => {
+    vi.mocked(editPortfolioTransaction).mockResolvedValue(
+      saved({ id: "tx-1", savedOn: "2026-09-25", version: 2 }),
+    );
+    vi.mocked(deletePortfolioTransaction)
+      .mockResolvedValueOnce(
+        saved({ id: "tx-1", savedOn: "2026-09-25", version: 3 }),
+      )
+      .mockResolvedValueOnce(
+        saved({ id: "tx-2", savedOn: "2026-09-25", version: 4 }),
+      );
+
+    const txOwned: OwnedPortfolio = {
+      savedOn: "2026-09-24",
+      snapshot: {
+        ...multiAccountSnapshot,
+        transactions: [
+          {
+            accountId: "cash-isa",
+            accountName: "ISA Cash",
+            amount: 500,
+            currency: "GBP",
+            date: "2026-09-22",
+            fees: 0,
+            id: "tx-1",
+            portfolioId: "port-isa",
+            portfolioName: "Northstar ISA",
+            securityId: "sec-alpha",
+            securityName: "Alpha World Equity",
+            shares: 5,
+            taxes: 0,
+            timestamp: 1_790_000_000,
+            type: "purchase",
+          },
+          {
+            amount: 100,
+            currency: "GBP",
+            date: "2026-09-20",
+            fees: 0,
+            id: "tx-2",
+            shares: 0,
+            taxes: 0,
+            timestamp: 1_789_900_000,
+            type: "deposit",
+          },
+        ],
+      },
+      version: 1,
+    };
+
+    const { rerender } = render(
+      <PortfolioScreen
+        initialTab="transactions"
+        isInScenario={false}
+        owned={txOwned}
+        today="2026-09-25"
+      />,
+      { wrapper: Toaster },
+    );
+
+    // Open Edit transaction dialog, cancel, reopen, save.
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Edit Purchase · Alpha World Equity · 22 Sep 2026",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(
+      screen.queryByRole("dialog", { name: "Purchase · Alpha World Equity" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Edit Purchase · Alpha World Equity · 22 Sep 2026",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Purchase · Alpha World Equity" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(editPortfolioTransaction).toHaveBeenCalledWith(1, {
+      accountId: "cash-isa",
+      amount: 500,
+      currency: "GBP",
+      date: "2026-09-22",
+      fees: 0,
+      id: "tx-1",
+      portfolioId: "port-isa",
+      securityId: "sec-alpha",
+      shares: 5,
+      taxes: 0,
+      type: "purchase",
+    });
+
+    const v2Owned: OwnedPortfolio = { ...txOwned, version: 2 };
+    rerender(
+      <PortfolioScreen
+        initialTab="transactions"
+        isInScenario={false}
+        owned={v2Owned}
+        today="2026-09-25"
+      />,
+    );
+
+    // Delete tx-1 from inside Edit dialog -> ConfirmDialog cancel restores focus to tx-1, then confirm -> focus restores to tx-2.
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Edit Purchase · Alpha World Equity · 22 Sep 2026",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    const cancelBuy = screen.getByRole("alertdialog", {
+      name: "Delete purchase?",
+    });
+    fireEvent.click(within(cancelBuy).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Purchase · Alpha World Equity" }),
+      ).toHaveFocus();
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Edit Purchase · Alpha World Equity · 22 Sep 2026",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    const confirmBuy = screen.getByRole("alertdialog", {
+      name: "Delete purchase?",
+    });
+    expect(confirmBuy).toHaveTextContent(
+      "Removes Purchase · Alpha World Equity · 22 Sep 2026 from the portfolio file. It cannot be brought back.",
+    );
+    fireEvent.click(within(confirmBuy).getByRole("button", { name: "Delete" }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("alertdialog", { name: "Delete purchase?" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(deletePortfolioTransaction).toHaveBeenCalledWith(2, { id: "tx-1" });
+
+    const v3Owned: OwnedPortfolio = {
+      ...v2Owned,
+      snapshot: {
+        ...v2Owned.snapshot,
+        transactions: v2Owned.snapshot.transactions.filter(
+          (tx) => tx.id !== "tx-1",
+        ),
+      },
+      version: 3,
+    };
+    rerender(
+      <PortfolioScreen
+        initialTab="transactions"
+        isInScenario={false}
+        owned={v3Owned}
+        today="2026-09-25"
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Deposit" })).toHaveFocus();
+    });
+
+    // Scenario flip while Edit transaction dialog is open closes it cleanly.
+    fireEvent.click(
+      screen.getByRole("button", { name: "Edit Deposit · 20 Sep 2026" }),
+    );
+    expect(screen.getByRole("dialog", { name: "Deposit" })).toBeInTheDocument();
+    rerender(
+      <PortfolioScreen
+        initialTab="transactions"
+        isInScenario
+        owned={v3Owned}
+        today="2026-09-25"
+      />,
+    );
+    expect(
+      screen.queryByRole("dialog", { name: "Deposit" }),
+    ).not.toBeInTheDocument();
+
+    // Return to live household and delete the orphan tx-2 from the table bin -> focus falls back to h1.
+    rerender(
+      <PortfolioScreen
+        initialTab="transactions"
+        isInScenario={false}
+        owned={v3Owned}
+        today="2026-09-25"
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Delete Deposit · 20 Sep 2026" }),
+    );
+    const confirmOrphan = screen.getByRole("alertdialog", {
+      name: "Delete deposit?",
+    });
+    expect(confirmOrphan).toHaveTextContent(
+      "Removes Deposit · 20 Sep 2026 from the portfolio file. It cannot be brought back.",
+    );
+    fireEvent.click(
+      within(confirmOrphan).getByRole("button", { name: "Delete" }),
+    );
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("alertdialog", { name: "Delete deposit?" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(deletePortfolioTransaction).toHaveBeenCalledWith(3, { id: "tx-2" });
+    rerender(
+      <PortfolioScreen
+        initialTab="transactions"
+        isInScenario={false}
+        owned={{
+          ...v3Owned,
+          snapshot: { ...v3Owned.snapshot, transactions: [] },
+          version: 4,
+        }}
+        today="2026-09-25"
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 1 })).toHaveFocus();
+    });
   });
 });

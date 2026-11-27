@@ -21,7 +21,11 @@ import { SectionCard } from "@/components/app/organisms/section-card";
 import { TransactionsTable } from "@/components/app/organisms/transactions-table";
 import { Button } from "@/components/kit/button";
 import { CardContent, CardFooter } from "@/components/kit/card";
-import { transactionsViewOf, transactionTypeGroups } from "@/data/portfolio";
+import {
+  neighboursOf,
+  transactionsViewOf,
+  transactionTypeGroups,
+} from "@/data/portfolio";
 import { counted } from "@/lib/count";
 
 interface PortfolioTransactionsProps {
@@ -33,6 +37,14 @@ interface PortfolioTransactionsProps {
   readonly label: string;
   readonly onAccountChange: (accountId: string) => void;
   readonly onAddTransaction: () => void;
+  readonly onDeleteTransaction?: (
+    transaction: PortfolioTransaction,
+    fallbackFocusIds: readonly string[],
+  ) => void;
+  readonly onEditTransaction?: (
+    transaction: PortfolioTransaction,
+    fallbackFocusIds: readonly string[],
+  ) => void;
   readonly onSecurityChange: (securityId: string) => void;
   readonly onShowingInactiveChange: (isShowing: boolean) => void;
   readonly onTypeChange: (type: "" | TransactionType) => void;
@@ -62,6 +74,8 @@ export function PortfolioTransactions({
   label,
   onAccountChange,
   onAddTransaction,
+  onDeleteTransaction,
+  onEditTransaction,
   onSecurityChange,
   onShowingInactiveChange,
   onTypeChange,
@@ -129,6 +143,17 @@ export function PortfolioTransactions({
   const isShowingClearButton = hasActiveFilters && filtered.length > 0;
 
   const filterKey = `${effectiveAccountId}\0${type}\0${effectiveSecurityId}`;
+  const fullFilteredIds = filtered.map((entry) => `transaction:${entry.id}`);
+  const handleEdit = transactionActionOf(
+    onEditTransaction,
+    isReadOnly,
+    fullFilteredIds,
+  );
+  const handleDelete = transactionActionOf(
+    onDeleteTransaction,
+    isReadOnly,
+    fullFilteredIds,
+  );
 
   function clearFilters(): void {
     onAccountChange("");
@@ -223,6 +248,8 @@ export function PortfolioTransactions({
         hasActiveFilters={hasActiveFilters}
         key={filterKey}
         onClearFilters={clearFilters}
+        onDelete={handleDelete}
+        onEdit={handleEdit}
       />
     </SectionCard>
   );
@@ -290,16 +317,41 @@ function securityOptionLabel(holding: {
     : holding.name;
 }
 
+function transactionActionOf(
+  handler:
+    | ((
+        transaction: PortfolioTransaction,
+        fallbackFocusIds: readonly string[],
+      ) => void)
+    | undefined,
+  isReadOnly: boolean,
+  fullFilteredIds: readonly string[],
+): ((transaction: PortfolioTransaction) => void) | undefined {
+  if (isReadOnly || handler === undefined) {
+    return undefined;
+  }
+  return (transaction: PortfolioTransaction): void => {
+    handler(
+      transaction,
+      neighboursOf(fullFilteredIds, `transaction:${transaction.id}`),
+    );
+  };
+}
+
 // Keyed on the active filter combination so pagination resets to 50
 // rows whenever any filter changes or is cleared, without an effect.
 function TransactionsPages({
   filtered,
   hasActiveFilters,
   onClearFilters,
+  onDelete,
+  onEdit,
 }: {
   readonly filtered: readonly PortfolioTransaction[];
   readonly hasActiveFilters: boolean;
   readonly onClearFilters: () => void;
+  readonly onDelete: ((transaction: PortfolioTransaction) => void) | undefined;
+  readonly onEdit: ((transaction: PortfolioTransaction) => void) | undefined;
 }): JSX.Element {
   const [limit, setLimit] = useState(pageSize);
   const shown = filtered.slice(0, limit);
@@ -308,7 +360,11 @@ function TransactionsPages({
   return (
     <>
       {shown.length > 0 ? (
-        <TransactionsTable transactions={shown} />
+        <TransactionsTable
+          onDelete={onDelete}
+          onEdit={onEdit}
+          transactions={shown}
+        />
       ) : (
         <CardContent>
           <EmptyState

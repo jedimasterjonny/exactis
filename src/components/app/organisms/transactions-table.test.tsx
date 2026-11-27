@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import type { PortfolioTransaction } from "@/data/portfolio";
 
@@ -293,5 +293,69 @@ describe("TransactionsTable", () => {
     expect(gbpToGbx).not.toHaveTextContent("@");
     expect(gbxToGbp).not.toHaveTextContent("£120.00");
     expect(gbxToGbp).not.toHaveTextContent("@");
+  });
+
+  it("renders Actions column with unique per-row labels, opens edit from folded rows, and supports one-sided handlers", () => {
+    const onEdit = vi.fn<(transaction: PortfolioTransaction) => void>();
+    const onDelete = vi.fn<(transaction: PortfolioTransaction) => void>();
+    const sample = [rows[0], rows[2], rows[5]].filter(
+      (entry): entry is PortfolioTransaction => entry !== undefined,
+    );
+
+    const { rerender } = render(
+      <TransactionsTable
+        onDelete={onDelete}
+        onEdit={onEdit}
+        transactions={sample}
+      />,
+    );
+
+    expect(
+      screen.getAllByRole("columnheader").map((head) => head.textContent),
+    ).toStrictEqual([
+      "Date",
+      "Type",
+      "Account",
+      "Security",
+      "Shares",
+      "Amount",
+      "Actions",
+    ]);
+
+    // Folded opener triggers onEdit.
+    fireEvent.click(
+      screen.getByRole("button", { name: "Purchase · Global Equity Index" }),
+    );
+    expect(onEdit).toHaveBeenCalledWith(rows[0]);
+
+    // Unique per-row accessible names for security, cash-only, and orphan rows.
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Edit Purchase · Global Equity Index · 22 Sep 2026",
+      }),
+    );
+    expect(onEdit).toHaveBeenCalledTimes(2);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Delete Interest · Northstar ISA Cash · 19 Sep 2026",
+      }),
+    );
+    expect(onDelete).toHaveBeenCalledWith(rows[2]);
+
+    expect(
+      screen.getByRole("button", { name: "Edit Deposit · 10 Sep 2026" }),
+    ).toBeInTheDocument();
+
+    // One-sided handlers omit the absent button.
+    rerender(<TransactionsTable onEdit={onEdit} transactions={sample} />);
+    expect(
+      screen.queryByRole("button", { name: /^Delete /u }),
+    ).not.toBeInTheDocument();
+
+    rerender(<TransactionsTable onDelete={onDelete} transactions={sample} />);
+    expect(
+      screen.queryByRole("button", { name: /^Edit /u }),
+    ).not.toBeInTheDocument();
   });
 });

@@ -11,17 +11,24 @@ import type {
   CashAccount,
   Holding,
   NewPortfolioTransaction,
+  PortfolioTransaction,
   SecuritiesAccount,
 } from "@/data/portfolio";
 
-import { addPortfolioTransaction } from "@/actions/portfolio";
+import {
+  addPortfolioTransaction,
+  editPortfolioTransaction,
+} from "@/actions/portfolio";
 import { Toaster } from "@/components/kit/toast";
 import { refused, saved } from "@/lib/answer";
 import { commit } from "@/test/dom";
 
 import { PortfolioTransactionDialog } from "./portfolio-transaction-dialog";
 
-vi.mock("@/actions/portfolio", () => ({ addPortfolioTransaction: vi.fn() }));
+vi.mock("@/actions/portfolio", () => ({
+  addPortfolioTransaction: vi.fn(),
+  editPortfolioTransaction: vi.fn(),
+}));
 
 const securitiesAccounts: readonly SecuritiesAccount[] = [
   {
@@ -340,17 +347,20 @@ describe("PortfolioTransactionDialog", () => {
     fireEvent.change(toCashSelect, { target: { value: "cash-isa" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => {
-      expect(onSaved).toHaveBeenLastCalledWith({
-        accountId: "cash-reserve",
-        amount: 150,
-        currency: "GBP",
-        date: "2026-09-25",
-        fees: 0,
-        otherAccountId: "cash-isa",
-        shares: 0,
-        taxes: 0,
-        type: "cash-transfer",
-      });
+      expect(onSaved).toHaveBeenLastCalledWith(
+        {
+          accountId: "cash-reserve",
+          amount: 150,
+          currency: "GBP",
+          date: "2026-09-25",
+          fees: 0,
+          otherAccountId: "cash-isa",
+          shares: 0,
+          taxes: 0,
+          type: "cash-transfer",
+        },
+        2,
+      );
     });
 
     // Security transfer with optional valuation cleared to 0.
@@ -384,18 +394,21 @@ describe("PortfolioTransactionDialog", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => {
-      expect(onSaved).toHaveBeenLastCalledWith({
-        amount: 0,
-        currency: "CHF",
-        date: "2026-09-25",
-        fees: 0,
-        otherPortfolioId: "port-isa",
-        portfolioId: "port-gia",
-        securityId: "sec-world",
-        shares: 2,
-        taxes: 0,
-        type: "security-transfer",
-      });
+      expect(onSaved).toHaveBeenLastCalledWith(
+        {
+          amount: 0,
+          currency: "CHF",
+          date: "2026-09-25",
+          fees: 0,
+          otherPortfolioId: "port-isa",
+          portfolioId: "port-gia",
+          securityId: "sec-world",
+          shares: 2,
+          taxes: 0,
+          type: "security-transfer",
+        },
+        2,
+      );
     });
 
     // Deposit strips security, shares, fees, and taxes and names cash account in toast.
@@ -406,16 +419,19 @@ describe("PortfolioTransactionDialog", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => {
-      expect(onSaved).toHaveBeenLastCalledWith({
-        accountId: "cash-usd",
-        amount: 400,
-        currency: "USD",
-        date: "2026-09-25",
-        fees: 0,
-        shares: 0,
-        taxes: 0,
-        type: "deposit",
-      });
+      expect(onSaved).toHaveBeenLastCalledWith(
+        {
+          accountId: "cash-usd",
+          amount: 400,
+          currency: "USD",
+          date: "2026-09-25",
+          fees: 0,
+          shares: 0,
+          taxes: 0,
+          type: "deposit",
+        },
+        2,
+      );
     });
   });
 
@@ -945,18 +961,21 @@ describe("PortfolioTransactionDialog", () => {
         "Purchase · Global Equity Index · 20 Sep 2026. Targets not synced: The portfolio file has no Asset Allocation taxonomy",
       );
     });
-    expect(onSaved).toHaveBeenCalledExactlyOnceWith({
-      accountId: "cash-isa",
-      amount: 250,
-      currency: "GBP",
-      date: "2026-09-20",
-      fees: 0,
-      portfolioId: "port-isa",
-      securityId: "sec-world",
-      shares: 5,
-      taxes: 0,
-      type: "purchase",
-    });
+    expect(onSaved).toHaveBeenCalledExactlyOnceWith(
+      {
+        accountId: "cash-isa",
+        amount: 250,
+        currency: "GBP",
+        date: "2026-09-20",
+        fees: 0,
+        portfolioId: "port-isa",
+        securityId: "sec-world",
+        shares: 5,
+        taxes: 0,
+        type: "purchase",
+      },
+      2,
+    );
   });
 
   it("preserves explicit blank trade selections with handoff hints until account, security, and shares are filled", () => {
@@ -1531,18 +1550,21 @@ describe("PortfolioTransactionDialog", () => {
     fireEvent.click(save);
 
     await waitFor(() => {
-      expect(onSaved).toHaveBeenCalledWith({
-        accountId: "cash-isa",
-        amount: 800,
-        currency: "GBP",
-        date: "2026-09-25",
-        fees: 12.6,
-        portfolioId: "port-isa",
-        securityId: "sec-uk-pence",
-        shares: 10,
-        taxes: 0,
-        type: "purchase",
-      });
+      expect(onSaved).toHaveBeenCalledWith(
+        {
+          accountId: "cash-isa",
+          amount: 800,
+          currency: "GBP",
+          date: "2026-09-25",
+          fees: 12.6,
+          portfolioId: "port-isa",
+          securityId: "sec-uk-pence",
+          shares: 10,
+          taxes: 0,
+          type: "purchase",
+        },
+        2,
+      );
     });
 
     // Save a cross-currency sale (where gross = amount + fees + taxes) driven by Exchange rate.
@@ -1565,19 +1587,22 @@ describe("PortfolioTransactionDialog", () => {
     fireEvent.click(save);
 
     await waitFor(() => {
-      expect(onSaved).toHaveBeenLastCalledWith({
-        accountId: "cash-isa",
-        amount: 780,
-        currency: "GBP",
-        date: "2026-09-25",
-        fees: 7.4,
-        fxAmount: 1000,
-        portfolioId: "port-isa",
-        securityId: "sec-us",
-        shares: 10,
-        taxes: 0,
-        type: "sale",
-      });
+      expect(onSaved).toHaveBeenLastCalledWith(
+        {
+          accountId: "cash-isa",
+          amount: 780,
+          currency: "GBP",
+          date: "2026-09-25",
+          fees: 7.4,
+          fxAmount: 1000,
+          portfolioId: "port-isa",
+          securityId: "sec-us",
+          shares: 10,
+          taxes: 0,
+          type: "sale",
+        },
+        2,
+      );
     });
   });
 
@@ -1663,18 +1688,21 @@ describe("PortfolioTransactionDialog", () => {
 
     fireEvent.click(save);
     await waitFor(() => {
-      expect(onSaved).toHaveBeenCalledExactlyOnceWith({
-        accountId: "cash-isa",
-        amount: 800,
-        currency: "GBP",
-        date: "2026-09-25",
-        fees: 0,
-        fxAmount: 1000,
-        otherAccountId: "cash-usd",
-        shares: 0,
-        taxes: 0,
-        type: "cash-transfer",
-      });
+      expect(onSaved).toHaveBeenCalledExactlyOnceWith(
+        {
+          accountId: "cash-isa",
+          amount: 800,
+          currency: "GBP",
+          date: "2026-09-25",
+          fees: 0,
+          fxAmount: 1000,
+          otherAccountId: "cash-usd",
+          shares: 0,
+          taxes: 0,
+          type: "cash-transfer",
+        },
+        2,
+      );
     });
 
     // Cross-currency dividend settled in USD for a EUR security uses non-GBP cross-rate (0.85 / 0.80 = 1.0625).
@@ -1700,18 +1728,21 @@ describe("PortfolioTransactionDialog", () => {
     fireEvent.click(save);
 
     await waitFor(() => {
-      expect(onSaved).toHaveBeenLastCalledWith({
-        accountId: "cash-usd",
-        amount: 40,
-        currency: "USD",
-        date: "2026-09-25",
-        fees: 0,
-        fxAmount: 40,
-        securityId: "sec-eu",
-        shares: 0,
-        taxes: 2.5,
-        type: "dividend",
-      });
+      expect(onSaved).toHaveBeenLastCalledWith(
+        {
+          accountId: "cash-usd",
+          amount: 40,
+          currency: "USD",
+          date: "2026-09-25",
+          fees: 0,
+          fxAmount: 40,
+          securityId: "sec-eu",
+          shares: 0,
+          taxes: 2.5,
+          type: "dividend",
+        },
+        2,
+      );
     });
 
     // Non-GBP cash (USD) + GBX security requires manual FX (never automatic GBP-to-GBX note).
@@ -1858,5 +1889,383 @@ describe("PortfolioTransactionDialog", () => {
       target: { value: "cash-usd" },
     });
     expect(status).toHaveTextContent("");
+  });
+
+  it("edits existing transactions with locked type, retained retired accounts/securities, seeded FX, preserved delivery currency, and Delete", async () => {
+    vi.mocked(editPortfolioTransaction).mockResolvedValue(
+      saved({ id: "tx-fx", savedOn: "2026-09-25", version: 5 }),
+    );
+    const retiredCash: CashAccount = {
+      balance: 0,
+      balanceGbp: 0,
+      currency: "GBP",
+      id: "cash-retired",
+      isRetired: true,
+      name: "Old Settlement Cash",
+      transactionCount: 1,
+    };
+    const retiredPortfolio: SecuritiesAccount = {
+      holdingsCount: 0,
+      id: "port-retired",
+      isRetired: true,
+      marketValue: 0,
+      name: "Old Brokerage",
+      transactionCount: 1,
+    };
+    const retiredUsSecurity: Holding = {
+      currency: "USD",
+      gbpRate: 0.78,
+      id: "sec-retired-us",
+      isRetired: true,
+      isSplitCategory: false,
+      latestPrice: 100,
+      latestPriceDate: "2026-09-25",
+      name: "Legacy US Fund",
+      shares: 0,
+      sharesByAccount: [],
+      transactionCount: 1,
+    };
+    // Non-terminating exchange rate (1000 / 300 = 3.333333...) verifies fxDriver="amount" survives blur without drift.
+    const fxPurchase: PortfolioTransaction = {
+      accountId: "cash-retired",
+      accountName: "Old Settlement Cash",
+      amount: 1010,
+      currency: "GBP",
+      date: "2026-09-20",
+      fees: 5,
+      grossValue: {
+        amount: 1000,
+        currency: "GBP",
+        exchangeRate: 1000 / 300,
+        fxAmount: 300,
+        fxCurrency: "USD",
+      },
+      id: "tx-fx",
+      note: "Legacy FX fill",
+      portfolioId: "port-retired",
+      portfolioName: "Old Brokerage",
+      securityId: "sec-retired-us",
+      securityName: "Legacy US Fund",
+      shares: 10,
+      taxes: 5,
+      timestamp: 1_789_900_000,
+      type: "purchase",
+    };
+
+    const onDelete = vi.fn<() => void>();
+    const onSaved =
+      vi.fn<(draft: NewPortfolioTransaction, version: number) => void>();
+
+    // Only retired accounts & security exist — edit mode must keep them selectable and enabled.
+    const { rerender } = render(
+      <PortfolioTransactionDialog
+        baseCurrency="GBP"
+        cashAccounts={[retiredCash]}
+        holdings={[retiredUsSecurity]}
+        onDelete={onDelete}
+        onDismiss={vi.fn<() => void>()}
+        onSaved={onSaved}
+        securitiesAccounts={[retiredPortfolio]}
+        today="2026-09-25"
+        transaction={fxPurchase}
+        version={4}
+      />,
+      { wrapper: Toaster },
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Purchase · Legacy US Fund" }),
+    ).toBeInTheDocument();
+    const typeSelect = screen.getByRole("combobox", { name: "Type" });
+    expect(typeSelect).toBeDisabled();
+    expect(typeSelect).toHaveAccessibleDescription(
+      "Transaction type cannot be changed",
+    );
+    expect(
+      screen.getByRole("combobox", { name: "Securities account" }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("option", { name: "Old Brokerage (retired)" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", {
+        name: "Old Settlement Cash (GBP, retired)",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Legacy US Fund (retired)" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "Gross value (USD)" }),
+    ).toHaveValue("US$300.00");
+    const rateInput = screen.getByRole("textbox", {
+      name: "Exchange rate (GBP per USD)",
+    });
+    expect(rateInput).toHaveValue("3.333333");
+    // Blurring the rounded Exchange rate field without editing must NOT flip fxDriver or drift fxAmount.
+    fireEvent.focus(rateInput);
+    fireEvent.blur(rateInput);
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    expect(onDelete).toHaveBeenCalledOnce();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Transaction saved" }),
+      ).toHaveAccessibleDescription("Purchase · Legacy US Fund · 20 Sep 2026");
+    });
+    expect(editPortfolioTransaction).toHaveBeenCalledWith(4, {
+      accountId: "cash-retired",
+      amount: 1010,
+      currency: "GBP",
+      date: "2026-09-20",
+      fees: 5,
+      fxAmount: 300,
+      id: "tx-fx",
+      note: "Legacy FX fill",
+      portfolioId: "port-retired",
+      securityId: "sec-retired-us",
+      shares: 10,
+      taxes: 5,
+      type: "purchase",
+    });
+    expect(onSaved).toHaveBeenCalledWith(
+      expect.objectContaining({ fxAmount: 300 }),
+      5,
+    );
+
+    // Changing Securities account in edit mode must NOT overwrite Cash account or wipe FX state;
+    // mismatched grossValue settlement currency must NOT seed fxTypedAmount.
+    rerender(
+      <PortfolioTransactionDialog
+        baseCurrency="GBP"
+        cashAccounts={[...cashAccounts, retiredCash]}
+        holdings={[...holdings, retiredUsSecurity]}
+        key="edit-trade-portfolio-no-overwrite"
+        onDismiss={vi.fn<() => void>()}
+        onSaved={onSaved}
+        securitiesAccounts={[...securitiesAccounts, retiredPortfolio]}
+        today="2026-09-25"
+        transaction={fxPurchase}
+        version={5}
+      />,
+    );
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Securities account" }),
+      { target: { value: "port-gia" } },
+    );
+    expect(screen.getByRole("combobox", { name: "Cash account" })).toHaveValue(
+      "cash-retired",
+    );
+    expect(
+      screen.getByRole("textbox", { name: "Gross value (USD)" }),
+    ).toHaveValue("US$300.00");
+
+    rerender(
+      <PortfolioTransactionDialog
+        baseCurrency="GBP"
+        cashAccounts={[retiredCash]}
+        holdings={[retiredUsSecurity]}
+        key="mismatched-gross-currency"
+        onDismiss={vi.fn<() => void>()}
+        onSaved={onSaved}
+        securitiesAccounts={[retiredPortfolio]}
+        today="2026-09-25"
+        transaction={{
+          ...fxPurchase,
+          grossValue: {
+            amount: 1000,
+            currency: "EUR",
+            fxAmount: 300,
+            fxCurrency: "USD",
+          },
+        }}
+        version={5}
+      />,
+    );
+    expect(
+      screen.getByRole("textbox", { name: "Gross value (USD)" }),
+    ).toHaveValue("");
+
+    // Preserves non-GBP/USD/EUR delivery currency dynamically even after switching away and back.
+    const chfDelivery: PortfolioTransaction = {
+      amount: 500,
+      currency: "CHF",
+      date: "2026-09-19",
+      fees: 0,
+      id: "tx-chf",
+      portfolioId: "port-isa",
+      portfolioName: "Northstar ISA",
+      securityId: "sec-world",
+      securityName: "Global Equity Index",
+      shares: 5,
+      taxes: 0,
+      timestamp: 1_789_800_000,
+      type: "inbound-delivery",
+    };
+    rerender(
+      <PortfolioTransactionDialog
+        baseCurrency="GBP"
+        cashAccounts={cashAccounts}
+        holdings={holdings}
+        key="chf-delivery"
+        onDismiss={vi.fn<() => void>()}
+        onSaved={onSaved}
+        securitiesAccounts={securitiesAccounts}
+        today="2026-09-25"
+        transaction={chfDelivery}
+        version={5}
+      />,
+    );
+    const deliveryCurrencySelect = screen.getByRole("combobox", {
+      name: "Currency",
+    });
+    expect(deliveryCurrencySelect).toHaveValue("CHF");
+    fireEvent.change(deliveryCurrencySelect, { target: { value: "GBP" } });
+    expect(
+      within(deliveryCurrencySelect).getByRole("option", { name: "CHF" }),
+    ).toBeInTheDocument();
+
+    // Zero-valuation non-base-currency security-transfer leaves Valuation blank and preserves its original currency on save.
+    const usdSecTransfer: PortfolioTransaction = {
+      amount: 0,
+      currency: "USD",
+      date: "2026-09-19",
+      fees: 0,
+      id: "tx-sec-xfer-usd",
+      otherPortfolioId: "port-gia",
+      otherPortfolioName: "Dealing Account",
+      portfolioId: "port-isa",
+      portfolioName: "Northstar ISA",
+      securityId: "sec-world",
+      securityName: "Global Equity Index",
+      shares: 2,
+      taxes: 0,
+      timestamp: 1_789_750_000,
+      type: "security-transfer",
+    };
+    rerender(
+      <PortfolioTransactionDialog
+        baseCurrency="GBP"
+        cashAccounts={cashAccounts}
+        holdings={holdings}
+        key="usd-sec-transfer"
+        onDismiss={vi.fn<() => void>()}
+        onSaved={onSaved}
+        securitiesAccounts={securitiesAccounts}
+        today="2026-09-25"
+        transaction={usdSecTransfer}
+        version={5}
+      />,
+    );
+    expect(screen.getByRole("textbox", { name: "Valuation" })).toHaveValue("");
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(editPortfolioTransaction).toHaveBeenLastCalledWith(
+        5,
+        expect.objectContaining({
+          currency: "USD",
+          id: "tx-sec-xfer-usd",
+          type: "security-transfer",
+        }),
+      );
+    });
+
+    // Cash-only edit titles with the cash account name; orphan deposit falls back to type label and leaves Amount blank when zero.
+    const cashDeposit: PortfolioTransaction = {
+      accountId: "cash-reserve",
+      accountName: "Reserve Cash",
+      amount: 250,
+      currency: "GBP",
+      date: "2026-09-18",
+      fees: 0,
+      id: "tx-dep",
+      shares: 0,
+      taxes: 0,
+      timestamp: 1_789_700_000,
+      type: "deposit",
+    };
+    rerender(
+      <PortfolioTransactionDialog
+        baseCurrency="GBP"
+        cashAccounts={cashAccounts}
+        holdings={holdings}
+        key="cash-deposit"
+        onDismiss={vi.fn<() => void>()}
+        onSaved={onSaved}
+        securitiesAccounts={securitiesAccounts}
+        today="2026-09-25"
+        transaction={cashDeposit}
+        version={5}
+      />,
+    );
+    expect(
+      screen.getByRole("heading", { name: "Deposit · Reserve Cash" }),
+    ).toBeInTheDocument();
+
+    const orphanDeposit: PortfolioTransaction = {
+      amount: 0,
+      currency: "GBP",
+      date: "2026-09-17",
+      fees: 0,
+      id: "tx-orphan",
+      shares: 0,
+      taxes: 0,
+      timestamp: 1_789_600_000,
+      type: "deposit",
+    };
+    rerender(
+      <PortfolioTransactionDialog
+        baseCurrency="GBP"
+        cashAccounts={cashAccounts}
+        holdings={holdings}
+        key="orphan-deposit"
+        onDismiss={vi.fn<() => void>()}
+        onSaved={onSaved}
+        securitiesAccounts={securitiesAccounts}
+        today="2026-09-25"
+        transaction={orphanDeposit}
+        version={5}
+      />,
+    );
+    expect(
+      screen.getByRole("heading", { name: "Deposit" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Amount" })).toHaveValue("");
+
+    // Cash transfer to a retired destination cash account keeps both accounts selectable and enabled.
+    const retiredTransfer: PortfolioTransaction = {
+      accountId: "cash-reserve",
+      accountName: "Reserve Cash",
+      amount: 100,
+      currency: "GBP",
+      date: "2026-09-16",
+      fees: 0,
+      id: "tx-xfer",
+      otherAccountId: "cash-retired",
+      otherAccountName: "Old Settlement Cash",
+      shares: 0,
+      taxes: 0,
+      timestamp: 1_789_500_000,
+      type: "cash-transfer",
+    };
+    rerender(
+      <PortfolioTransactionDialog
+        baseCurrency="GBP"
+        cashAccounts={[...cashAccounts, retiredCash]}
+        holdings={holdings}
+        key="retired-transfer"
+        onDismiss={vi.fn<() => void>()}
+        onSaved={onSaved}
+        securitiesAccounts={securitiesAccounts}
+        today="2026-09-25"
+        transaction={retiredTransfer}
+        version={5}
+      />,
+    );
+    expect(
+      screen.getByRole("combobox", { name: "To cash account" }),
+    ).toHaveValue("cash-retired");
   });
 });
