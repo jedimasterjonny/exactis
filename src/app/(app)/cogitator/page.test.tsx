@@ -59,6 +59,7 @@ function feedOf({
 } = {}): OwnedFeed {
   return {
     feed: {
+      accounts: { cash: [], securities: [] },
       handoff,
       latestQuoteDate,
       latestTransactionDate: "2026-09-07",

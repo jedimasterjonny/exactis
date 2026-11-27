@@ -86,6 +86,7 @@ function feedOf(
 ): NonNullable<Awaited<ReturnType<typeof getPortfolioFeed>>> {
   return {
     feed: {
+      accounts: { cash: [], securities: [] },
       handoff: { securitiesAccounts: [], securitiesByCategory: {} },
       latestQuoteDate: "2026-09-25",
       latestTransactionDate: "2026-09-25",

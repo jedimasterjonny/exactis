@@ -163,6 +163,25 @@ describe("the portfolio store", () => {
 
       expect(await getPortfolioFeed()).toStrictEqual({
         feed: {
+          accounts: {
+            cash: [],
+            securities: [
+              {
+                foreignCurrencies: [],
+                hasUncurrenciedHoldings: false,
+                holdingsCount: 1,
+                id: "portfolio-1",
+                isRetired: false,
+                lastTransactionDate: null,
+                marketValueGbp: 21_401.2,
+                name: "Brokerage",
+                noFxCurrencies: [],
+                oldestQuoteDate: "2024-10-05",
+                referenceCash: null,
+                unpricedCount: 0,
+              },
+            ],
+          },
           handoff: {
             securitiesAccounts: [{ id: "portfolio-1", name: "Brokerage" }],
             securitiesByCategory: {},

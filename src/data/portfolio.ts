@@ -179,10 +179,12 @@ export interface PortfolioCategory {
 }
 
 // Lightweight feed parsed from the household's owned .portfolio file
-// for Assumptions, Month end, and Cogitator: quote and transaction
-// freshness dates, validated target categories and portfolios (or their
-// refusal), and active account/category handoff lookups.
+// for Accounts, Assumptions, Month end, and Cogitator: per-account
+// valuation and freshness summaries, quote and transaction freshness
+// dates, validated target categories and portfolios (or their refusal),
+// and active account/category handoff lookups.
 export interface PortfolioFeed {
+  readonly accounts: PortfolioFeedAccounts;
   readonly handoff: PortfolioHandoff;
   readonly latestQuoteDate: null | string;
   readonly latestTransactionDate: null | string;
@@ -353,6 +355,48 @@ interface HoldingsView {
   readonly hasZeroShare: boolean;
   readonly rows: readonly HoldingRow[];
   readonly totalGbp: number;
+}
+
+interface PortfolioFeedAccounts {
+  readonly cash: readonly PortfolioFeedCashAccount[];
+  readonly securities: readonly PortfolioFeedSecuritiesAccount[];
+}
+
+interface PortfolioFeedCashAccount {
+  readonly balance: number;
+  readonly balanceGbp: null | number;
+  readonly currency: string;
+  readonly id: string;
+  readonly isRetired: boolean;
+  readonly lastTransactionDate: null | string;
+  readonly name: string;
+  readonly referencedBy: readonly string[];
+}
+
+interface PortfolioFeedReferenceCash {
+  readonly balance: number;
+  readonly balanceGbp: null | number;
+  readonly currency: string;
+  readonly id: string;
+  readonly isRetired: boolean;
+  readonly isShared: boolean;
+  readonly lastTransactionDate: null | string;
+  readonly name: string;
+}
+
+interface PortfolioFeedSecuritiesAccount {
+  readonly foreignCurrencies: readonly string[];
+  readonly hasUncurrenciedHoldings: boolean;
+  readonly holdingsCount: number;
+  readonly id: string;
+  readonly isRetired: boolean;
+  readonly lastTransactionDate: null | string;
+  readonly marketValueGbp: number;
+  readonly name: string;
+  readonly noFxCurrencies: readonly string[];
+  readonly oldestQuoteDate: null | string;
+  readonly referenceCash: null | PortfolioFeedReferenceCash;
+  readonly unpricedCount: number;
 }
 
 interface PortfolioSecurityHandoff {
