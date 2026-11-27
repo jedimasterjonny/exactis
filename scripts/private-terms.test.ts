@@ -5,6 +5,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -112,7 +113,9 @@ function terms(text: string): void {
 
 describe("the private terms guard", () => {
   beforeEach(() => {
-    base = mkdtempSync(join(tmpdir(), "private-terms-"));
+    // The temp directory is a symlink on macOS, and git hands the script the
+    // path it resolves to, so the repository is named by that path here too.
+    base = realpathSync(mkdtempSync(join(tmpdir(), "private-terms-")));
     repo = join(base, "work");
     mkdirSync(join(repo, "scripts"), { recursive: true });
     copyFileSync(script, join(repo, "scripts/private-terms.sh"));
