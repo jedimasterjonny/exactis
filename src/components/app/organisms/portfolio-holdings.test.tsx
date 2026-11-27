@@ -228,4 +228,59 @@ describe("PortfolioHoldings", () => {
       "Leave the scenario to replace the file or update the portfolio.",
     );
   });
+
+  it("threads edit and delete handlers with neighbour focus ids and omits them in read-only mode", () => {
+    const onEditSecurity =
+      vi.fn<(holding: Holding, fallbackFocusIds: readonly string[]) => void>();
+    const onDeleteSecurity =
+      vi.fn<(holding: Holding, fallbackFocusIds: readonly string[]) => void>();
+    const { rerender } = render(
+      <PortfolioHoldings
+        accountId=""
+        holdings={[gbpFund, usdFund, zeroFund]}
+        isShowingZeroShares
+        label="Sect. IX.i"
+        onAccountChange={vi.fn<(accountId: string) => void>()}
+        onAddSecurity={vi.fn<() => void>()}
+        onDeleteSecurity={onDeleteSecurity}
+        onEditSecurity={onEditSecurity}
+        onShowingZeroSharesChange={vi.fn<(isShowing: boolean) => void>()}
+        onUpdateQuotes={vi.fn<() => void>()}
+        securitiesAccounts={[isa]}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Edit Global Equity Index" }),
+    );
+    expect(onEditSecurity).toHaveBeenCalledWith(gbpFund, ["holding:sec-usd"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Sold Fund" }));
+    expect(onDeleteSecurity).toHaveBeenCalledWith(zeroFund, [
+      "holding:sec-usd",
+    ]);
+
+    rerender(
+      <PortfolioHoldings
+        accountId=""
+        holdings={[gbpFund, zeroFund]}
+        isReadOnly
+        isShowingZeroShares
+        label="Sect. IX.i"
+        onAccountChange={vi.fn<(accountId: string) => void>()}
+        onAddSecurity={vi.fn<() => void>()}
+        onDeleteSecurity={onDeleteSecurity}
+        onEditSecurity={onEditSecurity}
+        onShowingZeroSharesChange={vi.fn<(isShowing: boolean) => void>()}
+        onUpdateQuotes={vi.fn<() => void>()}
+        securitiesAccounts={[isa]}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", { name: /^Edit /u }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Delete /u }),
+    ).not.toBeInTheDocument();
+  });
 });

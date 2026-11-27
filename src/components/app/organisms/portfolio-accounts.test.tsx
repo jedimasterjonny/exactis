@@ -304,4 +304,77 @@ describe("PortfolioAccounts", () => {
       screen.queryByRole("button", { name: "Closed Account" }),
     ).not.toBeInTheDocument();
   });
+
+  it("renders sibling edit pencils on active/retired securities, non-shared reference cash, and standalone cash, aligns shared reference cash, and omits pencils in read-only mode", () => {
+    const onEditSecurities =
+      vi.fn<
+        (
+          account: SecuritiesAccount,
+          fallbackFocusIds: readonly string[],
+        ) => void
+      >();
+    const onEditCash =
+      vi.fn<
+        (account: CashAccount, fallbackFocusIds: readonly string[]) => void
+      >();
+    const { rerender } = render(
+      <PortfolioAccounts
+        cashAccounts={[isaCash, reserveCash, retiredCash]}
+        label="Sect. IX.i"
+        onAddCash={vi.fn<() => void>()}
+        onAddSecurities={vi.fn<() => void>()}
+        onEditCash={onEditCash}
+        onEditSecurities={onEditSecurities}
+        securitiesAccounts={[isaSecurities, jointSecurities, retiredSecurities]}
+      />,
+    );
+
+    // Reveal retired accounts so retired securities account gets an edit pencil too.
+    fireEvent.click(
+      screen.getByRole("switch", { name: "Show retired accounts" }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Northstar ISA" }));
+    expect(onEditSecurities).toHaveBeenCalledWith(isaSecurities, [
+      "cash:cash-isa",
+    ]);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Edit Closed Account" }),
+    );
+    expect(onEditSecurities).toHaveBeenCalledWith(retiredSecurities, [
+      "cash:cash-old",
+      "securities:sec-joint",
+    ]);
+
+    // Shared ISA Cash has only ONE edit pencil (on first appearance).
+    expect(
+      screen.getAllByRole("button", { name: "Edit ISA Cash" }),
+    ).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Edit ISA Cash" }));
+    expect(onEditCash).toHaveBeenCalledWith(isaCash, [
+      "securities:sec-joint",
+      "securities:sec-isa",
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Reserve Cash" }));
+    expect(onEditCash).toHaveBeenCalledWith(reserveCash, ["cash:cash-old"]);
+
+    // Read-only mode omits all row edit pencils.
+    rerender(
+      <PortfolioAccounts
+        cashAccounts={[isaCash, reserveCash]}
+        isReadOnly
+        label="Sect. IX.i"
+        onAddCash={vi.fn<() => void>()}
+        onAddSecurities={vi.fn<() => void>()}
+        onEditCash={onEditCash}
+        onEditSecurities={onEditSecurities}
+        securitiesAccounts={[isaSecurities, jointSecurities]}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", { name: /^Edit /u }),
+    ).not.toBeInTheDocument();
+  });
 });

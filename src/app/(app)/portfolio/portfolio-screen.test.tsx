@@ -15,6 +15,10 @@ import {
   addPortfolioAccount,
   addPortfolioSecurity,
   addPortfolioTransaction,
+  deletePortfolioAccount,
+  deletePortfolioSecurity,
+  editPortfolioAccount,
+  editPortfolioSecurity,
   updatePortfolioQuotes,
   uploadPortfolio,
 } from "@/actions/portfolio";
@@ -33,6 +37,10 @@ vi.mock("@/actions/portfolio", () => ({
   addPortfolioAccount: vi.fn(),
   addPortfolioSecurity: vi.fn(),
   addPortfolioTransaction: vi.fn(),
+  deletePortfolioAccount: vi.fn(),
+  deletePortfolioSecurity: vi.fn(),
+  editPortfolioAccount: vi.fn(),
+  editPortfolioSecurity: vi.fn(),
   fetchPortfolioQuotes: vi.fn(),
   updatePortfolioQuotes: vi.fn(),
   uploadPortfolio: vi.fn(),
@@ -1856,5 +1864,469 @@ describe("PortfolioScreen", () => {
     expect(
       within(dialog).getByRole("textbox", { name: "Total paid" }),
     ).toHaveValue("");
+  });
+
+  it("edits, retires, and deletes accounts and securities, preserves Holdings filters on edit, and restores focus to visible surviving rows or h1", async () => {
+    vi.mocked(editPortfolioAccount).mockResolvedValue(
+      saved({ id: "port-gia", savedOn: "2026-09-25", version: 2 }),
+    );
+    vi.mocked(deletePortfolioAccount).mockResolvedValue(
+      saved({ id: "cash-spare", savedOn: "2026-09-25", version: 3 }),
+    );
+    vi.mocked(editPortfolioSecurity)
+      .mockResolvedValueOnce(
+        saved({ id: "sec-alpha", savedOn: "2026-09-25", version: 4 }),
+      )
+      .mockResolvedValueOnce(
+        saved({ id: "sec-beta", savedOn: "2026-09-25", version: 5 }),
+      );
+    vi.mocked(deletePortfolioSecurity)
+      .mockResolvedValueOnce(
+        saved({ id: "sec-gamma", savedOn: "2026-09-25", version: 6 }),
+      )
+      .mockResolvedValueOnce(
+        saved({ id: "sec-delta", savedOn: "2026-09-25", version: 7 }),
+      );
+
+    const editableOwned: OwnedPortfolio = {
+      savedOn: "2026-09-24",
+      snapshot: {
+        ...multiAccountSnapshot,
+        cashAccounts: [
+          ...multiAccountSnapshot.cashAccounts,
+          {
+            balance: 0,
+            balanceGbp: 0,
+            currency: "GBP",
+            id: "cash-spare",
+            isRetired: false,
+            name: "Spare Cash",
+            transactionCount: 0,
+          },
+        ],
+      },
+      version: 1,
+    };
+
+    const { rerender } = render(
+      <PortfolioScreen
+        initialTab="accounts"
+        isInScenario={false}
+        owned={editableOwned}
+        today="2026-09-25"
+      />,
+      { wrapper: Toaster },
+    );
+
+    // 1. Edit and retire Dealing Account, then dismiss and re-open Spare Cash to delete via ConfirmDialog.
+    fireEvent.click(
+      screen.getByRole("button", { name: "Edit Dealing Account" }),
+    );
+    const editAccDialog = screen.getByRole("dialog", {
+      name: "Dealing Account",
+    });
+    fireEvent.click(
+      within(editAccDialog).getByRole("switch", { name: "Retired" }),
+    );
+    fireEvent.click(
+      within(editAccDialog).getByRole("button", { name: "Save" }),
+    );
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Dealing Account" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(editPortfolioAccount).toHaveBeenCalledWith(1, {
+      id: "port-gia",
+      isRetired: true,
+      kind: "securities",
+      name: "Dealing Account",
+      referenceAccountId: "cash-gia",
+    });
+
+    const afterRetireAccount: OwnedPortfolio = {
+      ...editableOwned,
+      snapshot: {
+        ...editableOwned.snapshot,
+        securitiesAccounts: editableOwned.snapshot.securitiesAccounts.map(
+          (a) => (a.id === "port-gia" ? { ...a, isRetired: true } : a),
+        ),
+      },
+      version: 2,
+    };
+    rerender(
+      <PortfolioScreen
+        initialTab="accounts"
+        isInScenario={false}
+        owned={afterRetireAccount}
+        today="2026-09-25"
+      />,
+    );
+    // Focus restores onto surviving neighbour row (cash-gia's button) after Base UI's unmount microtask.
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Dealing Cash" }),
+      ).toHaveFocus();
+    });
+
+    // Open Spare Cash, cancel dialog, edit without retiring (no focus shift), then delete via ConfirmDialog (cancel restores focus to Spare Cash, then confirm).
+    fireEvent.click(screen.getByRole("button", { name: "Edit Spare Cash" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(
+      screen.queryByRole("dialog", { name: "Spare Cash" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Spare Cash" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Spare Cash" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(editPortfolioAccount).toHaveBeenCalledTimes(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Spare Cash" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    const confirmAcc = screen.getByRole("alertdialog", {
+      name: "Delete Spare Cash?",
+    });
+    expect(confirmAcc).toHaveTextContent("It cannot be brought back.");
+    fireEvent.click(within(confirmAcc).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Spare Cash" })).toHaveFocus();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Spare Cash" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    fireEvent.click(
+      within(
+        screen.getByRole("alertdialog", { name: "Delete Spare Cash?" }),
+      ).getByRole("button", { name: "Delete" }),
+    );
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("alertdialog", { name: "Delete Spare Cash?" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(deletePortfolioAccount).toHaveBeenCalledWith(2, {
+      id: "cash-spare",
+      kind: "cash",
+    });
+
+    const afterDeleteAccount: OwnedPortfolio = {
+      ...afterRetireAccount,
+      snapshot: {
+        ...afterRetireAccount.snapshot,
+        cashAccounts: afterRetireAccount.snapshot.cashAccounts.filter(
+          (a) => a.id !== "cash-spare",
+        ),
+      },
+      version: 3,
+    };
+    rerender(
+      <PortfolioScreen
+        initialTab="accounts"
+        isInScenario={false}
+        owned={afterDeleteAccount}
+        today="2026-09-25"
+      />,
+    );
+
+    // 2. Switch to Holdings, filter to Northstar ISA, edit Alpha World Equity -> filter stays preserved!
+    fireEvent.click(screen.getByRole("tab", { name: "Holdings" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Account" }), {
+      target: { value: "port-isa" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Edit Alpha World Equity" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Edit Alpha World Equity" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Alpha World Equity" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(editPortfolioSecurity).toHaveBeenCalledWith(3, {
+      id: "sec-alpha",
+      isRetired: false,
+      name: "Alpha World Equity",
+    });
+    expect(screen.getByRole("combobox", { name: "Account" })).toHaveValue(
+      "port-isa",
+    );
+
+    // Retire Beta Core Equity to cover security retire focus restoration.
+    const afterAlphaEdit: OwnedPortfolio = {
+      ...afterDeleteAccount,
+      version: 4,
+    };
+    rerender(
+      <PortfolioScreen
+        initialTab="accounts"
+        isInScenario={false}
+        owned={afterAlphaEdit}
+        today="2026-09-25"
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Edit Beta Core Equity" }),
+    );
+    fireEvent.click(screen.getByRole("switch", { name: "Retired" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Beta Core Equity" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(editPortfolioSecurity).toHaveBeenLastCalledWith(4, {
+      id: "sec-beta",
+      isRetired: true,
+      name: "Beta Core Equity",
+    });
+    const afterBetaRetire: OwnedPortfolio = {
+      ...afterAlphaEdit,
+      snapshot: {
+        ...afterAlphaEdit.snapshot,
+        holdings: afterAlphaEdit.snapshot.holdings.map((holding) =>
+          holding.id === "sec-beta"
+            ? { ...holding, isRetired: true, shares: 0, sharesByAccount: [] }
+            : holding,
+        ),
+      },
+      version: 5,
+    };
+    rerender(
+      <PortfolioScreen
+        initialTab="accounts"
+        isInScenario={false}
+        owned={afterBetaRetire}
+        today="2026-09-25"
+      />,
+    );
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Alpha World Equity" }),
+      ).toHaveFocus();
+    });
+
+    // 3. Show zero-share securities, cancel table-bin ConfirmDialog (no edit-origin focus override),
+    // delete Gamma from table bin (skipping display:none, visibility:hidden, and inert buttons),
+    // then delete Delta from inside PortfolioSecurityDialog, falling back to h1 when no target survives.
+    fireEvent.change(screen.getByRole("combobox", { name: "Account" }), {
+      target: { value: "" },
+    });
+    fireEvent.click(
+      screen.getByRole("switch", { name: "Show zero-share securities" }),
+    );
+
+    // Hide every button inside Retired Index Fund via display:none, visibility:hidden, and inert,
+    // and hide Delta's folded opener so focus picks Delta's visible Edit button instead.
+    screen.getByRole("button", { name: "Retired Index Fund" }).style.display =
+      "none";
+    screen.getByRole("button", {
+      name: "Edit Retired Index Fund",
+    }).style.visibility = "hidden";
+    screen
+      .getByRole("button", { name: "Delete Retired Index Fund" })
+      .setAttribute("inert", "");
+    screen.getByRole("button", { name: "Delta Reserve Equity" }).style.display =
+      "none";
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Delete Gamma Unheld Equity" }),
+    );
+    fireEvent.click(
+      within(
+        screen.getByRole("alertdialog", {
+          name: "Delete Gamma Unheld Equity?",
+        }),
+      ).getByRole("button", { name: "Cancel" }),
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Delete Gamma Unheld Equity" }),
+    );
+    const confirmSec = screen.getByRole("alertdialog", {
+      name: "Delete Gamma Unheld Equity?",
+    });
+    expect(confirmSec).toHaveTextContent("It cannot be brought back.");
+    fireEvent.click(within(confirmSec).getByRole("button", { name: "Delete" }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("alertdialog", {
+          name: "Delete Gamma Unheld Equity?",
+        }),
+      ).not.toBeInTheDocument();
+    });
+    expect(deletePortfolioSecurity).toHaveBeenCalledWith(5, {
+      id: "sec-gamma",
+    });
+
+    const afterDeleteGamma: OwnedPortfolio = {
+      ...afterBetaRetire,
+      snapshot: {
+        ...afterBetaRetire.snapshot,
+        holdings: afterBetaRetire.snapshot.holdings.filter(
+          (h) => h.id !== "sec-gamma",
+        ),
+      },
+      version: 6,
+    };
+    rerender(
+      <PortfolioScreen
+        initialTab="accounts"
+        isInScenario={false}
+        owned={afterDeleteGamma}
+        today="2026-09-25"
+      />,
+    );
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Edit Delta Reserve Equity" }),
+      ).toHaveFocus();
+    });
+
+    // Delete Delta from inside Edit dialog when it is the ONLY remaining holding -> focus falls back to h1.
+    const onlyDelta: OwnedPortfolio = {
+      ...afterDeleteGamma,
+      snapshot: {
+        ...afterDeleteGamma.snapshot,
+        holdings: afterDeleteGamma.snapshot.holdings.filter(
+          (h) => h.id === "sec-delta",
+        ),
+      },
+      version: 6,
+    };
+    rerender(
+      <PortfolioScreen
+        initialTab="accounts"
+        isInScenario={false}
+        owned={onlyDelta}
+        today="2026-09-25"
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Edit Delta Reserve Equity" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    fireEvent.click(
+      within(
+        screen.getByRole("alertdialog", {
+          name: "Delete Delta Reserve Equity?",
+        }),
+      ).getByRole("button", { name: "Delete" }),
+    );
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("alertdialog", {
+          name: "Delete Delta Reserve Equity?",
+        }),
+      ).not.toBeInTheDocument();
+    });
+    expect(deletePortfolioSecurity).toHaveBeenCalledWith(6, {
+      id: "sec-delta",
+    });
+
+    const emptyHoldings: OwnedPortfolio = {
+      ...onlyDelta,
+      snapshot: { ...onlyDelta.snapshot, holdings: [] },
+      version: 7,
+    };
+    rerender(
+      <PortfolioScreen
+        initialTab="accounts"
+        isInScenario={false}
+        owned={emptyHoldings}
+        today="2026-09-25"
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 1 })).toHaveFocus();
+    });
+  });
+
+  it("drops pending focus on tab switch or scenario entry and cancels queued microtask on unmount", async () => {
+    vi.mocked(deletePortfolioSecurity).mockResolvedValue(
+      saved({ id: "sec-gamma", savedOn: "2026-09-25", version: 2 }),
+    );
+    const { rerender, unmount } = render(
+      <PortfolioScreen
+        initialTab="holdings"
+        isInScenario={false}
+        owned={ownedMulti}
+        today="2026-09-25"
+      />,
+      { wrapper: Toaster },
+    );
+
+    fireEvent.click(
+      screen.getByRole("switch", { name: "Show zero-share securities" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Delete Gamma Unheld Equity" }),
+    );
+    fireEvent.click(
+      within(
+        screen.getByRole("alertdialog", {
+          name: "Delete Gamma Unheld Equity?",
+        }),
+      ).getByRole("button", { name: "Delete" }),
+    );
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("alertdialog", {
+          name: "Delete Gamma Unheld Equity?",
+        }),
+      ).not.toBeInTheDocument();
+    });
+
+    // Switch tabs before version 2 arrives -> pending focus is discarded and does not steal focus back to Holdings.
+    const accountsTab = screen.getByRole("tab", { name: "Accounts" });
+    accountsTab.focus();
+    fireEvent.click(accountsTab);
+    rerender(
+      <PortfolioScreen
+        initialTab="holdings"
+        isInScenario={false}
+        owned={{ ...ownedMulti, version: 2 }}
+        today="2026-09-25"
+      />,
+    );
+    await Promise.resolve();
+    expect(accountsTab).toHaveFocus();
+
+    // Unmounting immediately after scheduling a queued focus microtask cancels the restore cleanly.
+    fireEvent.click(screen.getByRole("tab", { name: "Holdings" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Delete Gamma Unheld Equity" }),
+    );
+    fireEvent.click(
+      within(
+        screen.getByRole("alertdialog", {
+          name: "Delete Gamma Unheld Equity?",
+        }),
+      ).getByRole("button", { name: "Delete" }),
+    );
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("alertdialog", {
+          name: "Delete Gamma Unheld Equity?",
+        }),
+      ).not.toBeInTheDocument();
+    });
+    rerender(
+      <PortfolioScreen
+        initialTab="holdings"
+        isInScenario={false}
+        owned={{ ...ownedMulti, version: 3 }}
+        today="2026-09-25"
+      />,
+    );
+    unmount();
+    await Promise.resolve();
   });
 });

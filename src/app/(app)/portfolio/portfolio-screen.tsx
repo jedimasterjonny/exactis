@@ -7,12 +7,16 @@ import { Briefcase, Download } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
-import type { AccountKind } from "@/components/app/organisms/portfolio-account-dialog";
+import type {
+  AccountKind,
+  EditingPortfolioAccount,
+} from "@/components/app/organisms/portfolio-account-dialog";
 import type {
   PortfolioTransactionDraft,
   SuggestedCategory,
 } from "@/components/app/organisms/portfolio-transaction-dialog";
 import type {
+  CashAccount,
   Holding,
   NewPortfolioTransaction,
   PortfolioSnapshot,
@@ -21,8 +25,13 @@ import type {
 } from "@/data/portfolio";
 import type { OwnedPortfolio } from "@/store/portfolio";
 
+import {
+  deletePortfolioAccount,
+  deletePortfolioSecurity,
+} from "@/actions/portfolio";
 import { PortfolioSummary } from "@/components/app/atoms/portfolio-summary";
 import { Caution } from "@/components/app/molecules/caution";
+import { ConfirmDialog } from "@/components/app/molecules/confirm-dialog";
 import { EmptyState } from "@/components/app/molecules/empty-state";
 import { ScreenTabs } from "@/components/app/molecules/screen-tabs";
 import { PortfolioAccountDialog } from "@/components/app/organisms/portfolio-account-dialog";
@@ -37,6 +46,8 @@ import { SectionCard } from "@/components/app/organisms/section-card";
 import { Screen } from "@/components/app/templates/screen";
 import { buttonVariants } from "@/components/kit/button";
 import { CardContent, CardFooter } from "@/components/kit/card";
+import { withSyncNote } from "@/data/portfolio";
+import { useSender } from "@/hooks/use-sender";
 import { counted } from "@/lib/count";
 import { formatGbp } from "@/lib/money";
 import { formatDay } from "@/lib/months";
@@ -50,6 +61,14 @@ export interface PortfolioTradeHandoff {
   readonly type: "purchase" | "sale";
 }
 
+interface DeleteTarget {
+  readonly cancelFocusIds?: readonly string[];
+  readonly fallbackFocusIds: readonly string[];
+  readonly id: string;
+  readonly kind: "cash" | "securities" | "security";
+  readonly name: string;
+}
+
 interface OwnedPortfolioTabsProps {
   readonly activeTab: PortfolioTab;
   readonly initialTrade?: PortfolioTradeHandoff;
@@ -60,6 +79,12 @@ interface OwnedPortfolioTabsProps {
   readonly snapshot: PortfolioSnapshot;
   readonly today: string;
   readonly version: number;
+}
+
+interface PendingFocus {
+  readonly afterVersion: number;
+  readonly tab: PortfolioTab;
+  readonly targets: readonly string[];
 }
 
 interface PortfolioScreenProps {
@@ -255,6 +280,22 @@ function initialTabOf(
   return normalized === "transactions" ? "Transactions" : "Holdings";
 }
 
+function isElementVisible(element: HTMLElement): boolean {
+  let current: HTMLElement | null = element;
+  while (current !== null) {
+    const style = globalThis.getComputedStyle(current);
+    if (
+      style.display === "none" ||
+      style.visibility === "hidden" ||
+      current.hasAttribute("inert")
+    ) {
+      return false;
+    }
+    current = current.parentElement;
+  }
+  return true;
+}
+
 // Tabs, filters, switches, and write-back dialogs for the owned
 // portfolio file. Keyed on replaceCount and fileName so single-entry
 // mutations preserve filters and keep dialogs open across stale
@@ -281,7 +322,11 @@ function OwnedPortfolioTabs({
   const [isShowingInactiveTransactions, setIsShowingInactiveTransactions] =
     useState(false);
   const [addingAccount, setAddingAccount] = useState<AccountKind | null>(null);
+  const [editingAccount, setEditingAccount] =
+    useState<EditingPortfolioAccount | null>(null);
   const [isAddingSecurity, setIsAddingSecurity] = useState(false);
+  const [editingSecurity, setEditingSecurity] = useState<Holding | null>(null);
+  const [deleting, setDeleting] = useState<DeleteTarget | null>(null);
   const [isAddingTransaction, setIsAddingTransaction] = useState(false);
   const [handoff, setHandoff] = useState<null | ResolvedHandoff>(() =>
     initialTrade !== undefined
@@ -292,6 +337,9 @@ function OwnedPortfolioTabs({
   const [isScenarioOpen, setIsScenarioOpen] = useState(isInScenario);
   const isHandoffOpen = handoff !== null;
   const wasHandoffOpenRef = useRef(isHandoffOpen);
+  const editFallbackFocusRef = useRef<readonly string[]>([]);
+  const pendingFocusRef = useRef<null | PendingFocus>(null);
+  const { isSending: isDeleting, send: sendDelete } = useSender();
 
   useEffect(() => {
     if (wasHandoffOpenRef.current && !isHandoffOpen) {
@@ -301,20 +349,55 @@ function OwnedPortfolioTabs({
     wasHandoffOpenRef.current = isHandoffOpen;
   }, [isHandoffOpen, router]);
 
+  const isOverlayOpen =
+    addingAccount !== null ||
+    deleting !== null ||
+    editingAccount !== null ||
+    editingSecurity !== null ||
+    handoff !== null ||
+    isAddingSecurity ||
+    isAddingTransaction ||
+    isUpdatingQuotes;
+
+  useEffect(() => {
+    const pending = pendingFocusRef.current;
+    if (pending === null) {
+      return;
+    }
+    if (isInScenario || pending.tab !== activeTab) {
+      pendingFocusRef.current = null;
+      return;
+    }
+    if (isOverlayOpen || version < pending.afterVersion) {
+      return;
+    }
+    pendingFocusRef.current = null;
+    let isCancelled = false;
+    // Queue strictly after Base UI FloatingFocusManager's unmount microtask
+    // so same-commit refreshes do not have restored focus overwritten.
+    queueMicrotask(() => {
+      if (!isCancelled) {
+        restoreRowFocus(pending.targets);
+      }
+    });
+    return (): void => {
+      isCancelled = true;
+    };
+  }, [activeTab, isInScenario, isOverlayOpen, snapshot, version]);
+
   if (isScenarioOpen !== isInScenario) {
     setIsScenarioOpen(isInScenario);
     if (isInScenario) {
       setAddingAccount(null);
+      setDeleting(null);
+      setEditingAccount(null);
+      setEditingSecurity(null);
       setHandoff(null);
       setIsAddingSecurity(false);
       setIsAddingTransaction(false);
       setIsUpdatingQuotes(false);
     }
   }
-
-  const activeCashAccounts = snapshot.cashAccounts.filter(
-    (account) => !account.isRetired,
-  );
 
   function closeTransactionDialog(): void {
     if (handoff !== null) {
@@ -324,14 +407,123 @@ function OwnedPortfolioTabs({
     setIsAddingTransaction(false);
   }
 
-  function handleAccountSaved(): void {
+  function confirmDelete(target: DeleteTarget): void {
+    sendDelete(
+      async () =>
+        target.kind === "security"
+          ? deletePortfolioSecurity(version, { id: target.id })
+          : deletePortfolioAccount(version, {
+              id: target.id,
+              kind: target.kind,
+            }),
+      {
+        failure:
+          target.kind === "security"
+            ? "Security not deleted"
+            : "Account not deleted",
+        onAccepted: (result) => {
+          pendingFocusRef.current = {
+            afterVersion: result.version,
+            tab: activeTab,
+            targets: target.fallbackFocusIds,
+          };
+          setDeleting(null);
+        },
+        success: (result) => ({
+          description: withSyncNote(
+            target.kind === "security"
+              ? `${target.name} removed from the catalogue`
+              : `${target.name} removed from the portfolio file`,
+            result.syncWarning,
+          ),
+          title:
+            target.kind === "security" ? "Security deleted" : "Account deleted",
+        }),
+      },
+    );
+  }
+
+  function handleAccountAdded(): void {
     setAddingAccount(null);
   }
 
-  function handleSecuritySaved(): void {
+  function handleAccountEdited(
+    target: EditingPortfolioAccount,
+    outcome: { readonly isRetired: boolean; readonly version: number },
+  ): void {
+    if (!target.account.isRetired && outcome.isRetired) {
+      pendingFocusRef.current = {
+        afterVersion: outcome.version,
+        tab: activeTab,
+        targets: [
+          `${target.kind}:${target.account.id}`,
+          ...editFallbackFocusRef.current,
+        ],
+      };
+    }
+    setEditingAccount(null);
+  }
+
+  function handleSecurityAdded(): void {
     setHoldingsAccountId("");
     setIsShowingZeroShares(true);
     setIsAddingSecurity(false);
+  }
+
+  function handleSecurityEdited(
+    target: Holding,
+    outcome: { readonly isRetired: boolean; readonly version: number },
+  ): void {
+    if (!target.isRetired && outcome.isRetired) {
+      pendingFocusRef.current = {
+        afterVersion: outcome.version,
+        tab: activeTab,
+        targets: [`holding:${target.id}`, ...editFallbackFocusRef.current],
+      };
+    }
+    setEditingSecurity(null);
+  }
+
+  function openAccountEditor(
+    target: EditingPortfolioAccount,
+    fallbackFocusIds: readonly string[],
+  ): void {
+    editFallbackFocusRef.current = fallbackFocusIds;
+    setEditingAccount(target);
+  }
+
+  function openCashEditor(
+    account: CashAccount,
+    fallbackFocusIds: readonly string[],
+  ): void {
+    openAccountEditor({ account, kind: "cash" }, fallbackFocusIds);
+  }
+
+  function openSecuritiesEditor(
+    account: SecuritiesAccount,
+    fallbackFocusIds: readonly string[],
+  ): void {
+    openAccountEditor({ account, kind: "securities" }, fallbackFocusIds);
+  }
+
+  function openSecurityEditor(
+    holding: Holding,
+    fallbackFocusIds: readonly string[],
+  ): void {
+    editFallbackFocusRef.current = fallbackFocusIds;
+    setEditingSecurity(holding);
+  }
+
+  function requestSecurityDelete(
+    holding: Holding,
+    fallbackFocusIds: readonly string[],
+  ): void {
+    setDeleting({
+      fallbackFocusIds,
+      id: holding.id,
+      kind: "security",
+      name: holding.name,
+    });
   }
 
   function handleTransactionSaved(draft: NewPortfolioTransaction): void {
@@ -392,6 +584,8 @@ function OwnedPortfolioTabs({
                 onAddSecurity={() => {
                   setIsAddingSecurity(true);
                 }}
+                onDeleteSecurity={requestSecurityDelete}
+                onEditSecurity={openSecurityEditor}
                 onShowingZeroSharesChange={setIsShowingZeroShares}
                 onUpdateQuotes={() => {
                   setIsUpdatingQuotes(true);
@@ -414,6 +608,8 @@ function OwnedPortfolioTabs({
                 onAddSecurities={() => {
                   setAddingAccount("securities");
                 }}
+                onEditCash={openCashEditor}
+                onEditSecurities={openSecuritiesEditor}
                 onOpenCash={openCashInTransactions}
                 onOpenSecurities={openSecuritiesInHoldings}
                 readOnlyId={isInScenario ? scenarioNoteId : undefined}
@@ -452,13 +648,45 @@ function OwnedPortfolioTabs({
       />
       {!isInScenario && addingAccount !== null && (
         <PortfolioAccountDialog
-          cashAccounts={activeCashAccounts}
+          cashAccounts={snapshot.cashAccounts}
           defaultCurrency={snapshot.baseCurrency}
           kind={addingAccount}
           onDismiss={() => {
             setAddingAccount(null);
           }}
-          onSaved={handleAccountSaved}
+          onSaved={handleAccountAdded}
+          securitiesAccounts={snapshot.securitiesAccounts}
+          version={version}
+        />
+      )}
+      {!isInScenario && editingAccount !== null && (
+        <PortfolioAccountDialog
+          cashAccounts={snapshot.cashAccounts}
+          defaultCurrency={snapshot.baseCurrency}
+          editing={editingAccount}
+          key={editingAccount.account.id}
+          kind={editingAccount.kind}
+          onDelete={() => {
+            const target = editingAccount;
+            setEditingAccount(null);
+            setDeleting({
+              cancelFocusIds: [
+                `${target.kind}:${target.account.id}`,
+                ...editFallbackFocusRef.current,
+              ],
+              fallbackFocusIds: editFallbackFocusRef.current,
+              id: target.account.id,
+              kind: target.kind,
+              name: target.account.name,
+            });
+          }}
+          onDismiss={() => {
+            setEditingAccount(null);
+          }}
+          onSaved={(outcome) => {
+            handleAccountEdited(editingAccount, outcome);
+          }}
+          securitiesAccounts={snapshot.securitiesAccounts}
           version={version}
         />
       )}
@@ -469,10 +697,63 @@ function OwnedPortfolioTabs({
           onDismiss={() => {
             setIsAddingSecurity(false);
           }}
-          onSaved={handleSecuritySaved}
+          onSaved={handleSecurityAdded}
           today={today}
           version={version}
         />
+      )}
+      {!isInScenario && editingSecurity !== null && (
+        <PortfolioSecurityDialog
+          categories={snapshot.categories}
+          defaultCurrency={snapshot.baseCurrency}
+          key={editingSecurity.id}
+          onDelete={() => {
+            const target = editingSecurity;
+            setEditingSecurity(null);
+            setDeleting({
+              cancelFocusIds: [
+                `holding:${target.id}`,
+                ...editFallbackFocusRef.current,
+              ],
+              fallbackFocusIds: editFallbackFocusRef.current,
+              id: target.id,
+              kind: "security",
+              name: target.name,
+            });
+          }}
+          onDismiss={() => {
+            setEditingSecurity(null);
+          }}
+          onSaved={(outcome) => {
+            handleSecurityEdited(editingSecurity, outcome);
+          }}
+          security={editingSecurity}
+          today={today}
+          version={version}
+        />
+      )}
+      {!isInScenario && deleting !== null && (
+        <ConfirmDialog
+          isBusy={isDeleting}
+          onCancel={() => {
+            if (deleting.cancelFocusIds !== undefined) {
+              pendingFocusRef.current = {
+                afterVersion: version,
+                tab: activeTab,
+                targets: deleting.cancelFocusIds,
+              };
+            }
+            setDeleting(null);
+          }}
+          onConfirm={() => {
+            confirmDelete(deleting);
+          }}
+          title={`Delete ${deleting.name}?`}
+        >
+          {deleting.kind === "security"
+            ? `Removes ${deleting.name} from the catalogue. It cannot be brought back.`
+            : `Removes ${deleting.name} from the portfolio file. It cannot be brought back.`}
+        </ConfirmDialog>
       )}
       {!isInScenario && (isAddingTransaction || handoff !== null) && (
         <PortfolioTransactionDialog
@@ -605,6 +886,30 @@ function resolveTradeSecurity(
       securityIds: candidates.map((holding) => holding.id),
     },
   };
+}
+
+// Moves focus to the first visible focusable button inside the first
+// surviving target row, falling back to the screen heading when none
+// remain.
+function restoreRowFocus(targetRowIds: readonly string[]): void {
+  const rows = [...document.querySelectorAll<HTMLElement>("[data-row-id]")];
+  for (const rowId of targetRowIds) {
+    const container = rows.find(
+      (element) => element.dataset["rowId"] === rowId,
+    );
+    if (container !== undefined) {
+      const button = [
+        ...container.querySelectorAll<HTMLButtonElement>(
+          "button:not(:disabled)",
+        ),
+      ].find(isElementVisible);
+      if (button !== undefined) {
+        button.focus();
+        return;
+      }
+    }
+  }
+  document.querySelector<HTMLElement>("h1")?.focus();
 }
 
 function saleCandidatesOf(

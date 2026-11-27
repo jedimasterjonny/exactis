@@ -23,6 +23,7 @@ import {
   fetchPortfolioQuotesInputSchema,
   holdingsViewOf,
   isIsoCalendarDate,
+  neighboursOf,
   newPortfolioAccountSchema,
   newPortfolioSecuritySchema,
   newPortfolioTransactionSchema,
@@ -143,6 +144,16 @@ describe("roundPence", () => {
       roundPence(0.1 + 0.2),
     ]).toStrictEqual([12.35, 0, 0.3]);
     expect(Object.is(roundPence(-0.004), 0)).toBe(true);
+  });
+});
+
+describe("neighboursOf", () => {
+  it("returns [next, prev] around a target key and handles boundaries and missing keys", () => {
+    expect(neighboursOf(["a", "b", "c"], "b")).toStrictEqual(["c", "a"]);
+    expect(neighboursOf(["a", "b", "c"], "a")).toStrictEqual(["b"]);
+    expect(neighboursOf(["a", "b", "c"], "c")).toStrictEqual(["b"]);
+    expect(neighboursOf(["a"], "a")).toStrictEqual([]);
+    expect(neighboursOf(["a", "b"], "missing")).toStrictEqual([]);
   });
 });
 
