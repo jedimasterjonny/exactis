@@ -215,6 +215,7 @@ describe("toPension", () => {
         kind: "tax-deferred",
         name: "Aviva",
         owner: 1,
+        portfolio: null,
         rate: 0,
       },
     );

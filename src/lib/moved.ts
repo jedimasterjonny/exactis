@@ -6,11 +6,12 @@ import type { Month } from "@/data/schedule";
 import type { Future } from "@/engine/futures";
 import type { MonthsOn } from "@/engine/projection";
 
+import { accountTargetsOf } from "@/data/cma";
 import { soundKept } from "@/data/household";
 import { blendedBy, deductedBy } from "@/data/moves";
 import { ageIn, endAge } from "@/data/plan";
 import { endWorthOf, futureOf } from "@/engine/futures";
-import { laidOut, monthsOn, project } from "@/engine/projection";
+import { isOnPlanRate, laidOut, monthsOn, project } from "@/engine/projection";
 import { answerOf } from "@/lib/answer";
 import { sumOf } from "@/lib/ledger";
 import { cutOf, monthsBetween } from "@/lib/months";
@@ -164,8 +165,10 @@ const areas: readonly {
 // target allocation, what of them could move a rate, as Assumptions
 // reads them: the fees and yield without the day they were set, and the
 // allocation by each category's share and the class it is mapped onto,
-// by id, without an import's day, its values, holdings or portfolios,
-// or the categories' names and order. A reorder alone is taken as no
+// by id, plus normalized per-account holdings for portfolios linked by
+// plan-rate accounts in before, without an import's day, its values,
+// unlinked holdings or portfolios, or the categories' names and order.
+// A reorder alone is taken as no
 // change, though it can move a rate by its last bits, so a walk over
 // one ends on the household now to the pound rather than to the bit.
 const sources: readonly {
@@ -395,12 +398,16 @@ export function movedSince(
       ...account,
       balance: nowById.get(account.id)?.balance ?? account.balance,
     }));
+  const linked = linkedPortfoliosOf(before);
   const rates = sources
-    .filter(({ keys, read }) =>
-      read === undefined
+    .filter(({ keys, read, source }) => {
+      if (source === "targets") {
+        return differs(targetsRead(before, linked), targetsRead(now, linked));
+      }
+      return read === undefined
         ? keys.some((key) => differs(before[key], now[key]))
-        : differs(read(before), read(now)),
-    )
+        : differs(read(before), read(now));
+    })
     .map(({ source }) => source);
   const changes = areas
     .filter(({ read }) => differs(read(before), read(now)))
@@ -569,6 +576,20 @@ function futureIn(kept: Kept): {
   };
 }
 
+// The distinct Portfolio Performance account names linked by plan-rate
+// accounts in a kept household, sorted for stable comparison.
+function linkedPortfoliosOf(kept: Kept): readonly string[] {
+  return [
+    ...new Set(
+      kept.accounts.flatMap((account) =>
+        isOnPlanRate(account) && account.portfolio !== undefined
+          ? [account.portfolio]
+          : [],
+      ),
+    ),
+  ].toSorted((one, other) => one.localeCompare(other));
+}
+
 // What a future stands at: when its owner retires, and its liquid net
 // worth in the first year at or after the age given, or in its last
 // where it ends first. A projection always holds a year, so the years
@@ -578,4 +599,19 @@ function standingAt(future: Future, age: number): Standing {
     found.age >= age ? found : measured,
   );
   return { liquid: year.liquid, retired: future.retired };
+}
+
+// Target allocation as rates read it in movedSince: the global blend
+// plus normalized per-account category shares for portfolios linked by
+// plan-rate accounts in the before snapshot.
+function targetsRead(kept: Kept, portfolios: readonly string[]): unknown {
+  return {
+    accounts: portfolios.map((portfolio) => [
+      portfolio,
+      (accountTargetsOf(kept.targets, portfolio)?.categories ?? [])
+        .toSorted((one, other) => one.id.localeCompare(other.id))
+        .map(({ id, share }) => [id, share]),
+    ]),
+    global: blendedBy(kept),
+  };
 }

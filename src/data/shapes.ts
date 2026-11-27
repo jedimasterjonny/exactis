@@ -44,6 +44,13 @@ type Step = (document: Record<string, unknown>) => Record<string, unknown>;
 // reading dropped, as it drops any key it does not hold, and saving it
 // back that way, since a reading is what the plan said then and nothing
 // can work it out again.
+//
+// 4 to 5: a saving may name the Portfolio Performance securities
+// account it links to, so its growth is derived from that account's own
+// holdings. One kept in the fourth shape names none, so the step
+// carries it as it is. It is taken so that a build of the fourth shape
+// refuses a household of the fifth rather than reading it with every
+// portfolio link dropped and saving it back that way.
 const steps: readonly Step[] = [
   (document): Record<string, unknown> => {
     const { accounts } = document;
@@ -51,6 +58,7 @@ const steps: readonly Step[] = [
       ? { ...document, accounts: accounts.map(unmarked) }
       : document;
   },
+  (document): Record<string, unknown> => document,
   (document): Record<string, unknown> => document,
   (document): Record<string, unknown> => document,
 ];

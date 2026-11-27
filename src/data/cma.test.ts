@@ -1,10 +1,12 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import type { Blend, Cma, DerivedSet, Mapping } from "./cma";
+import type { AccountGrowth, Blend, Cma, DerivedSet, Mapping } from "./cma";
 import type { Targets } from "./targets";
 
 import {
+  accountGrowthOf,
+  accountTargetsOf,
   blendsOf,
   cmaRates,
   derivedSet,
@@ -798,5 +800,373 @@ describe("vintageMonth", () => {
 describe("vintageName", () => {
   it("names a vintage by its month in full and its year", () => {
     expect(vintageName(cma)).toBe("August 2026");
+  });
+});
+
+// Helper creating targets with invented per-account holdings by category name.
+function bespokeOf(
+  growth: AccountGrowth,
+): Extract<AccountGrowth, { readonly kind: "bespoke" }> {
+  if (growth.kind !== "bespoke") {
+    throw new Error(growth.reason);
+  }
+  return growth;
+}
+
+function targetsWithHoldings(
+  holdings: Readonly<
+    Record<string, readonly { readonly name: string; readonly value: number }[]>
+  >,
+): Targets {
+  return {
+    ...targets,
+    categories: targets.categories.map(
+      ({ classes, id, isImplemented, name, share, value }) => {
+        const accounts = holdings[name];
+        return accounts === undefined
+          ? { classes, id, isImplemented, name, share, value }
+          : { accounts, classes, id, isImplemented, name, share, value };
+      },
+    ),
+  };
+}
+
+describe("accountTargetsOf", () => {
+  it("returns null for null targets, blank names, missing accounts, or zero total holdings", () => {
+    expect(accountTargetsOf(null, "Brokerage ISA")).toBeNull();
+    expect(accountTargetsOf(targets, "   ")).toBeNull();
+    expect(accountTargetsOf(targets, "Brokerage ISA")).toBeNull();
+    expect(
+      accountTargetsOf(
+        targetsWithHoldings({
+          "UK equity": [{ name: "Brokerage ISA", value: 0 }],
+        }),
+        "Brokerage ISA",
+      ),
+    ).toBeNull();
+  });
+
+  // Trims both the requested name and Portfolio Performance account
+  // names, summing duplicate trimmed entries within a category.
+  it("matches untrimmed Portfolio Performance account names and sums duplicate entries", () => {
+    const withPadded = targetsWithHoldings({
+      "Global bonds, hedged": [{ name: " Padded ISA ", value: 2000 }],
+      "UK equity": [
+        { name: " Padded ISA", value: 3000 },
+        { name: "Padded ISA ", value: 5000 },
+        { name: "Other ISA", value: 9000 },
+      ],
+    });
+    const accountTargets = accountTargetsOf(withPadded, "  Padded ISA  ");
+    const byName = new Map(
+      accountTargets?.categories.map(({ name, share }) => [name, share]) ?? [],
+    );
+
+    expect(byName.get("UK equity")).toBeCloseTo(0.8, 15);
+    expect(byName.get("Global bonds, hedged")).toBeCloseTo(0.2, 15);
+  });
+
+  // Three equal categories in the same sleeve normalize to exact 1.0
+  // without floating-point drift leaving a residual bond share, and the
+  // 1-ULP remainder lands on the same category id regardless of input
+  // category order.
+  it("normalizes positive category holdings to exact 1 deterministically across category orders", () => {
+    const withThree = targetsWithHoldings({
+      "FTSE Global All Cap ex-UK": [{ name: "Equal ISA", value: 1000 }],
+      "Global emerging markets": [{ name: "Equal ISA", value: 1000 }],
+      "UK equity": [{ name: "Equal ISA", value: 1000 }],
+    });
+    const reversed: Targets = {
+      ...withThree,
+      categories: withThree.categories.toReversed(),
+    };
+    const forwardTargets = accountTargetsOf(withThree, "Equal ISA");
+    const reversedTargets = accountTargetsOf(reversed, "Equal ISA");
+    const shares = forwardTargets?.categories.map(({ share }) => share) ?? [];
+
+    expect(shares.reduce((sum, share) => sum + share, 0)).toBe(1);
+    expect(shares.filter((share) => share > 0)).toHaveLength(3);
+    const byId = (listed: null | Targets): Readonly<Record<string, number>> =>
+      Object.fromEntries(
+        listed?.categories.map(({ id, share }) => [id, share]) ?? [],
+      );
+    expect(byId(reversedTargets)).toStrictEqual(byId(forwardTargets));
+  });
+});
+
+describe("accountGrowthOf", () => {
+  const baseSources = {
+    cma: { latest: cma, previous: null },
+    curve,
+    deductions: { dividends: 0.02, fees: 0.002 },
+    glide: [] as const,
+    mappings,
+    rateSet: "cma" as const,
+  };
+  const plan = { born: 1992, from: 2026, years: 3 };
+
+  it("falls back under custom rates, missing targets, missing CMA, or zero holdings", () => {
+    const held = targetsWithHoldings({
+      "UK equity": [{ name: "Brokerage ISA", value: 50000 }],
+    });
+
+    expect(
+      accountGrowthOf(
+        { ...baseSources, rateSet: "custom", targets: held },
+        plan,
+        "Brokerage ISA",
+      ),
+    ).toStrictEqual({ kind: "fallback", reason: "Custom rates are live" });
+    expect(
+      accountGrowthOf({ ...baseSources, targets: null }, plan, "Brokerage ISA"),
+    ).toStrictEqual({
+      kind: "fallback",
+      reason: "No target allocation is synced",
+    });
+    expect(
+      accountGrowthOf({ ...baseSources, targets }, plan, "Brokerage ISA"),
+    ).toStrictEqual({
+      kind: "fallback",
+      reason: "No categorised holdings synced from Portfolio",
+    });
+    expect(
+      accountGrowthOf(
+        { ...baseSources, cma: null, targets: held },
+        plan,
+        "Brokerage ISA",
+      ),
+    ).toStrictEqual({ kind: "fallback", reason: "No CMA is pulled" });
+  });
+
+  // Single-category UK equity (8.156% less 0.20% fees = 7.956%), multi-
+  // category equity with intra-sleeve rebalancing, and mixed 50/50
+  // stocks/bonds with hedged global bonds and cross-sleeve rebalancing.
+  it("derives bespoke rate, spread, and stock share for single, multi-equity, and mixed accounts", () => {
+    const held = targetsWithHoldings({
+      "FTSE Global All Cap ex-UK": [{ name: "Multi Equity", value: 25000 }],
+      "Global bonds, hedged": [{ name: "Balanced SIPP", value: 30000 }],
+      "UK equity": [
+        { name: "UK Only", value: 40000 },
+        { name: "Multi Equity", value: 25000 },
+        { name: "Balanced SIPP", value: 30000 },
+      ],
+    });
+    const sources = { ...baseSources, targets: held };
+
+    const ukOnly = accountGrowthOf(sources, plan, "UK Only");
+    expect(ukOnly).toMatchObject({ kind: "bespoke", stocks: 1 });
+    expect(ukOnly.kind === "bespoke" ? ukOnly.rate.rate : 0).toBeCloseTo(
+      0.08156 - 0.002,
+      12,
+    );
+    expect(ukOnly.kind === "bespoke" ? ukOnly.spread?.rate : 0).toBeGreaterThan(
+      0,
+    );
+
+    const multi = accountGrowthOf(sources, plan, "Multi Equity");
+    const expectedMulti = derivedSet({
+      ...sources,
+      targets: onlyIn("UK equity", "FTSE Global All Cap ex-UK"),
+    });
+    expect(multi).toMatchObject({ kind: "bespoke", stocks: 1 });
+    expect(multi.kind === "bespoke" ? multi.rate.rate : 0).toBeCloseTo(
+      "short" in expectedMulti
+        ? 0
+        : (0.08156 + 0.07722) / 2 - 0.002 + expectedMulti.rebalancing,
+      12,
+    );
+
+    const balanced = accountGrowthOf(sources, plan, "Balanced SIPP");
+    expect(balanced).toMatchObject({ kind: "bespoke", stocks: 0.5 });
+    expect(
+      balanced.kind === "bespoke" ? balanced.spread?.rate : 0,
+    ).toBeLessThan(ukOnly.kind === "bespoke" ? (ukOnly.spread?.rate ?? 1) : 0);
+  });
+
+  // Falls back on unmapped category, unrisked class in a risked vintage,
+  // and a rate at or below -100%; omits spread when vintage predates
+  // volatilities.
+  it("falls back on unmapped, unrisked, or total-loss holdings, and omits spread for unread vintages", () => {
+    const held = targetsWithHoldings({
+      "UK equity": [{ name: "UK ISA", value: 10000 }],
+    });
+
+    expect(
+      accountGrowthOf(
+        {
+          ...baseSources,
+          mappings: remapped({ "UK equity": null }),
+          targets: held,
+        },
+        plan,
+        "UK ISA",
+      ),
+    ).toStrictEqual({ kind: "fallback", reason: "UK equity has no CMA class" });
+
+    const ukUnrisked: Cma = {
+      ...cma,
+      assets: cma.assets.map((asset) =>
+        asset.name === "UK large cap equities"
+          ? { name: asset.name, rate: asset.rate, sleeve: asset.sleeve }
+          : asset,
+      ),
+    };
+    expect(
+      accountGrowthOf(
+        {
+          ...baseSources,
+          cma: { latest: ukUnrisked, previous: null },
+          targets: held,
+        },
+        plan,
+        "UK ISA",
+      ),
+    ).toStrictEqual({
+      kind: "fallback",
+      reason: "The August 2026 CMA gives UK large cap equities no volatility",
+    });
+
+    const totalLoss: Cma = {
+      ...cma,
+      assets: cma.assets.map((asset) =>
+        asset.name === "UK large cap equities" ? { ...asset, rate: -1 } : asset,
+      ),
+    };
+    expect(
+      accountGrowthOf(
+        {
+          ...baseSources,
+          cma: { latest: totalLoss, previous: null },
+          targets: held,
+        },
+        plan,
+        "UK ISA",
+      ),
+    ).toStrictEqual({
+      kind: "fallback",
+      reason: "A rate loses no more than everything",
+    });
+
+    const noRisk = accountGrowthOf(
+      {
+        ...baseSources,
+        cma: { latest: unread, previous: null },
+        targets: held,
+      },
+      plan,
+      "UK ISA",
+    );
+    expect(noRisk.kind).toBe("bespoke");
+    expect(noRisk.kind === "bespoke" && "spread" in noRisk).toBe(false);
+
+    // A vintage carrying asset volatilities without a bond/equity
+    // correlation keeps deterministic bespoke rates and omits spread.
+    const noCorrelation: Cma = {
+      asOf: cma.asOf,
+      assets: cma.assets,
+      vintage: cma.vintage,
+    };
+    const withoutCorrelation = bespokeOf(
+      accountGrowthOf(
+        {
+          ...baseSources,
+          cma: { latest: noCorrelation, previous: null },
+          targets: held,
+        },
+        plan,
+        "UK ISA",
+      ),
+    );
+    expect(withoutCorrelation.rate.rate).toBeCloseTo(0.08156 - 0.002, 12);
+    expect("spread" in withoutCorrelation).toBe(false);
+  });
+
+  // Along a glide path, an all-equity account uses bondsStandIn as bonds
+  // rise with age, handles plan.years === 0 and unread vintages, and an
+  // all-bonds account falls back with Portfolio-account wording (both at
+  // year 0 and when a later year requires stocks).
+  it("follows the glide path year by year and rewrites missing-sleeve shortfalls", () => {
+    const held = targetsWithHoldings({
+      "Short-dated gilts": [{ name: "Bonds Only", value: 10000 }],
+      "UK equity": [{ name: "Equity Only", value: 10000 }],
+    });
+    const glide = [
+      { age: 34, bonds: 0.2 },
+      { age: 36, bonds: 0.4 },
+    ] as const;
+
+    const glidedEquity = bespokeOf(
+      accountGrowthOf(
+        { ...baseSources, glide, targets: held },
+        plan,
+        "Equity Only",
+      ),
+    );
+    expect(glidedEquity.stocks).toBeCloseTo(0.8, 12);
+    expect(glidedEquity.rate.byYear).toHaveLength(3);
+    expect(glidedEquity.rate.byYear?.[0]).toBeCloseTo(
+      glidedEquity.rate.rate,
+      12,
+    );
+    expect(glidedEquity.rate.byYear?.[2]).toBeLessThan(
+      glidedEquity.rate.byYear?.[0] ?? 0,
+    );
+    expect(glidedEquity.spread?.byYear).toHaveLength(3);
+
+    const zeroYears = bespokeOf(
+      accountGrowthOf(
+        { ...baseSources, glide, targets: held },
+        { ...plan, years: 0 },
+        "Equity Only",
+      ),
+    );
+    expect(zeroYears.rate.byYear).toStrictEqual([]);
+    expect(zeroYears.spread?.byYear).toStrictEqual([]);
+
+    const unreadGlided = accountGrowthOf(
+      {
+        ...baseSources,
+        cma: { latest: unread, previous: null },
+        glide,
+        targets: held,
+      },
+      plan,
+      "Equity Only",
+    );
+    expect(unreadGlided.kind).toBe("bespoke");
+    expect(unreadGlided.kind === "bespoke" && "spread" in unreadGlided).toBe(
+      false,
+    );
+
+    expect(
+      accountGrowthOf(
+        { ...baseSources, glide, targets: held },
+        plan,
+        "Bonds Only",
+      ),
+    ).toStrictEqual({
+      kind: "fallback",
+      reason: "Holds no stocks for the glide path",
+    });
+
+    // Starts at 100% bonds at age 34 (valid) then moves to 50% stocks at
+    // age 35 (fails inside the year loop).
+    expect(
+      accountGrowthOf(
+        {
+          ...baseSources,
+          glide: [
+            { age: 34, bonds: 1 },
+            { age: 35, bonds: 0.5 },
+          ],
+          targets: held,
+        },
+        plan,
+        "Bonds Only",
+      ),
+    ).toStrictEqual({
+      kind: "fallback",
+      reason: "Holds no stocks for the glide path",
+    });
   });
 });

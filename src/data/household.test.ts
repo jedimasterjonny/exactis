@@ -349,6 +349,19 @@ const held: readonly Case[] = [
     (given): Inputs => changed(given, 4, (home) => ({ ...home, move })),
   ],
   [
+    "Only a saving links to a portfolio account",
+    (given): Inputs =>
+      changed(given, 5, (mortgage) => ({
+        ...mortgage,
+        portfolio: "Brokerage",
+      })),
+  ],
+  [
+    "Only a saving links to a portfolio account",
+    (given): Inputs =>
+      changed(given, 4, (home) => ({ ...home, portfolio: "Brokerage" })),
+  ],
+  [
     "A move buys a house for something",
     (given): Inputs => moved(given, { ...move, price: 0 }),
   ],
@@ -2263,5 +2276,97 @@ describe("holdWhileLive", () => {
     expect(() => {
       holdWhileLive({ ...bonds, glide: [{ age: 60, bonds: 1 }] }, change);
     }).not.toThrow();
+  });
+});
+
+describe("per-account bespoke CMA rates in soundKept", () => {
+  const heldTargets: Targets = {
+    ...targets,
+    categories: targets.categories.map((category) =>
+      category.name === "UK equity"
+        ? { ...category, accounts: [{ name: "UK ISA", value: 40000 }] }
+        : category,
+    ),
+  };
+
+  it("derives accountRates and accountSpreads for linked plan-rate savings under CMA, memoising shared links", () => {
+    const linked: Kept = {
+      ...kept,
+      accounts: kept.accounts.map((listed) => {
+        if (listed.id === 2 || listed.id === 6) {
+          return { ...listed, portfolio: "UK ISA" };
+        }
+        if (listed.id === 3) {
+          return { ...listed, portfolio: "UK ISA" };
+        }
+        return listed;
+      }),
+      rateSet: "cma",
+      targets: heldTargets,
+    };
+    const { household: read } = soundKept(linked);
+
+    expect(read.plan.accountRates?.[2]?.rate).toBeCloseTo(0.08156 - 0.002, 12);
+    expect(read.plan.accountRates?.[6]).toStrictEqual(
+      read.plan.accountRates?.[2],
+    );
+    expect(read.plan.accountRates?.[3]).toBeUndefined();
+    expect(
+      "short" in read.spread
+        ? undefined
+        : read.spread.accountSpreads?.[2]?.rate,
+    ).toBeGreaterThan(0);
+    expect(
+      "short" in read.spread ? undefined : read.spread.accountSpreads?.[6],
+    ).toStrictEqual(
+      "short" in read.spread ? undefined : read.spread.accountSpreads?.[2],
+    );
+  });
+
+  it("omits accountRates under custom rates or fallback links, and omits accountSpreads when the CMA predates volatilities", () => {
+    const linkedCustom: Kept = {
+      ...kept,
+      accounts: kept.accounts.map((listed) =>
+        listed.id === 2 ? { ...listed, portfolio: "UK ISA" } : listed,
+      ),
+      rateSet: "custom",
+      targets: heldTargets,
+    };
+    expect(soundKept(linkedCustom).household.plan.accountRates).toBeUndefined();
+
+    const unblendable: Kept = {
+      ...kept,
+      accounts: kept.accounts.map((listed) =>
+        listed.id === 2 ? { ...listed, portfolio: "Empty account" } : listed,
+      ),
+      rateSet: "cma",
+      targets: heldTargets,
+    };
+    expect(soundKept(unblendable).household.plan.accountRates).toBeUndefined();
+
+    const unreadCma: Cma = {
+      asOf: cma.asOf,
+      assets: cma.assets.map(({ name, rate, sleeve }) => ({
+        name,
+        rate,
+        sleeve,
+      })),
+      vintage: cma.vintage,
+    };
+    const unreadLinked: Kept = {
+      ...kept,
+      accounts: kept.accounts.map((listed) =>
+        listed.id === 2 ? { ...listed, portfolio: "UK ISA" } : listed,
+      ),
+      cma: { latest: unreadCma, previous: null },
+      rateSet: "cma",
+      targets: heldTargets,
+    };
+    const readUnread = soundKept(unreadLinked).household;
+    expect(readUnread.plan.accountRates?.[2]?.rate).toBeCloseTo(
+      0.08156 - 0.002,
+      12,
+    );
+    expect("short" in readUnread.spread).toBe(true);
   });
 });

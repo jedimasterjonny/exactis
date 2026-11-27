@@ -321,6 +321,7 @@ describe("the schedule actions", () => {
           kind: "tax-deferred",
           name: "Workplace pension",
           owner: 1,
+          portfolio: null,
           rate: 0,
           shares: [{ line: 16, sacrifice: 0.05 }],
         },
