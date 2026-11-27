@@ -101,6 +101,7 @@ export interface NewPortfolioTransaction {
   readonly currency: string;
   readonly date: string;
   readonly fees: number;
+  readonly fxAmount?: number;
   readonly note?: string;
   readonly otherAccountId?: string;
   readonly otherPortfolioId?: string;
@@ -357,6 +358,10 @@ const isoDate = z
   .refine(isIsoCalendarDate, "Enter a valid calendar date");
 
 const nonNegativeMoney = z.number().min(0).max(maxPortfolioMoney);
+const positiveMoney = nonNegativeMoney.refine(
+  (value) => Math.round(value * 100) >= 1,
+  "Must be greater than zero",
+);
 const nonNegativeScaled = z.number().min(0).max(maxPortfolioScaled);
 const positiveScaled = nonNegativeScaled.refine(
   (value) => Math.round(value * 1e8) >= 1,
@@ -423,6 +428,7 @@ export const newPortfolioTransactionSchema = z
     currency: cashCurrency,
     date: isoDate,
     fees: nonNegativeMoney,
+    fxAmount: positiveMoney.exactOptional(),
     note: optionalNote,
     otherAccountId: optionalId,
     otherPortfolioId: optionalId,

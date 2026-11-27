@@ -837,6 +837,22 @@ describe("portfolio write-back schemas", () => {
         amount: 1_000_000_000_001,
       }).success,
     ).toBe(false);
+    expect(
+      newPortfolioTransactionSchema.parse({ ...validDeposit, fxAmount: 125.5 })
+        .fxAmount,
+    ).toBe(125.5);
+    expect(
+      newPortfolioTransactionSchema.safeParse({
+        ...validDeposit,
+        fxAmount: 0.001,
+      }).success,
+    ).toBe(false);
+    expect(
+      newPortfolioTransactionSchema.safeParse({
+        ...validDeposit,
+        fxAmount: 1_000_000_000_001,
+      }).success,
+    ).toBe(false);
   });
 
   it("validates portfolioQuoteBatchSchema for size bounds, uniqueness, dates, and positive prices", () => {

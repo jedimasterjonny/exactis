@@ -73,6 +73,16 @@ interface Class {
   readonly weight: number;
 }
 
+// Validated cross-currency GROSS_VALUE unit ready to serialize into a
+// PTransactionUnit message.
+interface GrossValueSpec {
+  readonly amountPence: number;
+  readonly currency: string;
+  readonly fxAmountMinor: number;
+  readonly fxCurrency: string;
+  readonly rate: number;
+}
+
 // A file opened: the parts of the zip, and the client's protobuf behind
 // the signature.
 interface Opened {
@@ -80,10 +90,12 @@ interface Opened {
   readonly parts: Unzipped;
 }
 
-// Validated account, portfolio and security UUIDs resolved for a new
-// transaction against raw protobuf field-1 ids.
+// Validated account, portfolio and security UUIDs (plus optional
+// cross-currency counterpart) resolved for a transaction against raw
+// protobuf field-1 ids.
 interface ResolvedTransactionRefs {
   readonly accountId: string | undefined;
+  readonly fxCurrency: string | undefined;
   readonly otherAccountId: string | undefined;
   readonly otherPortfolioId: string | undefined;
   readonly portfolioId: string | undefined;
@@ -575,12 +587,22 @@ export function appendTransaction(
       currency,
       rule,
     });
+    const grossValue = resolveGrossValue({
+      amountPence,
+      currency,
+      feesPence,
+      fxAmount: input.fxAmount,
+      fxCurrency: refs.fxCurrency,
+      rule,
+      taxesPence,
+    });
     id = makeId();
     const entry = buildTransactionBytes({
       amountPence,
       currency,
       dateBytes,
       feesPence,
+      grossValue,
       id,
       note: trimmedOptional(input.note),
       otherId: rule.hasCrossEntry ? makeId() : undefined,
@@ -1005,6 +1027,7 @@ function buildTransactionBytes({
   currency,
   dateBytes,
   feesPence,
+  grossValue,
   id,
   note,
   otherId,
@@ -1018,6 +1041,7 @@ function buildTransactionBytes({
   readonly currency: string;
   readonly dateBytes: Uint8Array;
   readonly feesPence: number;
+  readonly grossValue: GrossValueSpec | undefined;
   readonly id: string;
   readonly note: string | undefined;
   readonly otherId: string | undefined;
@@ -1062,7 +1086,7 @@ function buildTransactionBytes({
     ...(refs.securityId === undefined
       ? []
       : [textField(fields.transaction.security, refs.securityId)]),
-    ...transactionUnitsOf(currency, feesPence, taxesPence),
+    ...transactionUnitsOf({ currency, feesPence, grossValue, taxesPence }),
     delimitedOf(fields.transaction.updatedAt, updatedAt),
   ]);
 }
@@ -1283,6 +1307,99 @@ function decodeTransaction(
       type,
     },
   };
+}
+
+// Encodes a positive finite exchange rate into Portfolio Performance's
+// PDecimalValue (scale <= 8 with trailing fractional zeroes trimmed,
+// exact BigDecimal precision, and minimal big-endian signed
+// two's-complement BigInteger bytes).
+function encodeDecimalValue(rate: number): Uint8Array {
+  const scaledInt = Math.round(rate * scaled);
+  if (!Number.isSafeInteger(scaledInt) || scaledInt < 1) {
+    throw new Refusal("Exchange rate is out of range");
+  }
+  let unscaled = BigInt(scaledInt);
+  let scale = 8;
+  while (scale > 0 && unscaled % 10n === 0n) {
+    unscaled /= 10n;
+    scale -= 1;
+  }
+  const precision = unscaled.toString().length;
+  let left = unscaled;
+  let high = 0;
+  const bytes: number[] = [];
+  while (left > 0n) {
+    high = Number(left & 0xffn);
+    bytes.push(high);
+    left >>= 8n;
+  }
+  if (high >= 0x80) {
+    bytes.push(0);
+  }
+  bytes.reverse();
+  return joined([
+    ...(scale === 0 ? [] : [wholeField(fields.decimal.scale, scale)]),
+    wholeField(fields.decimal.precision, precision),
+    delimitedOf(fields.decimal.value, new Uint8Array(bytes)),
+  ]);
+}
+
+// Counterpart foreign currency when a transaction crosses currencies,
+// or undefined for same-currency or currency-less entries.
+function fxCurrencyOf({
+  currency,
+  otherCashCurrency,
+  rule,
+  securityCurrency,
+}: {
+  readonly currency: string;
+  readonly otherCashCurrency: string | undefined;
+  readonly rule: TransactionWriteRule;
+  readonly securityCurrency: string | undefined;
+}): string | undefined {
+  if (otherCashCurrency !== undefined) {
+    return otherCashCurrency === currency ? undefined : otherCashCurrency;
+  }
+  return rule.hasCosts &&
+    securityCurrency !== undefined &&
+    securityCurrency !== "" &&
+    securityCurrency !== currency
+    ? securityCurrency
+    : undefined;
+}
+
+// Settlement gross amount in minor units for a cross-currency
+// transaction: total less fees/taxes for buys and inbound deliveries,
+// total plus fees/taxes for sales, outbound deliveries and dividends,
+// or the debited amount itself for cash transfers.
+function grossAmountPenceOf({
+  amountPence,
+  feesPence,
+  rule,
+  taxesPence,
+}: {
+  readonly amountPence: number;
+  readonly feesPence: number;
+  readonly rule: TransactionWriteRule;
+  readonly taxesPence: number;
+}): number {
+  if (rule.isCostsBoundedByAmount) {
+    const gross = amountPence - feesPence - taxesPence;
+    if (gross < 1) {
+      throw new Refusal(
+        "Fees and taxes must be less than the transaction amount for cross-currency trades",
+      );
+    }
+    return gross;
+  }
+  if (rule.hasCosts) {
+    const gross = amountPence + feesPence + taxesPence;
+    if (gross > maxPortfolioMoney * hundredths) {
+      throw new Refusal("Gross amount is out of range");
+    }
+    return gross;
+  }
+  return amountPence;
 }
 
 // First positive cross-currency GROSS_VALUE unit on a transaction,
@@ -1839,6 +1956,70 @@ function resolveCashRef(
   return trimmed;
 }
 
+// Validates and derives the cross-currency GROSS_VALUE unit for a
+// transaction, auto-computing GBP -> GBX at 0.01 and deriving
+// fxRateToBase from gross settlement / foreign amount otherwise.
+function resolveGrossValue({
+  amountPence,
+  currency,
+  feesPence,
+  fxAmount,
+  fxCurrency,
+  rule,
+  taxesPence,
+}: {
+  readonly amountPence: number;
+  readonly currency: string;
+  readonly feesPence: number;
+  readonly fxAmount: number | undefined;
+  readonly fxCurrency: string | undefined;
+  readonly rule: TransactionWriteRule;
+  readonly taxesPence: number;
+}): GrossValueSpec | undefined {
+  if (fxCurrency === undefined) {
+    if (fxAmount !== undefined) {
+      throw new Refusal(
+        "Foreign amount only applies to cross-currency transactions",
+      );
+    }
+    return undefined;
+  }
+  const grossPence = grossAmountPenceOf({
+    amountPence,
+    feesPence,
+    rule,
+    taxesPence,
+  });
+  if (currency === "GBP" && fxCurrency === "GBX") {
+    if (fxAmount !== undefined) {
+      throw new Refusal("GBP to GBX conversions are calculated automatically");
+    }
+    const fxAmountMinor = grossPence * hundredths;
+    if (fxAmountMinor > Number.MAX_SAFE_INTEGER) {
+      throw new Refusal("Gross amount is out of range");
+    }
+    return {
+      amountPence: grossPence,
+      currency,
+      fxAmountMinor,
+      fxCurrency,
+      rate: 0.01,
+    };
+  }
+  if (fxAmount === undefined) {
+    throw new Refusal(`Enter the foreign amount in ${fxCurrency}`);
+  }
+  const fxAmountMinor = moneyToHundredths(fxAmount, "Foreign amount", {
+    isZeroAllowed: false,
+  });
+  return {
+    amountPence: grossPence,
+    currency,
+    fxAmountMinor,
+    fxCurrency,
+    rate: grossPence / fxAmountMinor,
+  };
+}
 function resolveIdRef(
   knownIds: ReadonlySet<string>,
   id: string | undefined,
@@ -1854,11 +2035,8 @@ function resolveIdRef(
 function resolveOtherCashRef(
   cashCurrencies: ReadonlyMap<string, string>,
   id: string | undefined,
-  {
-    accountId,
-    currency,
-  }: { readonly accountId: string | undefined; readonly currency: string },
-): string {
+  accountId: string | undefined,
+): { readonly currency: string; readonly id: string } {
   const trimmed = trimmedOptional(id);
   const otherCurrency =
     trimmed === undefined ? undefined : cashCurrencies.get(trimmed);
@@ -1868,12 +2046,7 @@ function resolveOtherCashRef(
   if (trimmed === accountId) {
     throw new Refusal("Source and destination accounts must differ");
   }
-  if (otherCurrency !== currency) {
-    throw new Refusal(
-      "Cash transfers between different currencies are not supported yet",
-    );
-  }
-  return trimmed;
+  return { currency: otherCurrency, id: trimmed };
 }
 
 // Opens a binary .portfolio file, validates its PClient protobuf stream,
@@ -1960,6 +2133,22 @@ function securitiesOf(client: Message): ReadonlyMap<string, Security> {
       ];
     }),
   );
+}
+
+// Raw protobuf security ids mapped to their optional quote currency
+// (empty string when omitted in field 4).
+function securityCurrenciesOf(client: Message): ReadonlyMap<string, string> {
+  const currencies = new Map<string, string>();
+  for (const security of messagesAt(client, fields.client.securities)) {
+    const id = optionalText(security, fields.security.id);
+    if (id !== undefined) {
+      currencies.set(
+        id,
+        optionalText(security, fields.security.currency) ?? "",
+      );
+    }
+  }
+  return currencies;
 }
 
 // What each securities account holds of each security, by the
@@ -2234,14 +2423,37 @@ function transactionsOf(
     .map(({ transaction }) => transaction);
 }
 
-// Encodes positive fee and tax PTransactionUnit submessages carrying
-// the transaction's currency code.
-function transactionUnitsOf(
-  currency: string,
-  feesPence: number,
-  taxesPence: number,
-): readonly Uint8Array[] {
+// Encodes optional GROSS_VALUE (with PDecimalValue exchange rate) plus
+// positive fee and tax PTransactionUnit submessages.
+function transactionUnitsOf({
+  currency,
+  feesPence,
+  grossValue,
+  taxesPence,
+}: {
+  readonly currency: string;
+  readonly feesPence: number;
+  readonly grossValue: GrossValueSpec | undefined;
+  readonly taxesPence: number;
+}): readonly Uint8Array[] {
   const units: Uint8Array[] = [];
+  if (grossValue !== undefined) {
+    units.push(
+      delimitedOf(
+        fields.transaction.units,
+        joined([
+          wholeField(fields.unit.amount, grossValue.amountPence),
+          textField(fields.unit.currency, grossValue.currency),
+          wholeField(fields.unit.fxAmount, grossValue.fxAmountMinor),
+          textField(fields.unit.fxCurrency, grossValue.fxCurrency),
+          delimitedOf(
+            fields.unit.fxRateToBase,
+            encodeDecimalValue(grossValue.rate),
+          ),
+        ]),
+      ),
+    );
+  }
   if (feesPence > 0) {
     units.push(
       delimitedOf(
@@ -2391,19 +2603,18 @@ function validateTransactionRefs(
     rule.hasPortfolio || rule.hasOtherPortfolio
       ? rawIdsOf(client, fields.client.portfolios, fields.portfolio.id)
       : new Set<string>();
-  const securityIds = rule.hasSecurity
-    ? rawIdsOf(client, fields.client.securities, fields.security.id)
-    : new Set<string>();
+  const securityCurrencies = rule.hasSecurity
+    ? securityCurrenciesOf(client)
+    : new Map<string, string>();
+  const securityIds = new Set(securityCurrencies.keys());
 
   const accountId = rule.hasAccount
     ? resolveCashRef(cashCurrencies, input.accountId, currency)
     : undefined;
-  const otherAccountId = rule.hasOtherAccount
-    ? resolveOtherCashRef(cashCurrencies, input.otherAccountId, {
-        accountId,
-        currency,
-      })
+  const otherCash = rule.hasOtherAccount
+    ? resolveOtherCashRef(cashCurrencies, input.otherAccountId, accountId)
     : undefined;
+  const otherAccountId = otherCash?.id;
   const portfolioId = rule.hasPortfolio
     ? resolveIdRef(
         portfolioIds,
@@ -2428,9 +2639,17 @@ function validateTransactionRefs(
         "The selected security was not found",
       )
     : undefined;
+  const fxCurrency = fxCurrencyOf({
+    currency,
+    otherCashCurrency: otherCash?.currency,
+    rule,
+    securityCurrency:
+      securityId === undefined ? undefined : securityCurrencies.get(securityId),
+  });
 
   return {
     accountId,
+    fxCurrency,
     otherAccountId,
     otherPortfolioId,
     portfolioId,
