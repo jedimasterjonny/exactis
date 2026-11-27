@@ -230,6 +230,133 @@ describe("movedSince", () => {
     });
   });
 
+  // The ISA renamed and explicitly linked to Portfolio Performance's
+  // Brokerage account (with an invented £500 paid on 2026-09-12)
+  // receives Brokerage's actual paid-in under its Exactis account name:
+  // £2,336 pension + £500 ISA + £980 mortgage = £3,816.
+  it("resolves paid-in history through an explicit portfolio link when names differ", () => {
+    const linked = closing({
+      accounts: changed(kept.accounts, 2, {
+        name: "My renamed ISA",
+        portfolio: "Brokerage",
+      }),
+    });
+    const withBrokerage = portfolios.map((portfolio) =>
+      portfolio.name === "Brokerage"
+        ? { ...portfolio, paid: [{ amount: 500, on: "2026-09-12" }] }
+        : portfolio,
+    );
+    const now = closed(linked, {
+      targets: {
+        ...targets,
+        importedOn: "2026-09-25",
+        portfolios: withBrokerage,
+      },
+    });
+
+    expect(movedSince(linked, now).balances).toMatchObject({
+      actual: ["Workplace pension", "My renamed ISA"],
+      paid: 3816,
+    });
+  });
+
+  // Two Exactis accounts linked to the same Portfolio Performance
+  // account — or one linked and one unlinked resolving to the same key
+  // — are both left out so inflows are never counted twice.
+  it("excludes a portfolio key claimed by two accounts via links or name", () => {
+    const twoLinked = closing({
+      accounts: changed(
+        changed(kept.accounts, 2, { portfolio: "Brokerage" }),
+        6,
+        { portfolio: "Brokerage" },
+      ),
+    });
+    const twoLinkedNow = closed(twoLinked, {
+      targets: { ...targets, importedOn: "2026-09-25", portfolios },
+    });
+
+    expect(movedSince(twoLinked, twoLinkedNow).balances).toMatchObject({
+      actual: [],
+      paid: 5330,
+    });
+
+    const mixed = closing({
+      accounts: changed(kept.accounts, 3, { portfolio: "Workplace pension" }),
+    });
+    const mixedNow = closed(mixed, {
+      targets: { ...targets, importedOn: "2026-09-25", portfolios },
+    });
+
+    expect(movedSince(mixed, mixedNow).balances).toMatchObject({
+      actual: ["Stocks & shares ISA"],
+      paid: 6830,
+    });
+  });
+
+  // Whitespace-padded Portfolio names match linked savings, blank or
+  // duplicate trimmed Portfolio names are excluded rather than silently
+  // overwriting, and non-saving accounts (like a house or debt) sharing
+  // a Portfolio name neither receive paid-in nor collide with a saving.
+  it("trims portfolio names, excludes duplicate or blank portfolio entries, and ignores non-savings", () => {
+    const withCollision = closing({
+      accounts: changed(
+        changed(kept.accounts, 2, { name: "My ISA", portfolio: "Brokerage" }),
+        4,
+        { name: "Brokerage" },
+      ),
+    });
+    const trimmedNow = closed(withCollision, {
+      targets: {
+        ...targets,
+        importedOn: "2026-09-25",
+        portfolios: [
+          ...portfolios.filter(({ name }) => name !== "Brokerage"),
+          {
+            cash: 0,
+            name: "  Brokerage  ",
+            paid: [{ amount: 500, on: "2026-09-12" }],
+          },
+          { cash: 0, name: "   ", paid: [{ amount: 999, on: "2026-09-12" }] },
+          {
+            cash: 0,
+            name: "Mortgage",
+            paid: [{ amount: 777, on: "2026-09-12" }],
+          },
+        ],
+      },
+    });
+
+    expect(movedSince(withCollision, trimmedNow).balances).toMatchObject({
+      actual: ["Workplace pension", "My ISA"],
+      paid: 3816,
+    });
+
+    const dupPortfolioNow = closed(withCollision, {
+      targets: {
+        ...targets,
+        importedOn: "2026-09-25",
+        portfolios: [
+          ...portfolios.filter(({ name }) => name !== "Brokerage"),
+          {
+            cash: 0,
+            name: "Brokerage",
+            paid: [{ amount: 500, on: "2026-09-12" }],
+          },
+          {
+            cash: 0,
+            name: " Brokerage ",
+            paid: [{ amount: 900, on: "2026-09-12" }],
+          },
+        ],
+      },
+    });
+
+    expect(movedSince(withCollision, dupPortfolioNow).balances).toMatchObject({
+      actual: ["Workplace pension"],
+      paid: 3316,
+    });
+  });
+
   // Imported on the 24th, the file need not hold all that was paid by
   // September's cut on the 25th, and with no target allocation there is
   // nothing it says.

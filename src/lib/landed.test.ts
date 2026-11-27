@@ -196,6 +196,114 @@ describe("landedSince", () => {
     }
   });
 
+  // An invested account renamed in Exactis and linked to a Portfolio
+  // Performance securities account shifts the bands by that portfolio's
+  // paid-in and reports the Exactis account name; two accounts
+  // resolving to the same portfolio key are both left out.
+  it("resolves paid-in history through an explicit portfolio link and ignores ambiguous keys", () => {
+    const isa = accounts[1];
+    const pension = accounts[0];
+    const linkedBefore = closedAt(july, {
+      accounts: before.accounts.map((account) =>
+        account.id === isa.id
+          ? { ...account, name: "My ISA", portfolio: "Broker ISA" }
+          : account,
+      ),
+    });
+    const linkedNow = closedAt(august, {
+      accounts: now.accounts.map((account) =>
+        account.id === isa.id
+          ? { ...account, name: "My ISA", portfolio: "Broker ISA" }
+          : account,
+      ),
+      targets: {
+        ...targets,
+        importedOn: "2026-08-26",
+        portfolios: [
+          {
+            cash: 0,
+            name: "Broker ISA",
+            paid: [{ amount: 3000, on: "2026-08-20" }],
+          },
+        ],
+      },
+    });
+
+    const shifted = landedOf(linkedBefore, linkedNow);
+    const household = soundKept(linkedBefore).household;
+    const { plan, schedule } = laidOut(
+      household.accounts,
+      household.schedule,
+      household.plan,
+    );
+    const [, planned] = monthsOn(linkedBefore.accounts, schedule, {
+      months: 1,
+      plan,
+    });
+
+    expect(shifted.paidBy).toStrictEqual(["My ISA"]);
+    expect(shifted.beyond).toBeCloseTo(3000 - (planned?.paid ?? 0), 6);
+
+    const duplicateNow: Kept = {
+      ...linkedNow,
+      accounts: linkedNow.accounts.map((account) =>
+        account.id === pension.id
+          ? { ...account, portfolio: "Broker ISA" }
+          : account,
+      ),
+    };
+    expect(landedOf(linkedBefore, duplicateNow)).toMatchObject({
+      beyond: 0,
+      paidBy: [],
+    });
+
+    // Whitespace-padded Portfolio names still resolve, and a non-saving
+    // sharing the same name does not collide; duplicate trimmed
+    // Portfolio names are excluded.
+    const paddedNow: Kept = {
+      ...linkedNow,
+      accounts: linkedNow.accounts.map((account) =>
+        account.id === 4 ? { ...account, name: "Broker ISA" } : account,
+      ),
+      targets: {
+        ...targets,
+        importedOn: "2026-08-26",
+        portfolios: [
+          {
+            cash: 0,
+            name: "  Broker ISA  ",
+            paid: [{ amount: 3000, on: "2026-08-20" }],
+          },
+        ],
+      },
+    };
+    expect(landedOf(linkedBefore, paddedNow).paidBy).toStrictEqual(["My ISA"]);
+
+    const dupPortfolioNow: Kept = {
+      ...linkedNow,
+      targets: {
+        ...targets,
+        importedOn: "2026-08-26",
+        portfolios: [
+          {
+            cash: 0,
+            name: "Broker ISA",
+            paid: [{ amount: 3000, on: "2026-08-20" }],
+          },
+          {
+            cash: 0,
+            name: " Broker ISA ",
+            paid: [{ amount: 1000, on: "2026-08-20" }],
+          },
+        ],
+      },
+    };
+    expect(landedOf(linkedBefore, dupPortfolioNow)).toMatchObject({
+      beyond: 0,
+      paidBy: [],
+    });
+  });
+
   // The ISA at August's close emptied, as it stood, and £2,000,000 up,
   // invented: below every future, between the bottom and the middle, and
   // above every one; then, as it stood, with Portfolio Performance saying
