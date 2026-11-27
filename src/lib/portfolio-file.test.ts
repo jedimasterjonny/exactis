@@ -753,6 +753,11 @@ describe("readPortfolioSnapshot", () => {
         },
       ],
       fileName: "household.portfolio",
+      gbpRates: Object.fromEntries([
+        ["GBP", 1],
+        ["GBX", 0.01],
+        ["USD", 0.75],
+      ]),
       holdings: [
         {
           category: "Global equity, UK gilts",
@@ -883,6 +888,10 @@ describe("readPortfolioSnapshot", () => {
       cashAccounts: [],
       categories: [],
       fileName: "plain.portfolio",
+      gbpRates: Object.fromEntries([
+        ["GBP", 1],
+        ["GBX", 0.01],
+      ]),
       holdings: [
         {
           currency: "GBP",
@@ -970,6 +979,10 @@ describe("readPortfolioSnapshot", () => {
       cashAccounts: [],
       categories: [],
       fileName: "dollar.portfolio",
+      gbpRates: Object.fromEntries([
+        ["GBP", 1],
+        ["GBX", 0.01],
+      ]),
       holdings: [
         {
           currency: "GBP",
@@ -1354,6 +1367,10 @@ describe("readPortfolioSnapshot", () => {
       ],
       categories: [],
       fileName: "edge.portfolio",
+      gbpRates: Object.fromEntries([
+        ["GBP", 1],
+        ["GBX", 0.01],
+      ]),
       holdings: [
         {
           currency: "GBP",
@@ -3712,6 +3729,7 @@ describe("appendTransaction", () => {
           { amount: -50, on: "2026-09-08" },
         ],
       },
+      { cash: 100, name: "Harbour GIA", paid: [] },
     ]);
   });
 
@@ -5065,5 +5083,558 @@ describe("readPortfolioFeed", () => {
       ],
     ]);
     expect(readPortfolioFeed(tooLate).latestTransactionDate).toBeNull();
+  });
+});
+
+describe("GROSS_VALUE decoding and cross-currency bookkeeping", () => {
+  it("decodes GROSS_VALUE units and valid PDecimalValue exchange rates while ignoring malformed rates", () => {
+    const file = portfolioFile([
+      [
+        2,
+        [
+          [1, "sec-us"],
+          [3, "US Equity"],
+          [4, "USD"],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-gbp"],
+          [2, "Cash GBP"],
+          [3, "GBP"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-1"],
+          [2, "Dealing"],
+          [5, "cash-gbp"],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-valid-rate"],
+          [2, 0],
+          [3, "cash-gbp"],
+          [4, "port-1"],
+          [9, [[1, 1_790_000_000]]],
+          [10, "GBP"],
+          [11, 78_740],
+          [12, 1_000_000_000],
+          [14, "sec-us"],
+          [
+            15,
+            [
+              [1, 0],
+              [2, 78_740],
+              [4, 100_000],
+              [5, "USD"],
+              [
+                6,
+                [
+                  [1, 4],
+                  [2, 4],
+                  [3, new Uint8Array([0x1e, 0xc2])],
+                ],
+              ],
+            ],
+          ],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-high-bit-positive"],
+          [2, 8],
+          [3, "cash-gbp"],
+          [9, [[1, 1_789_900_000]]],
+          [10, "GBP"],
+          [11, 12_800],
+          [14, "sec-us"],
+          [
+            15,
+            [
+              [1, 0],
+              [2, 12_800],
+              [3, "GBP"],
+              [4, 10_000],
+              [5, "CHF"],
+              [
+                6,
+                [
+                  [1, 2],
+                  [2, 3],
+                  [3, new Uint8Array([0x00, 0x80])],
+                ],
+              ],
+            ],
+          ],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-bad-rates"],
+          [2, 8],
+          [3, "cash-gbp"],
+          [9, [[1, 1_789_800_000]]],
+          [10, "GBP"],
+          [11, 10_000],
+          [14, "sec-us"],
+          // Ignored: non-positive fxAmount
+          [
+            15,
+            [
+              [1, 0],
+              [2, 10_000],
+              [3, "GBP"],
+              [4, 0],
+              [5, "USD"],
+            ],
+          ],
+          // Valid amounts, negative two's-complement PDecimalValue -> rate omitted
+          [
+            15,
+            [
+              [1, 0],
+              [2, 10_000],
+              [3, "GBP"],
+              [4, 12_500],
+              [5, "USD"],
+              [
+                6,
+                [
+                  [1, 2],
+                  [3, new Uint8Array([0x80])],
+                ],
+              ],
+            ],
+          ],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-zero-rate"],
+          [2, 8],
+          [3, "cash-gbp"],
+          [9, [[1, 1_789_700_000]]],
+          [10, "GBP"],
+          [11, 10_000],
+          [14, "sec-us"],
+          [
+            15,
+            [
+              [1, 0],
+              [2, 10_000],
+              [3, "GBP"],
+              [4, 12_500],
+              [5, "USD"],
+              [
+                6,
+                [
+                  [1, 2],
+                  [3, new Uint8Array([0x00])],
+                ],
+              ],
+            ],
+          ],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-missing-bytes"],
+          [2, 8],
+          [3, "cash-gbp"],
+          [9, [[1, 1_789_600_000]]],
+          [10, "GBP"],
+          [11, 10_000],
+          [14, "sec-us"],
+          [
+            15,
+            [
+              [1, 0],
+              [2, 10_000],
+              [3, "GBP"],
+              [4, 12_500],
+              [5, "USD"],
+              [6, [[1, 2]]],
+            ],
+          ],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-wide-scale"],
+          [2, 8],
+          [3, "cash-gbp"],
+          [9, [[1, 1_789_500_000]]],
+          [10, "GBP"],
+          [11, 10_000],
+          [14, "sec-us"],
+          [
+            15,
+            [
+              [1, 0],
+              [2, 10_000],
+              [3, "GBP"],
+              [4, 12_500],
+              [5, "USD"],
+              [
+                6,
+                [
+                  [1, 19],
+                  [3, new Uint8Array([0x01])],
+                ],
+              ],
+            ],
+          ],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-empty-bytes"],
+          [2, 8],
+          [3, "cash-gbp"],
+          [9, [[1, 1_789_400_000]]],
+          [10, "GBP"],
+          [11, 10_000],
+          [14, "sec-us"],
+          [
+            15,
+            [
+              [1, 0],
+              [2, 10_000],
+              [3, "GBP"],
+              [4, 12_500],
+              [5, "USD"],
+              [
+                6,
+                [
+                  [1, 2],
+                  [3, new Uint8Array()],
+                ],
+              ],
+            ],
+          ],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-too-many-bytes"],
+          [2, 8],
+          [3, "cash-gbp"],
+          [9, [[1, 1_789_300_000]]],
+          [10, "GBP"],
+          [11, 10_000],
+          [14, "sec-us"],
+          [
+            15,
+            [
+              [1, 0],
+              [2, 10_000],
+              [3, "GBP"],
+              [4, 12_500],
+              [5, "USD"],
+              [
+                6,
+                [
+                  [1, 2],
+                  [3, new Uint8Array(17).fill(0x01)],
+                ],
+              ],
+            ],
+          ],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-negative-scale"],
+          [2, 8],
+          [3, "cash-gbp"],
+          [9, [[1, 1_789_200_000]]],
+          [10, "GBP"],
+          [11, 10_000],
+          [14, "sec-us"],
+          [
+            15,
+            [
+              [1, 0],
+              [2, 10_000],
+              [3, "GBP"],
+              [4, 12_500],
+              [5, "USD"],
+              [
+                6,
+                [
+                  [1, -1],
+                  [3, new Uint8Array([0x01])],
+                ],
+              ],
+            ],
+          ],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+
+    const { transactions } = readPortfolioSnapshot(file, "gross.portfolio");
+    const byId = new Map(transactions.map((tx) => [tx.id, tx.grossValue]));
+
+    expect(byId.get("tx-valid-rate")).toStrictEqual({
+      amount: 787.4,
+      currency: "GBP",
+      exchangeRate: 0.7874,
+      fxAmount: 1000,
+      fxCurrency: "USD",
+    });
+    expect(byId.get("tx-high-bit-positive")).toStrictEqual({
+      amount: 128,
+      currency: "GBP",
+      exchangeRate: 1.28,
+      fxAmount: 100,
+      fxCurrency: "CHF",
+    });
+    for (const id of [
+      "tx-bad-rates",
+      "tx-zero-rate",
+      "tx-missing-bytes",
+      "tx-wide-scale",
+      "tx-empty-bytes",
+      "tx-too-many-bytes",
+      "tx-negative-scale",
+    ]) {
+      expect(byId.get(id)).toStrictEqual({
+        amount: 100,
+        currency: "GBP",
+        fxAmount: 125,
+        fxCurrency: "USD",
+      });
+    }
+  });
+
+  it("reads inverse foreign -> GBP FX rates symmetrically in poundsPer and credits inbound foreign transfers in GBP", () => {
+    const file = portfolioFile([
+      [
+        2,
+        [
+          [1, "sec-us"],
+          [3, "US Fund"],
+          [4, "USD"],
+          [
+            13,
+            [
+              [1, 20_720],
+              [2, 10_000_000_000],
+            ],
+          ],
+        ],
+      ],
+      // Blank-id cash account is ignored safely by readPortfoliosFromClient
+      [3, [[2, "Unnamed"]]],
+      // Reference cash account omitting currency inherits GBP baseCurrency
+      [
+        3,
+        [
+          [1, "cash-ref"],
+          [2, "ISA Cash"],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-usd"],
+          [2, "Dollar Cash"],
+          [3, "USD"],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-eur"],
+          [2, "Euro Cash"],
+          [3, "EUR"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-isa"],
+          [2, "ISA"],
+          [5, "cash-ref"],
+        ],
+      ],
+      // Non-GBP-to-non-GBP transaction ignored by poundsPer
+      [
+        5,
+        [
+          [1, "tx-usd-eur"],
+          [2, 5],
+          [3, "cash-usd"],
+          [5, "cash-eur"],
+          [9, [[1, 1_788_000_000]]],
+          [10, "USD"],
+          [11, 10_000],
+          [
+            15,
+            [
+              [1, 0],
+              [2, 10_000],
+              [3, "USD"],
+              [4, 9_000],
+              [5, "EUR"],
+            ],
+          ],
+        ],
+      ],
+      // Transaction omitting currency inherits baseCurrency (GBP) in poundsPer
+      [
+        5,
+        [
+          [1, "tx-default-base"],
+          [2, 8],
+          [3, "cash-ref"],
+          [9, [[1, 1_788_500_000]]],
+          [11, 9_000],
+          [
+            15,
+            [
+              [1, 0],
+              [2, 9_000],
+              [4, 10_000],
+              [5, "CHF"],
+            ],
+          ],
+        ],
+      ],
+      // Inbound USD -> GBP transfer: $1,250 debited from USD, £1,000 credited to ISA Cash -> USD rate 0.8
+      [
+        5,
+        [
+          [1, "tx-in-fx"],
+          [2, 5],
+          [3, "cash-usd"],
+          [5, "cash-ref"],
+          [9, [[1, 1_789_000_000]]],
+          [10, "USD"],
+          [11, 125_000],
+          [
+            15,
+            [
+              [1, 0],
+              [2, 125_000],
+              [3, "USD"],
+              [4, 100_000],
+              [5, "GBP"],
+            ],
+          ],
+        ],
+      ],
+      // Outbound GBP -> USD transfer: £400 debited from ISA Cash, $500 credited to USD
+      [
+        5,
+        [
+          [1, "tx-out-fx"],
+          [2, 5],
+          [3, "cash-ref"],
+          [5, "cash-usd"],
+          [9, [[1, 1_789_100_000]]],
+          [10, "GBP"],
+          [11, 40_000],
+          [
+            15,
+            [
+              [1, 0],
+              [2, 40_000],
+              [3, "GBP"],
+              [4, 50_000],
+              [5, "USD"],
+            ],
+          ],
+        ],
+      ],
+      // Purchase of 1 share of US Fund to keep targets happy
+      [
+        5,
+        [
+          [1, "tx-buy"],
+          [2, 2],
+          [4, "port-isa"],
+          [9, [[1, 1_789_200_000]]],
+          [10, "USD"],
+          [11, 10_000],
+          [12, 100_000_000],
+          [14, "sec-us"],
+        ],
+      ],
+      [
+        8,
+        [
+          [1, "tax-aa"],
+          [2, "Asset Allocation"],
+          [
+            5,
+            [
+              [1, "root"],
+              [3, "Asset Allocation"],
+              [6, 10_000],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "eq"],
+              [2, "root"],
+              [3, "Equity"],
+              [6, 10_000],
+              [
+                9,
+                [
+                  [1, "sec-us"],
+                  [2, 10_000],
+                ],
+              ],
+            ],
+          ],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+
+    const snapshot = readPortfolioSnapshot(file, "fx-transfers.portfolio");
+    expect(snapshot.gbpRates).toStrictEqual(
+      Object.fromEntries([
+        ["CHF", 0.9],
+        ["GBP", 1],
+        ["GBX", 0.01],
+        ["USD", 0.8],
+      ]),
+    );
+    expect(
+      snapshot.cashAccounts.find((account) => account.id === "cash-ref")
+        ?.balance,
+    ).toBe(690);
+
+    const targets = readPortfolioTargets(file);
+    expect(targets.portfolios).toStrictEqual([
+      {
+        cash: 690,
+        name: "ISA",
+        paid: [
+          { amount: 1000, on: "2026-09-10" },
+          { amount: -400, on: "2026-09-11" },
+        ],
+      },
+    ]);
+    // 1 share * $100 * 0.8 = £80
+    expect(targets.categories[0]?.value).toBe(80);
   });
 });

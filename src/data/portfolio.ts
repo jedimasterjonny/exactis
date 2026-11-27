@@ -134,6 +134,18 @@ export interface PortfolioFeed {
   }>;
 }
 
+// Cross-currency gross value unit on a Portfolio Performance
+// transaction: settlement gross amount and currency, foreign gross
+// amount and currency, and optional decoded exchange rate (settlement
+// currency per unit of foreign currency).
+export interface PortfolioGrossValue {
+  readonly amount: number;
+  readonly currency: string;
+  readonly exchangeRate?: number;
+  readonly fxAmount: number;
+  readonly fxCurrency: string;
+}
+
 // Active securities accounts and per-category security holdings
 // extracted from the household's .portfolio file so Cogitator can hand
 // off a rebalancing trade directly into the Portfolio transaction
@@ -172,6 +184,7 @@ export interface PortfolioSnapshot {
   readonly cashAccounts: readonly CashAccount[];
   readonly categories: readonly PortfolioCategory[];
   readonly fileName: string;
+  readonly gbpRates: Readonly<Record<string, number>>;
   readonly holdings: readonly Holding[];
   readonly latestQuoteDate: null | string;
   readonly securitiesAccounts: readonly SecuritiesAccount[];
@@ -191,6 +204,7 @@ export interface PortfolioTransaction {
   readonly currency: string;
   readonly date: string;
   readonly fees: number;
+  readonly grossValue?: PortfolioGrossValue;
   readonly id: string;
   readonly note?: string;
   readonly otherAccountId?: string;

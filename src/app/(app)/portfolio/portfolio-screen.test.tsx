@@ -88,6 +88,10 @@ const multiAccountSnapshot: PortfolioSnapshot = {
     },
   ],
   fileName: "multi.portfolio",
+  gbpRates: Object.fromEntries([
+    ["GBP", 1],
+    ["GBX", 0.01],
+  ]),
   holdings: [
     {
       category: "Global Equity",
