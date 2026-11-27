@@ -30,6 +30,7 @@ import {
   readPortfolioFeed,
   readPortfolioSnapshot,
   readPortfolioTargets,
+  readQuotableSecurities,
   readTargets,
   reweighted,
   updateQuotes,
@@ -6123,5 +6124,162 @@ describe("GROSS_VALUE decoding and cross-currency bookkeeping", () => {
         type: "cash-transfer",
       }),
     ).toThrow(new Refusal("Exchange rate is out of range"));
+  });
+
+  it("supports per-quote dates in updateQuotes falling back to the batch date", () => {
+    const file = portfolioFile([
+      [
+        2,
+        [
+          [1, "sec-a"],
+          [3, "Fund A"],
+          [4, "GBP"],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-b"],
+          [3, "Fund B"],
+          [4, "GBP"],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+
+    const updated = updateQuotes(file, {
+      date: "2026-09-25",
+      quotes: [
+        { date: "2026-09-23", price: 101.5, securityId: "sec-a" },
+        { price: 202.25, securityId: "sec-b" },
+      ],
+    });
+    const snapshot = readPortfolioSnapshot(updated.content, "dates.portfolio");
+    expect(
+      snapshot.holdings.map((h) => ({
+        date: h.latestPriceDate,
+        id: h.id,
+        price: h.latestPrice,
+      })),
+    ).toStrictEqual([
+      { date: "2026-09-23", id: "sec-a", price: 101.5 },
+      { date: "2026-09-25", id: "sec-b", price: 202.25 },
+    ]);
+
+    expect(() =>
+      updateQuotes(file, {
+        date: "2026-09-25",
+        quotes: [{ date: "2026-02-31", price: 10, securityId: "sec-a" }],
+      }),
+    ).toThrow(new Refusal("Enter a valid calendar date"));
+  });
+
+  it("extracts stored quote-lookup metadata and resolves feed precedence in request order", () => {
+    const file = portfolioFile([
+      [2, [[3, "Missing Id"]]],
+      [
+        2,
+        [
+          [1, "sec-yahoo-nodata"],
+          [3, "Yahoo EOD"],
+          [4, "GBP"],
+          [8, "TESTA.L"],
+          [11, "YAHOO"],
+          [14, "NO_DATA"],
+          [
+            13,
+            [
+              [1, 20_720],
+              [2, 12_340_000_000],
+            ],
+          ],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-manual-yahoo"],
+          [3, "Yahoo Latest"],
+          [4, "GBP"],
+          [8, "TESTB.L"],
+          [11, "MANUAL"],
+          [14, "YAHOO-ADJUSTEDCLOSE"],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-ft"],
+          [3, "FT Fund"],
+          [4, "GBP"],
+          [11, "FT"],
+          [14, "NO_DATA"],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-latest-manual"],
+          [3, "Latest Manual"],
+          [14, "MANUAL"],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-none"],
+          [3, "Plain Security"],
+          [4, "GBP"],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+
+    expect(
+      readQuotableSecurities(file, [
+        "sec-latest-manual",
+        "sec-missing",
+        "sec-yahoo-nodata",
+        "sec-manual-yahoo",
+        "sec-ft",
+        "sec-none",
+      ]),
+    ).toStrictEqual([
+      {
+        currency: "",
+        feed: "MANUAL",
+        id: "sec-latest-manual",
+        latestPrice: null,
+        ticker: undefined,
+      },
+      {
+        currency: "GBP",
+        feed: "YAHOO",
+        id: "sec-yahoo-nodata",
+        latestPrice: 123.4,
+        ticker: "TESTA.L",
+      },
+      {
+        currency: "GBP",
+        feed: "YAHOO-ADJUSTEDCLOSE",
+        id: "sec-manual-yahoo",
+        latestPrice: null,
+        ticker: "TESTB.L",
+      },
+      {
+        currency: "GBP",
+        feed: "FT",
+        id: "sec-ft",
+        latestPrice: null,
+        ticker: undefined,
+      },
+      {
+        currency: "GBP",
+        feed: undefined,
+        id: "sec-none",
+        latestPrice: null,
+        ticker: undefined,
+      },
+    ]);
   });
 });

@@ -19,6 +19,7 @@ import type {
   TransactionType,
 } from "@/data/portfolio";
 import type { Portfolio, Target } from "@/data/targets";
+import type { QuotableSecurity } from "@/lib/portfolio-quotes";
 import type { Message } from "@/lib/protobuf";
 
 import {
@@ -32,6 +33,7 @@ import {
 import { answerOf, Refusal } from "@/lib/answer";
 import { sumOf } from "@/lib/ledger";
 import { formatPercent } from "@/lib/money";
+import { yahooFeeds } from "@/lib/portfolio-quotes";
 import {
   bytesAt,
   delimitedOf,
@@ -324,10 +326,12 @@ const fields = {
   price: { close: 2, date: 1 },
   security: {
     currency: 4,
+    feed: 11,
     id: 1,
     isin: 7,
     isRetired: 20,
     latest: 16,
+    latestFeed: 14,
     name: 3,
     note: 6,
     prices: 13,
@@ -825,6 +829,35 @@ export function readPortfolioTargets(file: Uint8Array): {
   };
 }
 
+// Extracts stored quote-lookup metadata (currency, resolved feed,
+// ticker, and latest positive price) for requested raw protobuf field-1
+// security ids, preserving request order and skipping any ids absent
+// from the stored file.
+export function readQuotableSecurities(
+  file: Uint8Array,
+  securityIds: readonly string[],
+): readonly QuotableSecurity[] {
+  const client = messageOf(opened(file).client);
+  const byId = new Map<string, QuotableSecurity>();
+  for (const security of messagesAt(client, fields.client.securities)) {
+    const id = optionalText(security, fields.security.id);
+    if (id !== undefined) {
+      const { price } = latestQuoteOf(security);
+      byId.set(id, {
+        currency: optionalText(security, fields.security.currency) ?? "",
+        feed: resolvedFeedOf(security),
+        id,
+        latestPrice: price > 0 ? price : null,
+        ticker: optionalText(security, fields.security.ticker),
+      });
+    }
+  }
+  return securityIds.flatMap((id) => {
+    const found = byId.get(id);
+    return found === undefined ? [] : [found];
+  });
+}
+
 // The target allocation a Portfolio Performance file holds, from its
 // Asset Allocation taxonomy, and what each category of it holds. The
 // file is the one Portfolio Performance saves in binary: a zip holding
@@ -924,8 +957,8 @@ export function updateQuotes(
   const { now } = writeContextOf(options);
   let updatedCount = 0;
   const content = rewriteClient(file, (clientBytes) => {
-    const quoteEpochDay = isoDateToEpochDay(input.date);
-    const updates = quoteUpdatesMapOf(input.quotes);
+    const defaultEpochDay = isoDateToEpochDay(input.date);
+    const updates = quoteUpdatesMapOf(input.quotes, defaultEpochDay);
     const knownIds = rawIdsOf(
       messageOf(clientBytes),
       fields.client.securities,
@@ -946,13 +979,12 @@ export function updateQuotes(
           messageOf(securityBytes),
           fields.security.id,
         );
-        const closeScaled =
-          secId === undefined ? undefined : updates.get(secId);
-        return closeScaled === undefined
+        const update = secId === undefined ? undefined : updates.get(secId);
+        return update === undefined
           ? securityBytes
           : rewriteSecurityQuote(securityBytes, {
-              closeScaled,
-              quoteEpochDay,
+              closeScaled: update.closeScaled,
+              quoteEpochDay: update.quoteEpochDay,
               updatedAt,
             });
       },
@@ -1811,20 +1843,32 @@ function quoteOf(
 }
 
 // Validates a non-empty batch of unique security quote updates and
-// converts each price to integer hundred-millionths.
+// converts each price to integer hundred-millionths and each optional
+// per-quote date (falling back to defaultEpochDay) to UTC epoch days.
 function quoteUpdatesMapOf(
   quotes: readonly PortfolioQuoteUpdate[],
-): ReadonlyMap<string, number> {
+  defaultEpochDay: number,
+): ReadonlyMap<
+  string,
+  { readonly closeScaled: number; readonly quoteEpochDay: number }
+> {
   if (quotes.length === 0) {
     throw new Refusal("Enter at least one security price");
   }
-  const updates = new Map<string, number>();
-  for (const { price, securityId } of quotes) {
+  const updates = new Map<
+    string,
+    { readonly closeScaled: number; readonly quoteEpochDay: number }
+  >();
+  for (const { date, price, securityId } of quotes) {
     const id = trimmedRequired(securityId, "Security");
     if (updates.has(id)) {
       throw new Refusal("Each security can only be updated once per batch");
     }
-    updates.set(id, scaledValueOf(price, "Quote price"));
+    updates.set(id, {
+      closeScaled: scaledValueOf(price, "Quote price"),
+      quoteEpochDay:
+        date === undefined ? defaultEpochDay : isoDateToEpochDay(date),
+    });
   }
   return updates;
 }
@@ -1954,6 +1998,22 @@ function resolveCashRef(
     );
   }
   return trimmed;
+}
+
+// Effective quote feed for a security: historical feed (field 11) is
+// primary, with Yahoo feeds winning over non-Yahoo/NO_DATA companion
+// feeds so PP's common feed=YAHOO + latestFeed=NO_DATA setup stays
+// Yahoo-eligible.
+function resolvedFeedOf(security: Message): string | undefined {
+  const historical = optionalText(security, fields.security.feed);
+  const latest = optionalText(security, fields.security.latestFeed);
+  if (historical !== undefined && yahooFeeds.has(historical)) {
+    return historical;
+  }
+  if (latest !== undefined && yahooFeeds.has(latest)) {
+    return latest;
+  }
+  return historical ?? latest;
 }
 
 // Validates and derives the cross-currency GROSS_VALUE unit for a

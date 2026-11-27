@@ -168,8 +168,10 @@ export interface PortfolioQuoteBatch {
   readonly quotes: readonly PortfolioQuoteUpdate[];
 }
 
-// One security price entry within a batch quote update.
+// One security price entry within a batch quote update, optionally
+// carrying its own ISO calendar date (falling back to the batch date).
 export interface PortfolioQuoteUpdate {
+  readonly date?: string;
   readonly price: number;
   readonly securityId: string;
 }
@@ -391,6 +393,19 @@ const transactionTypeValues: readonly [TransactionType, ...TransactionType[]] =
 // Postgres int4 max minus 1 so version + 1 always fits.
 export const afterVersionSchema = z.number().int().min(1).max(2_147_483_646);
 
+// Server-side validation schema for requesting online quote lookups
+// against stored securities in the household's .portfolio file.
+export const fetchPortfolioQuotesInputSchema = z.object({
+  securityIds: z
+    .array(requiredId)
+    .min(1, "Select at least one security")
+    .max(100)
+    .refine(
+      (ids) => new Set(ids).size === ids.length,
+      "Each security can only be fetched once per batch",
+    ),
+});
+
 // Server-side validation schema for appending a cash or securities account.
 export const newPortfolioAccountSchema = z.discriminatedUnion("kind", [
   z.object({
@@ -452,7 +467,13 @@ export const newPortfolioTransactionSchema = z
 export const portfolioQuoteBatchSchema = z.object({
   date: isoDate,
   quotes: z
-    .array(z.object({ price: positiveScaled, securityId: requiredId }))
+    .array(
+      z.object({
+        date: isoDate.exactOptional(),
+        price: positiveScaled,
+        securityId: requiredId,
+      }),
+    )
     .min(1, "Enter at least one security price")
     .max(1000)
     .refine(

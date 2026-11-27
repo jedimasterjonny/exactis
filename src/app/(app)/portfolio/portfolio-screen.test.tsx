@@ -33,6 +33,7 @@ vi.mock("@/actions/portfolio", () => ({
   addPortfolioAccount: vi.fn(),
   addPortfolioSecurity: vi.fn(),
   addPortfolioTransaction: vi.fn(),
+  fetchPortfolioQuotes: vi.fn(),
   updatePortfolioQuotes: vi.fn(),
   uploadPortfolio: vi.fn(),
 }));
