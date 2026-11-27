@@ -11,6 +11,7 @@ import { allocation, rates } from "@/data/rates.fixture";
 import { termOf } from "@/lib/loans";
 
 import {
+  accountRateIn,
   ageIn,
   debtTermOf,
   earnerOf,
@@ -21,6 +22,7 @@ import {
   marginOf,
   planOf,
   pricesIn,
+  rateFrom,
   rateIn,
   risenBy,
   risenWith,
@@ -259,6 +261,71 @@ describe("rateIn", () => {
     expect(rateIn(plan, 2025)).toBeCloseTo(0.05, 15);
     expect(rateIn(plan, 2028)).toBeCloseTo(0.05, 15);
     expect(rateIn({ from: 2026, rate: 0.05 }, 2026)).toBeCloseTo(0.05, 15);
+  });
+});
+
+describe("accountRateIn", () => {
+  // Account 4 has a bespoke glide path (9%, 8%) and a path draw for
+  // 2026 (12%); account 5 has no bespoke entry and reads the global
+  // plan rate along its path and glide path.
+  it("reads a bespoke account's path, glide path, and own rate, falling back to the global plan rate for unlinked accounts", () => {
+    const plan = {
+      accountRates: { 4: { byYear: [0.09, 0.08], rate: 0.075 } },
+      byYear: [0.06, 0.055],
+      from: 2026,
+      path: { accounts: { 4: { rate: [0.12] } }, inflation: [0], rate: [0.1] },
+      rate: 0.05,
+    };
+
+    expect(accountRateIn({ id: 4 }, plan, 2026)).toBeCloseTo(0.12, 15);
+    expect(accountRateIn({ id: 4 }, plan, 2027)).toBeCloseTo(0.08, 15);
+    expect(accountRateIn({ id: 4 }, plan, 2028)).toBeCloseTo(0.075, 15);
+    expect(accountRateIn({ id: 5 }, plan, 2026)).toBeCloseTo(0.1, 15);
+    expect(accountRateIn({ id: 5 }, plan, 2027)).toBeCloseTo(0.055, 15);
+    expect(
+      accountRateIn(
+        { id: 4 },
+        { accountRates: { 4: { rate: 0.075 } }, from: 2026, rate: 0.05 },
+        2026,
+      ),
+    ).toBeCloseTo(0.075, 15);
+  });
+});
+
+describe("rateFrom", () => {
+  it("reads a fixed rate, a bespoke plan rate for non-debts, and the global plan rate for unlinked accounts and debts", () => {
+    const base = planOf(setting, opening);
+    const plan = {
+      ...base,
+      accountRates: { 2: { rate: 0.08 }, 8: { rate: 0.09 } },
+    };
+    const saving: Account = {
+      balance: 10000,
+      growth: { kind: "plan" },
+      id: 2,
+      kind: "tax-free",
+      name: "ISA",
+      owner: 1,
+    };
+    const unlinked: Account = { ...saving, id: 3, name: "Unlinked ISA" };
+    const fixed: Account = {
+      ...saving,
+      growth: { kind: "fixed", rate: 0.03 },
+      id: 4,
+    };
+    const debt: Account = {
+      balance: -10000,
+      growth: { kind: "plan" },
+      id: 8,
+      kind: "debt",
+      name: "Loan",
+    };
+
+    expect(rateFrom(saving, plan)).toBeCloseTo(0.08, 15);
+    expect(rateFrom(unlinked, plan)).toBeCloseTo(0.05, 15);
+    expect(rateFrom(fixed, plan)).toBeCloseTo(0.03, 15);
+    expect(rateFrom(debt, plan)).toBeCloseTo(0.05, 15);
+    expect(rateFrom(saving, base)).toBeCloseTo(0.05, 15);
   });
 });
 

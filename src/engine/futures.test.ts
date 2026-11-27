@@ -163,6 +163,85 @@ describe("pathOf", () => {
     expect(Math.min(...path.rate)).toBeGreaterThan(-1);
     expect(Math.min(...path.inflation)).toBeGreaterThan(-1);
   });
+
+  // Adding accountRates must not alter the global path bit-for-bit, and
+  // each bespoke account shares the same market shock scaled by its own
+  // spread (or falls back to the plan's glide/flat spread when absent).
+  it("draws bespoke account paths along the shared market shocks without altering the global path", () => {
+    const spread: Spread = {
+      accountSpreads: { 1: { byYear: [0, 0.2], rate: 0.1 }, 2: { rate: 0.08 } },
+      byYear: [0.12, 0.16],
+      inflation: 0.02,
+      rate: 0.14,
+    };
+    const base = pathOf({ ...plan, years: 3 }, spread, normalsFrom(42));
+    const withAccounts = pathOf(
+      {
+        ...plan,
+        accountRates: {
+          1: { byYear: [0.09, 0.08], rate: 0.06 },
+          2: { rate: 0.04 },
+          3: { rate: 0.05 },
+        },
+        years: 3,
+      },
+      spread,
+      normalsFrom(42),
+    );
+
+    expect(withAccounts.inflation).toStrictEqual(base.inflation);
+    expect(withAccounts.rate).toStrictEqual(base.rate);
+    expect(withAccounts.accounts?.[1]?.rate[0]).toBeCloseTo(0.09, 15);
+    expect(withAccounts.accounts?.[1]?.rate).toHaveLength(3);
+    expect(withAccounts.accounts?.[2]?.rate).toHaveLength(3);
+    expect(withAccounts.accounts?.[3]?.rate).toHaveLength(3);
+
+    const globalSpreads = [0.12, 0.16, 0.14] as const;
+    const globalShocks = globalSpreads.map(
+      (globSpread, offset) =>
+        (logOf(withAccounts.rate[offset] ?? Number.NaN) - logOf(plan.rate)) /
+        globSpread,
+    );
+    const inflationShock0 =
+      (logOf(withAccounts.inflation[0] ?? Number.NaN) - logOf(plan.inflation)) /
+      spread.inflation;
+    expect(globalShocks[0]).not.toBeCloseTo(inflationShock0, 2);
+
+    const expectedChecks: readonly (readonly [
+      number,
+      number,
+      number,
+      number,
+    ])[] = [
+      // [accountId, offset, expectedMean, expectedSpread]
+      [1, 1, 0.08, 0.2],
+      [1, 2, 0.06, 0.1],
+      [2, 0, 0.04, 0.08],
+      [2, 1, 0.04, 0.08],
+      [2, 2, 0.04, 0.08],
+      [3, 0, 0.05, 0.12],
+      [3, 1, 0.05, 0.16],
+      [3, 2, 0.05, 0.14],
+    ];
+    for (const [id, offset, accMean, accSpread] of expectedChecks) {
+      const drawn = withAccounts.accounts?.[id]?.rate[offset] ?? Number.NaN;
+      const shock = (logOf(drawn) - logOf(accMean)) / accSpread;
+      expect(shock).toBeCloseTo(globalShocks[offset] ?? Number.NaN, 12);
+    }
+
+    const normal = normalsFrom(2026);
+    const paths = Array.from({ length: 500 }, () =>
+      pathOf(
+        { ...plan, accountRates: { 1: { rate: 0.09 } }, years: 10 },
+        { accountSpreads: { 1: { rate: 0.18 } }, inflation: 0.02, rate: 0.14 },
+        normal,
+      ),
+    );
+    const bespokeRates = paths.flatMap(
+      ({ accounts }) => accounts?.[1]?.rate ?? [],
+    );
+    expect(Math.abs(middleOf(bespokeRates) - 0.09)).toBeLessThan(0.008);
+  });
 });
 
 describe("monthsAlong", () => {
@@ -314,6 +393,59 @@ describe("monthsOver", () => {
 
   it("draws a year's months the same however long the plan runs", () => {
     expect(monthsFor(40).slice(0, 120)).toStrictEqual(monthsFor(10));
+  });
+
+  // Sharing the same twelve monthly draws across global and bespoke
+  // accounts preserves global months bit-for-bit, compounds each bespoke
+  // account's twelve months to its yearly return, and skips years absent
+  // from a shorter account path.
+  it("shares each year's monthly draws across bespoke accounts without altering global months", () => {
+    const bespokeSpread: Spread = {
+      accountSpreads: { 1: { rate: 0.18 } },
+      inflation: 0.02,
+      rate: 0.14,
+    };
+    const basePath = pathOf(
+      { ...plan, years: 3 },
+      bespokeSpread,
+      normalsFrom(1),
+    );
+    const bespokePath = pathOf(
+      { ...plan, accountRates: { 1: { rate: 0.09 } }, years: 3 },
+      bespokeSpread,
+      normalsFrom(1),
+    );
+    const baseMonths = monthsOver(basePath, bespokeSpread, normalsFrom(2));
+    const withAccounts = monthsOver(bespokePath, bespokeSpread, normalsFrom(2));
+
+    expect(withAccounts.months).toStrictEqual(baseMonths.months);
+    const globalMonths = withAccounts.months ?? [];
+    const accountRates = withAccounts.accounts?.[1]?.rate ?? [];
+    const accountMonths = withAccounts.accounts?.[1]?.months ?? [];
+    expect(accountMonths).toHaveLength(36);
+    for (const [offset, rate] of accountRates.entries()) {
+      const yearGlobal = withAccounts.rate[offset] ?? Number.NaN;
+      const slice = accountMonths.slice(12 * offset, 12 * offset + 12);
+      const grown = slice.reduce((product, month) => product * (1 + month), 1);
+      expect(Math.abs(grown / (1 + rate) - 1)).toBeLessThan(1e-12);
+      for (const [monthIndex, accMonth] of slice.entries()) {
+        const globMonth = globalMonths[12 * offset + monthIndex] ?? Number.NaN;
+        const accShock = (logOf(accMonth) - logOf(rate) / 12) / 0.18;
+        const globShock = (logOf(globMonth) - logOf(yearGlobal) / 12) / 0.14;
+        expect(accShock).toBeCloseTo(globShock, 12);
+      }
+    }
+
+    const shorter = monthsOver(
+      {
+        accounts: { 1: { rate: [0.08] } },
+        inflation: [0, 0],
+        rate: [0.05, 0.05],
+      },
+      { inflation: 0, rate: 0.14 },
+      normalsFrom(2),
+    );
+    expect(shorter.accounts?.[1]?.months).toHaveLength(12);
   });
 });
 
@@ -1575,6 +1707,41 @@ describe("marketsOf", () => {
     expect(
       marketsOf({ future: 0, plan: planned, seed: 7, spread }).rate,
     ).not.toStrictEqual(marketsOf({ future: 0, plan: planned, spread }).rate);
+  });
+
+  // marketsOf preserves bespoke per-account annual and monthly returns,
+  // and monthsAlong carries bespoke accounts along their own monthly draws.
+  it("preserves bespoke per-account annual and monthly returns in marketsOf and monthsAlong", () => {
+    const bespokePlan = { ...planned, accountRates: { 1: { rate: 0.09 } } };
+    const bespokeSpread = {
+      accountSpreads: { 1: { rate: 0.2 } },
+      inflation: 0,
+      rate: 0.14,
+    };
+    const markets = marketsOf({
+      future: 0,
+      plan: bespokePlan,
+      spread: bespokeSpread,
+    });
+    const accountPath = markets.accounts?.[1];
+
+    expect(accountPath?.rate).toHaveLength(4);
+    expect(accountPath?.months).toHaveLength(48);
+    expect(compounded((accountPath?.months ?? []).slice(0, 12))).toBeCloseTo(
+      accountPath?.rate[0] ?? Number.NaN,
+      10,
+    );
+
+    const [reached] = monthsAlong([isa], nothing, {
+      months: 3,
+      plan: bespokePlan,
+      spread: bespokeSpread,
+    })
+      .take(1)
+      .toArray();
+    const expected =
+      isa.balance * (1 + compounded((accountPath?.months ?? []).slice(0, 3)));
+    expect(reached?.[0]?.balance).toBeCloseTo(expected, 8);
   });
 });
 

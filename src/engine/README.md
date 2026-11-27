@@ -472,15 +472,24 @@ and where it asks nothing of bonds, what the vintage expects of global bonds
 hedged to sterling, or unhedged where it prices no hedged form: an allocation
 all in equities can still sit under a glide path that holds bonds in later
 years, and those years need a return and a risk that the allocation cannot give.
-A glide path moves the split with the plan's owner's age, so a plan on one
-carries the plan rate year by year, each year's at the split the path holds at
-the age reached in it, and its own rate is its first year's. Along a glide path,
-a saving or an asset on the plan rate takes the year's rate, and along a future
-of the markets the month's its path holds, or the twelfth root of the year's
-where it holds none. An account on a fixed rate keeps its own, and so does a
-debt on the plan rate, since its payment and the term it clears in are worked
-out against the plan's own rate, and charged at another it would be left owing
-when the payments stop.
+A saving on the plan rate linked to a Portfolio Performance securities account
+grows instead at a bespoke rate derived from that account's own holdings across
+the target allocation's categories by the same CMA method as the plan rate,
+rebalancing included, and along a future of the markets strays by its own
+CMA-derived spread driven by the same yearly and monthly market draws. Along a
+glide path, a linked saving keeps its own within-sleeve blend while its
+stocks/bonds split follows the glide path's age curve. Under custom rates, or
+where the linked account holds no blendable categorised holdings or lacks a
+sleeve the glide path holds, it falls back to the plan rate. Unlinked savings
+continue to grow at the plan rate. A glide path moves the split with the plan's
+owner's age, so a plan on one carries the plan rate year by year, each year's at
+the split the path holds at the age reached in it, and its own rate is its first
+year's. Along a glide path, a saving or an asset on the plan rate takes the
+year's rate, and along a future of the markets the month's its path holds, or
+the twelfth root of the year's where it holds none. An account on a fixed rate
+keeps its own, and so does a debt on the plan rate, since its payment and the
+term it clears in are worked out against the plan's own rate, and charged at
+another it would be left owing when the payments stop.
 
 Each account is carried on its own, and the point sums the wrappers as well.
 Cash and the GIAs are carried beside the wrappers, so a short month can be drawn

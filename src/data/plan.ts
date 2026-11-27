@@ -44,17 +44,26 @@ export const drawnFromWords: Readonly<Record<Drawdown, string>> = {
   "savings-first": "Drawn from the savings, cash first.",
 };
 
+// One future of the markets with its monthly figures present, as
+// marketsOf hands back and a future's story reads.
+export type Markets = Omit<Path, "months"> & {
+  readonly months: readonly number[];
+};
+
 // One future of the markets, a figure for each year the plan carries,
 // the first year's the one the plan starts in and each after it the
 // year on: what the plan rate comes to that year, and what prices rise
-// by in it, each a fraction as every rate is; and, where it holds them,
+// by in it, each a fraction as every rate is; where it holds them,
 // what the plan rate comes to in each month of those years, twelve a
-// year from January, the first year's first. A plan carried along a
-// path takes the year's figures in place of its own, everywhere a rate
-// or prices move with the markets, and a saving or an asset on the plan
-// rate the month's where the path holds them; a year the path holds no
-// figure for takes the plan's own.
+// year from January, the first year's first; and, for accounts on a
+// bespoke rate, each account's own yearly and monthly figures driven by
+// the same market draws. A plan carried along a path takes the year's
+// figures in place of its own, everywhere a rate or prices move with
+// the markets, and a saving or an asset on the plan rate the month's
+// where the path holds them; a year the path holds no figure for takes
+// the plan's own.
 export interface Path {
+  readonly accounts?: Readonly<Record<number, AccountPath>>;
   readonly inflation: readonly number[];
   readonly months?: readonly number[];
   readonly rate: readonly number[];
@@ -87,9 +96,12 @@ export interface Path {
 // plan on a glide path carries the plan rate each of its years by year,
 // the first year's first, since the split moves with its owner's age,
 // and its own rate is then its first year's, the rate it grows at now.
-// A plan may name the drawdown a shortfall is drawn in, and one naming
-// none draws its savings first.
+// Accounts linked to Portfolio Performance on the plan rate carry their
+// own bespoke rates by account id under accountRates. A plan may name
+// the drawdown a shortfall is drawn in, and one naming none draws its
+// savings first.
 export interface Plan {
+  readonly accountRates?: Readonly<Record<number, AccountRate>>;
   readonly born: number;
   readonly byYear?: readonly number[];
   readonly children?: readonly Child[];
@@ -119,13 +131,34 @@ export interface PlanAges {
 // the standard deviation of the logarithm of one plus the plan rate's
 // return in a year, and of one plus prices' rise. The rate's is the
 // portfolio's as a whole, stocks and bonds in the split the plan holds,
-// since every account on the plan rate is carried at the one rate. Along
-// a glide path the split moves with its owner's age, so the rate's is
-// carried for each year of the plan as well, the first year's first,
-// and its own is then the first year's.
+// and accounts on a bespoke rate carry their own spreads by account id
+// under accountSpreads. Along a glide path the split moves with its
+// owner's age, so the rate's is carried for each year of the plan as
+// well, the first year's first, and its own is then the first year's.
 export interface Spread {
+  readonly accountSpreads?: Readonly<Record<number, AccountSpread>>;
   readonly byYear?: readonly number[];
   readonly inflation: number;
+  readonly rate: number;
+}
+
+// One account's drawn returns along a future of the markets.
+interface AccountPath {
+  readonly months?: readonly number[];
+  readonly rate: readonly number[];
+}
+
+// One account's bespoke nominal return, and its per-year figures along
+// a glide path.
+interface AccountRate {
+  readonly byYear?: readonly number[];
+  readonly rate: number;
+}
+
+// One account's bespoke log-spread, and its per-year figures along a
+// glide path.
+interface AccountSpread {
+  readonly byYear?: readonly number[];
   readonly rate: number;
 }
 
@@ -154,6 +187,26 @@ interface Setting {
 // the plan itself, which carries the path and the month it starts from,
 // and let go with it.
 const yearStarts = new WeakMap<Priced, Map<number, Map<number, number>>>();
+
+// The plan rate an account on the plan rate takes in a year: its
+// bespoke path figure, glide path figure, or own rate where the plan
+// carries one for it, and the global plan rate otherwise.
+export function accountRateIn(
+  account: Pick<Account, "id">,
+  plan: Pick<Plan, "accountRates" | "byYear" | "from" | "path" | "rate">,
+  year: number,
+): number {
+  const bespoke = plan.accountRates?.[account.id];
+  if (bespoke === undefined) {
+    return rateIn(plan, year);
+  }
+  const offset = year - plan.from;
+  return (
+    plan.path?.accounts?.[account.id]?.rate[offset] ??
+    bespoke.byYear?.[offset] ??
+    bespoke.rate
+  );
+}
 
 // The age the plan's owner reaches in a year. The plan holds the year
 // they were born in and not the day, so it is the age reached that
@@ -350,15 +403,18 @@ export function pricesIn(plan: Priced, at: Month): number {
   return risenWith(0, plan, at);
 }
 
-// The rate an account is carried at, its own fixed one or the plan's,
-// whichever it is carried on. A debt is charged at the same rate it
-// grows at, so its payments are worked out against this one too.
+// The rate an account is carried at, its own fixed one, its bespoke
+// plan rate where it carries one, or the plan's own, whichever it is
+// carried on. A debt is charged at the plan's own rate rather than any
+// bespoke rate, so its payments are worked out against that one too.
 export function rateFrom(account: Account, plan: Plan): number {
   switch (account.growth.kind) {
     case "fixed":
       return account.growth.rate;
     case "plan":
-      return plan.rate;
+      return account.kind === "debt"
+        ? plan.rate
+        : (plan.accountRates?.[account.id]?.rate ?? plan.rate);
   }
 }
 
