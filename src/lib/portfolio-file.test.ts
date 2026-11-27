@@ -27,13 +27,19 @@ import {
   appendAccount,
   appendSecurity,
   appendTransaction,
+  deleteAccount,
+  deleteSecurity,
+  deleteTransaction,
   readPortfolioFeed,
   readPortfolioSnapshot,
   readPortfolioTargets,
   readQuotableSecurities,
   readTargets,
   reweighted,
+  updateAccount,
   updateQuotes,
+  updateSecurity,
+  updateTransaction,
 } from "./portfolio-file";
 
 // A transaction as a test writes it out: the security it is on, or
@@ -768,6 +774,7 @@ describe("readPortfolioSnapshot", () => {
           id: "sec-gbp",
           isin: "GB00TEST0001",
           isRetired: false,
+          isSplitCategory: true,
           latestPrice: 125.5,
           latestPriceDate: "2026-09-25",
           name: "Global Equity Index",
@@ -775,52 +782,63 @@ describe("readPortfolioSnapshot", () => {
           shares: 10,
           sharesByAccount: [{ portfolioId: "port-isa", shares: 10 }],
           ticker: "GEIDX",
+          transactionCount: 2,
         },
         {
           category: "UK gilts",
+          categoryId: "aa-bonds",
           currency: "GBX",
           gbpRate: 0.01,
           id: "sec-gbx",
           isRetired: false,
+          isSplitCategory: false,
           latestPrice: 250,
           latestPriceDate: "2026-09-24",
           name: "UK Gilts Fund",
           shares: 40,
           sharesByAccount: [{ portfolioId: "port-isa", shares: 40 }],
+          transactionCount: 1,
         },
         {
           category: "Global equity",
+          categoryId: "aa-dev",
           currency: "USD",
           gbpRate: 0.75,
           id: "sec-usd",
           isRetired: false,
+          isSplitCategory: false,
           latestPrice: 100,
           latestPriceDate: "2026-09-22",
           name: "North America ETF",
           shares: 2,
           sharesByAccount: [{ portfolioId: "port-isa", shares: 2 }],
+          transactionCount: 1,
         },
         {
           currency: "JPY",
           gbpRate: null,
           id: "sec-jpy",
           isRetired: false,
+          isSplitCategory: false,
           latestPrice: 1000,
           latestPriceDate: "2026-09-22",
           name: "Tokyo Tracker",
           shares: 5,
           sharesByAccount: [{ portfolioId: "port-isa", shares: 5 }],
+          transactionCount: 1,
         },
         {
           currency: "",
           gbpRate: null,
           id: "sec-zero",
           isRetired: true,
+          isSplitCategory: false,
           latestPrice: null,
           latestPriceDate: null,
           name: "Pending Launch",
           shares: 0,
           sharesByAccount: [],
+          transactionCount: 2,
         },
       ],
       latestQuoteDate: "2026-09-25",
@@ -833,6 +851,7 @@ describe("readPortfolioSnapshot", () => {
           name: "Northstar ISA",
           note: "Tax wrapper",
           referenceAccountId: "cash-isa",
+          transactionCount: 6,
         },
         {
           holdingsCount: 1,
@@ -841,6 +860,7 @@ describe("readPortfolioSnapshot", () => {
           marketValue: 125.5,
           name: "Closed Dealing",
           referenceAccountId: "cash-old",
+          transactionCount: 2,
         },
         {
           holdingsCount: 0,
@@ -848,6 +868,7 @@ describe("readPortfolioSnapshot", () => {
           isRetired: false,
           marketValue: 0,
           name: "Unfunded",
+          transactionCount: 0,
         },
       ],
       totalCash: 540,
@@ -900,11 +921,13 @@ describe("readPortfolioSnapshot", () => {
           gbpRate: 1,
           id: "sec-undated",
           isRetired: false,
+          isSplitCategory: false,
           latestPrice: 60,
           latestPriceDate: null,
           name: "Undated Fund",
           shares: 2,
           sharesByAccount: [{ portfolioId: "port-1", shares: 2 }],
+          transactionCount: 1,
         },
       ],
       latestQuoteDate: null,
@@ -915,6 +938,7 @@ describe("readPortfolioSnapshot", () => {
           isRetired: false,
           marketValue: 120,
           name: "Dealing",
+          transactionCount: 1,
         },
       ],
       totalCash: 0,
@@ -991,11 +1015,13 @@ describe("readPortfolioSnapshot", () => {
           gbpRate: 1,
           id: "sec-dated",
           isRetired: false,
+          isSplitCategory: false,
           latestPrice: 50,
           latestPriceDate: "2026-09-24",
           name: "Dated Fund",
           shares: 1,
           sharesByAccount: [{ portfolioId: "port-1", shares: 1 }],
+          transactionCount: 1,
         },
       ],
       latestQuoteDate: "2026-09-24",
@@ -1006,6 +1032,7 @@ describe("readPortfolioSnapshot", () => {
           isRetired: false,
           marketValue: 50,
           name: "Dealing",
+          transactionCount: 1,
         },
       ],
       totalCash: 0,
@@ -1185,7 +1212,8 @@ describe("readPortfolioSnapshot", () => {
           ],
         ],
       ],
-      // Unknown future transaction enum values are skipped from cash ledger counts.
+      // Unknown future transaction enum values are skipped from cash balances
+      // but still counted in raw transactionCount so delete guards agree.
       [
         5,
         [
@@ -1246,6 +1274,7 @@ describe("readPortfolioSnapshot", () => {
         isRetired: false,
         marketValue: 165,
         name: "Dealing",
+        transactionCount: 2,
       },
     ]);
     expect(snapshot.cashAccounts).toStrictEqual([
@@ -1256,7 +1285,7 @@ describe("readPortfolioSnapshot", () => {
         id: "cash-gbp",
         isRetired: false,
         name: "Sterling Cash",
-        transactionCount: 3,
+        transactionCount: 5,
       },
       {
         balance: 125,
@@ -1379,33 +1408,39 @@ describe("readPortfolioSnapshot", () => {
           gbpRate: 1,
           id: "sec-a",
           isRetired: false,
+          isSplitCategory: false,
           latestPrice: 10.004,
           latestPriceDate: null,
           name: "Fund A",
           shares: 1,
           sharesByAccount: [{ portfolioId: "port-lots", shares: 1 }],
+          transactionCount: 1,
         },
         {
           currency: "GBP",
           gbpRate: 1,
           id: "sec-b",
           isRetired: false,
+          isSplitCategory: false,
           latestPrice: 10.004,
           latestPriceDate: null,
           name: "Fund B",
           shares: 1,
           sharesByAccount: [{ portfolioId: "port-lots", shares: 1 }],
+          transactionCount: 1,
         },
         {
           currency: "",
           gbpRate: null,
           id: "security-2",
           isRetired: false,
+          isSplitCategory: false,
           latestPrice: null,
           latestPriceDate: null,
           name: "Blank Id Fund",
           shares: 0,
           sharesByAccount: [],
+          transactionCount: 0,
         },
       ],
       latestQuoteDate: null,
@@ -1416,6 +1451,7 @@ describe("readPortfolioSnapshot", () => {
           isRetired: false,
           marketValue: 0,
           name: "Unnamed Id Portfolio",
+          transactionCount: 0,
         },
         {
           holdingsCount: 2,
@@ -1423,6 +1459,7 @@ describe("readPortfolioSnapshot", () => {
           isRetired: false,
           marketValue: 20,
           name: "Lots Account",
+          transactionCount: 2,
         },
       ],
       totalCash: 0,
@@ -1482,11 +1519,13 @@ describe("readPortfolioSnapshot", () => {
         gbpRate: 1,
         id: "sec-watch",
         isRetired: false,
+        isSplitCategory: false,
         latestPrice: null,
         latestPriceDate: null,
         name: "Watchlist Tracker",
         shares: 0,
         sharesByAccount: [],
+        transactionCount: 0,
       },
     ]);
   });
@@ -3234,11 +3273,13 @@ describe("appendSecurity", () => {
     expect(snapshot.holdings).toStrictEqual([
       {
         category: "Global equity",
+        categoryId: "aa-equity",
         currency: "GBX",
         gbpRate: 0.01,
         id: "sec-new",
         isin: "GB00TEST0002",
         isRetired: false,
+        isSplitCategory: false,
         latestPrice: 214.015,
         latestPriceDate: "2026-09-25",
         name: "UK Gilts Tracker",
@@ -3246,6 +3287,7 @@ describe("appendSecurity", () => {
         shares: 0,
         sharesByAccount: [],
         ticker: "UKGT",
+        transactionCount: 0,
       },
     ]);
 
@@ -6281,5 +6323,1468 @@ describe("GROSS_VALUE decoding and cross-currency bookkeeping", () => {
         ticker: undefined,
       },
     ]);
+  });
+});
+
+describe("isSplitCategory and raw transaction counts", () => {
+  it("detects clean single-leaf 100% assignments vs partial weights, non-leaves, orphans, missing roots, and duplicates", () => {
+    const file = portfolioFile([
+      [
+        2,
+        [
+          [1, "sec-clean"],
+          [3, "Clean Leaf"],
+          [4, "GBP"],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-partial"],
+          [3, "Partial Leaf"],
+          [4, "GBP"],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-nonleaf"],
+          [3, "Non Leaf"],
+          [4, "GBP"],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-orphan"],
+          [3, "Orphan Class"],
+          [4, "GBP"],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-dup"],
+          [3, "Dup Assignment"],
+          [4, "GBP"],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-none"],
+          [3, "Unassigned"],
+          [4, "GBP"],
+        ],
+      ],
+      [
+        8,
+        [
+          [1, "tax-aa"],
+          [2, "Asset Allocation"],
+          [
+            5,
+            [
+              [1, "aa-root"],
+              [3, "Root"],
+              [
+                9,
+                [
+                  [1, "sec-nonleaf"],
+                  [2, 10_000],
+                ],
+              ],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "aa-leaf"],
+              [2, "aa-root"],
+              [3, "Equities"],
+              [
+                9,
+                [
+                  [1, "sec-clean"],
+                  [2, 10_000],
+                ],
+              ],
+              [
+                9,
+                [
+                  [1, "sec-partial"],
+                  [2, 6000],
+                ],
+              ],
+              [
+                9,
+                [
+                  [1, "sec-dup"],
+                  [2, 5000],
+                ],
+              ],
+              [
+                9,
+                [
+                  [1, "sec-dup"],
+                  [2, 5000],
+                ],
+              ],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "aa-orphan"],
+              [2, "missing-parent"],
+              [3, "Orphan"],
+              [
+                9,
+                [
+                  [1, "sec-orphan"],
+                  [2, 10_000],
+                ],
+              ],
+            ],
+          ],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+
+    const snapshot = readPortfolioSnapshot(file, "split.portfolio");
+    expect(
+      snapshot.holdings.map((h) => ({
+        categoryId: h.categoryId,
+        id: h.id,
+        isSplitCategory: h.isSplitCategory,
+      })),
+    ).toStrictEqual([
+      { categoryId: "aa-leaf", id: "sec-clean", isSplitCategory: false },
+      { categoryId: undefined, id: "sec-partial", isSplitCategory: true },
+      { categoryId: undefined, id: "sec-nonleaf", isSplitCategory: true },
+      { categoryId: undefined, id: "sec-orphan", isSplitCategory: true },
+      { categoryId: undefined, id: "sec-dup", isSplitCategory: true },
+      { categoryId: undefined, id: "sec-none", isSplitCategory: false },
+    ]);
+
+    // A taxonomy with no root marks any assigned security as split.
+    const rootless = portfolioFile([
+      [
+        2,
+        [
+          [1, "sec-rootless"],
+          [3, "Rootless Security"],
+          [4, "GBP"],
+        ],
+      ],
+      [
+        8,
+        [
+          [1, "tax-aa"],
+          [2, "Asset Allocation"],
+          [
+            5,
+            [
+              [1, "aa-stray"],
+              [2, "missing-root"],
+              [3, "Stray"],
+              [
+                9,
+                [
+                  [1, "sec-rootless"],
+                  [2, 10_000],
+                ],
+              ],
+            ],
+          ],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+    const rootlessHolding = readPortfolioSnapshot(
+      rootless,
+      "rootless.portfolio",
+    ).holdings[0];
+    expect(rootlessHolding?.isSplitCategory).toBe(true);
+    expect(rootlessHolding?.categoryId).toBeUndefined();
+
+    // Updating a security against a taxonomy with a duplicate orphan class.id assigns ONLY the root-reachable leaf (never self-locking into split).
+    const dupClassFile = portfolioFile([
+      [
+        2,
+        [
+          [1, "sec-dup-cat"],
+          [3, "Dup Cat Fund"],
+          [4, "GBP"],
+        ],
+      ],
+      [
+        8,
+        [
+          [1, "tax-aa"],
+          [2, "Asset Allocation"],
+          [
+            5,
+            [
+              [1, "cat-eq"],
+              [2, "missing-parent"],
+              [3, "Orphan Duplicate"],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "root"],
+              [3, "Asset Allocation"],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "cat-eq"],
+              [2, "root"],
+              [3, "Equities"],
+            ],
+          ],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+    const assigned = updateSecurity(dupClassFile, {
+      categoryId: "cat-eq",
+      id: "sec-dup-cat",
+      isRetired: false,
+      name: "Dup Cat Fund",
+    });
+    const assignedHolding = readPortfolioSnapshot(
+      assigned.content,
+      "dup.portfolio",
+    ).holdings[0];
+    expect(assignedHolding?.categoryId).toBe("cat-eq");
+    expect(assignedHolding?.isSplitCategory).toBe(false);
+
+    // Assigning a category when the Asset Allocation taxonomy has no root refuses cleanly.
+    expect(() =>
+      updateSecurity(rootless, {
+        categoryId: "orphan",
+        id: "sec-rootless",
+        isRetired: false,
+        name: "Rootless",
+      }),
+    ).toThrow("split asset allocation");
+
+    const rootlessUnassigned = portfolioFile([
+      [
+        2,
+        [
+          [1, "sec-plain"],
+          [3, "Plain Fund"],
+          [4, "GBP"],
+        ],
+      ],
+      [
+        8,
+        [
+          [1, "tax-aa"],
+          [2, "Asset Allocation"],
+          [
+            5,
+            [
+              [1, "cat-eq"],
+              [2, "missing-root"],
+              [3, "Stray"],
+            ],
+          ],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+    expect(() =>
+      updateSecurity(rootlessUnassigned, {
+        categoryId: "cat-eq",
+        id: "sec-plain",
+        isRetired: false,
+        name: "Plain Fund",
+      }),
+    ).toThrow("The selected asset class was not found");
+
+    const noTaxonomy = portfolioFile([
+      [
+        2,
+        [
+          [1, "sec-notax"],
+          [3, "No Tax Fund"],
+          [4, "GBP"],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+    expect(() =>
+      updateSecurity(noTaxonomy, {
+        categoryId: "cat-eq",
+        id: "sec-notax",
+        isRetired: false,
+        name: "No Tax Fund",
+      }),
+    ).toThrow("The selected asset class was not found");
+  });
+
+  it("counts self-transfers once per transaction and includes otherPortfolio and unknown enum types", () => {
+    const file = portfolioFile([
+      [
+        2,
+        [
+          [1, "sec-a"],
+          [3, "Fund A"],
+          [4, "GBP"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-1"],
+          [2, "ISA"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-2"],
+          [2, "GIA"],
+        ],
+      ],
+      // Self security-transfer counts once on port-1.
+      [
+        5,
+        [
+          [1, "tx-self-sec"],
+          [2, 4],
+          [4, "port-1"],
+          [6, "port-1"],
+          [12, 100_000_000],
+          [14, "sec-a"],
+        ],
+      ],
+      // Transfer from port-1 to port-2 counts once on each.
+      [
+        5,
+        [
+          [1, "tx-move-sec"],
+          [2, 4],
+          [4, "port-1"],
+          [6, "port-2"],
+          [12, 100_000_000],
+          [14, "sec-a"],
+        ],
+      ],
+      // Unknown enum type still counts on port-2 and sec-a.
+      [
+        5,
+        [
+          [1, "tx-unknown"],
+          [2, 99],
+          [4, "port-2"],
+          [14, "sec-a"],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+
+    const snapshot = readPortfolioSnapshot(file, "counts.portfolio");
+    expect(
+      snapshot.securitiesAccounts.map((a) => [a.id, a.transactionCount]),
+    ).toStrictEqual([
+      ["port-1", 2],
+      ["port-2", 2],
+    ]);
+    expect(snapshot.holdings[0]?.transactionCount).toBe(3);
+  });
+});
+
+describe("updateAccount and deleteAccount", () => {
+  it("updates cash and securities accounts in place while preserving currency, untouched accounts, unknown fields, and sibling zip parts", () => {
+    const base = richPortfolioFile([
+      [1, 66],
+      [
+        3,
+        [
+          [1, "cash-1"],
+          [2, "Old Cash"],
+          [3, "USD"],
+          [4, "Initial note"],
+          [99, "keep-cash-unknown"],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-2"],
+          [2, "Untouched Cash"],
+          [3, "GBP"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-1"],
+          [2, "Old ISA"],
+          [3, "Old port note"],
+          [5, "cash-1"],
+          [99, "keep-port-unknown"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-2"],
+          [2, "Untouched GIA"],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+
+    const baseClient = messageOf(rawClientOf(base));
+    const untouchedCashBefore = baseClient.get(3)?.[1];
+    const untouchedPortBefore = baseClient.get(4)?.[1];
+
+    // Update cash account: rename, clear note, retire.
+    const cashUpdated = updateAccount(
+      base,
+      {
+        id: "cash-1",
+        isRetired: true,
+        kind: "cash",
+        name: "  Dollar Settlement  ",
+        note: "   ",
+      },
+      { now: new Date("2026-10-01T08:00:00Z") },
+    );
+    expect(cashUpdated.id).toBe("cash-1");
+    expect(unzipSync(cashUpdated.content)["sibling.txt"]).toStrictEqual(
+      strToU8("keep me byte-for-byte"),
+    );
+
+    // Unretire cash account and set note again.
+    const cashUnretired = updateAccount(
+      cashUpdated.content,
+      {
+        id: "cash-1",
+        isRetired: false,
+        kind: "cash",
+        name: "Dollar Settlement",
+        note: "Active again",
+      },
+      { now: new Date("2026-10-02T08:00:00Z") },
+    );
+
+    // Update securities account: rename, unlink reference cash, retire.
+    const portUpdated = updateAccount(
+      cashUnretired.content,
+      {
+        id: "port-1",
+        isRetired: true,
+        kind: "securities",
+        name: "Northstar ISA",
+        note: "Closed wrapper",
+      },
+      { now: new Date("2026-10-03T08:00:00Z") },
+    );
+
+    // Re-link securities account to cash-2 and unretire.
+    const portRelinked = updateAccount(
+      portUpdated.content,
+      {
+        id: "port-1",
+        isRetired: false,
+        kind: "securities",
+        name: "Northstar ISA",
+        referenceAccountId: "cash-2",
+      },
+      { now: new Date("2026-10-04T08:00:00Z") },
+    );
+
+    const afterClient = messageOf(rawClientOf(portRelinked.content));
+    expect(afterClient.get(3)?.[1]).toStrictEqual(untouchedCashBefore);
+    expect(afterClient.get(4)?.[1]).toStrictEqual(untouchedPortBefore);
+    expect(textAt(messagesAt(afterClient, 3)[0] ?? new Map(), 99)).toBe(
+      "keep-cash-unknown",
+    );
+    expect(textAt(messagesAt(afterClient, 4)[0] ?? new Map(), 99)).toBe(
+      "keep-port-unknown",
+    );
+
+    const snapshot = readPortfolioSnapshot(portRelinked.content, "t.portfolio");
+    expect(snapshot.cashAccounts[0]).toMatchObject({
+      currency: "USD",
+      id: "cash-1",
+      isRetired: false,
+      name: "Dollar Settlement",
+      note: "Active again",
+    });
+    expect(snapshot.securitiesAccounts[0]).toMatchObject({
+      id: "port-1",
+      isRetired: false,
+      name: "Northstar ISA",
+      referenceAccountId: "cash-2",
+    });
+    expect(snapshot.securitiesAccounts[0]?.note).toBeUndefined();
+  });
+
+  it("refuses missing, duplicate, or invalid reference ids on updateAccount", () => {
+    const dupFile = portfolioFile([
+      [
+        3,
+        [
+          [1, "dup-cash"],
+          [2, "A"],
+          [3, "GBP"],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "dup-cash"],
+          [2, "B"],
+          [3, "GBP"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-1"],
+          [2, "ISA"],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+
+    expect(() =>
+      updateAccount(dupFile, {
+        id: "missing",
+        isRetired: false,
+        kind: "cash",
+        name: "X",
+      }),
+    ).toThrow(new Refusal("The selected cash account was not found"));
+    expect(() =>
+      updateAccount(dupFile, {
+        id: "dup-cash",
+        isRetired: false,
+        kind: "cash",
+        name: "X",
+      }),
+    ).toThrow(
+      new Refusal(
+        "Multiple cash account entries share this id, so it cannot be changed safely",
+      ),
+    );
+    expect(() =>
+      updateAccount(dupFile, {
+        id: "port-1",
+        isRetired: false,
+        kind: "securities",
+        name: "ISA",
+        referenceAccountId: "missing-cash",
+      }),
+    ).toThrow(new Refusal("The selected reference cash account was not found"));
+  });
+
+  it("deletes unreferenced zero-transaction accounts, strips taxonomy assignments across taxonomies, and enforces referential guards", () => {
+    const base = richPortfolioFile([
+      [
+        3,
+        [
+          [1, "cash-free"],
+          [2, "Free Cash"],
+          [3, "GBP"],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-linked"],
+          [2, "Linked Cash"],
+          [3, "GBP"],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-used"],
+          [2, "Used Cash"],
+          [3, "GBP"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-free"],
+          [2, "Free GIA"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-linking"],
+          [2, "Northstar ISA"],
+          [4, 1],
+          [5, "cash-linked"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-nameless"],
+          [5, "cash-linked"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-used"],
+          [2, "Used ISA"],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-unknown"],
+          [2, 99],
+          [3, "cash-used"],
+          [4, "port-used"],
+        ],
+      ],
+      [
+        8,
+        [
+          [1, "tax-aa"],
+          [2, "Asset Allocation"],
+          [
+            5,
+            [
+              [1, "aa-root"],
+              [3, "Root"],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "aa-cash"],
+              [2, "aa-root"],
+              [3, "Cash"],
+              [
+                9,
+                [
+                  [1, "cash-free"],
+                  [2, 10_000],
+                ],
+              ],
+              [
+                9,
+                [
+                  [1, "port-free"],
+                  [2, 10_000],
+                ],
+              ],
+              [
+                9,
+                [
+                  [1, "keep-me"],
+                  [2, 10_000],
+                ],
+              ],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "aa-untouched"],
+              [2, "aa-root"],
+              [3, "Bonds"],
+            ],
+          ],
+        ],
+      ],
+      [
+        8,
+        [
+          [1, "tax-regions"],
+          [2, "Regions"],
+          [
+            5,
+            [
+              [1, "reg-uk"],
+              [3, "UK"],
+              [
+                9,
+                [
+                  [1, "cash-free"],
+                  [2, 10_000],
+                ],
+              ],
+            ],
+          ],
+        ],
+      ],
+      [
+        8,
+        [
+          [1, "tax-untouched"],
+          [2, "Untouched Tax"],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+
+    const untouchedTaxBefore = messageOf(rawClientOf(base)).get(8)?.[2];
+
+    // Guards refuse used cash, linked cash (even by retired/nameless securities account), and used portfolio.
+    expect(() =>
+      deleteAccount(base, { id: "cash-used", kind: "cash" }),
+    ).toThrow(new Refusal("Used by 1 transaction — retire it instead"));
+    expect(() =>
+      deleteAccount(base, { id: "cash-linked", kind: "cash" }),
+    ).toThrow(
+      new Refusal(
+        "Referenced by Northstar ISA and a securities account — unlink first to delete, or retire it instead",
+      ),
+    );
+    expect(() =>
+      deleteAccount(base, { id: "port-used", kind: "securities" }),
+    ).toThrow(new Refusal("Used by 1 transaction — retire it instead"));
+
+    // Deleting free cash account and free securities account strips their taxonomy assignments everywhere.
+    const afterCash = deleteAccount(base, { id: "cash-free", kind: "cash" });
+    const afterPort = deleteAccount(afterCash.content, {
+      id: "port-free",
+      kind: "securities",
+    });
+
+    const afterClient = messageOf(rawClientOf(afterPort.content));
+    expect(afterClient.get(8)?.[2]).toStrictEqual(untouchedTaxBefore);
+    const aaCashClass = messagesAt(
+      messagesAt(afterClient, 8)[0] ?? new Map(),
+      5,
+    )[1];
+    expect(
+      messagesAt(aaCashClass ?? new Map(), 9).map((a) => textAt(a, 1)),
+    ).toStrictEqual(["keep-me"]);
+    const regClass = messagesAt(
+      messagesAt(afterClient, 8)[1] ?? new Map(),
+      5,
+    )[0];
+    expect(messagesAt(regClass ?? new Map(), 9)).toStrictEqual([]);
+    const snap = readPortfolioSnapshot(afterPort.content, "del.portfolio");
+    expect(snap.cashAccounts.map((a) => a.id)).toStrictEqual([
+      "cash-linked",
+      "cash-used",
+    ]);
+    expect(snap.securitiesAccounts.map((a) => a.id)).toStrictEqual([
+      "port-linking",
+      "port-nameless",
+      "port-used",
+    ]);
+  });
+});
+
+describe("updateSecurity and deleteSecurity", () => {
+  it("updates security metadata, preserves currency/prices/feeds/split taxonomies, and rewrites only affected Asset Allocation classes", () => {
+    const base = richPortfolioFile([
+      [
+        2,
+        [
+          [1, "sec-1"],
+          [3, "Old Fund"],
+          [4, "GBX"],
+          [6, "Old note"],
+          [7, "GB00OLD00001"],
+          [8, "OLD.L"],
+          [11, "YAHOO"],
+          [
+            13,
+            [
+              [1, 20_720],
+              [2, 21_400_000_000],
+            ],
+          ],
+          [99, "keep-sec-unknown"],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-split"],
+          [3, "Split Fund"],
+          [4, "GBP"],
+        ],
+      ],
+      [
+        8,
+        [
+          [1, "tax-regions"],
+          [2, "Regions"],
+          [
+            5,
+            [
+              [1, "reg-uk"],
+              [3, "UK"],
+              [
+                9,
+                [
+                  [1, "sec-1"],
+                  [2, 10_000],
+                ],
+              ],
+            ],
+          ],
+        ],
+      ],
+      [
+        8,
+        [
+          [1, "tax-aa"],
+          [2, "Asset Allocation"],
+          [
+            5,
+            [
+              [1, "aa-root"],
+              [3, "Root"],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "aa-eq"],
+              [2, "aa-root"],
+              [3, "Equity"],
+              [
+                9,
+                [
+                  [1, "sec-1"],
+                  [2, 10_000],
+                ],
+              ],
+              [
+                9,
+                [
+                  [1, "sec-split"],
+                  [2, 6000],
+                ],
+              ],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "aa-bonds"],
+              [2, "aa-root"],
+              [3, "Bonds"],
+              [
+                9,
+                [
+                  [1, "sec-split"],
+                  [2, 4000],
+                ],
+              ],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "aa-cash"],
+              [2, "aa-root"],
+              [3, "Cash"],
+            ],
+          ],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+
+    const regionsTaxBefore = messageOf(rawClientOf(base)).get(8)?.[0];
+    const aaTaxBefore = messageOf(rawClientOf(base)).get(8)?.[1];
+
+    // Editing metadata with unchanged categoryId leaves taxonomy bytes untouched byte-for-byte.
+    const unchangedCat = updateSecurity(
+      base,
+      {
+        categoryId: "aa-eq",
+        id: "sec-1",
+        isin: "GB00NEW00001",
+        isRetired: true,
+        name: "Renamed Fund",
+        note: "Updated note",
+        ticker: "NEW.L",
+      },
+      { now: new Date("2026-10-05T00:00:00Z") },
+    );
+    expect(
+      messageOf(rawClientOf(unchangedCat.content)).get(8)?.[1],
+    ).toStrictEqual(aaTaxBefore);
+
+    // Reassigning sec-1 from aa-eq to aa-bonds keeps Regions taxonomy and aa-cash untouched.
+    const reassigned = updateSecurity(
+      unchangedCat.content,
+      {
+        categoryId: "aa-bonds",
+        id: "sec-1",
+        isRetired: false,
+        name: "Renamed Fund",
+      },
+      { now: new Date("2026-10-06T00:00:00Z") },
+    );
+    expect(
+      messageOf(rawClientOf(reassigned.content)).get(8)?.[0],
+    ).toStrictEqual(regionsTaxBefore);
+    const snapReassigned = readPortfolioSnapshot(
+      reassigned.content,
+      "s.portfolio",
+    );
+    expect(snapReassigned.holdings[0]).toMatchObject({
+      category: "Bonds",
+      categoryId: "aa-bonds",
+      currency: "GBX",
+      isRetired: false,
+      isSplitCategory: false,
+      latestPrice: 214,
+      name: "Renamed Fund",
+    });
+    expect(snapReassigned.holdings[0]?.isin).toBeUndefined();
+    expect(snapReassigned.holdings[0]?.ticker).toBeUndefined();
+    expect(snapReassigned.holdings[0]?.note).toBeUndefined();
+    expect(
+      textAt(
+        messagesAt(messageOf(rawClientOf(reassigned.content)), 2)[0] ??
+          new Map(),
+        99,
+      ),
+    ).toBe("keep-sec-unknown");
+
+    // Unassigning sec-1 clears only the first Asset Allocation taxonomy.
+    const unassigned = updateSecurity(reassigned.content, {
+      id: "sec-1",
+      isRetired: false,
+      name: "Renamed Fund",
+    });
+    expect(
+      readPortfolioSnapshot(unassigned.content, "s.portfolio").holdings[0],
+    ).toMatchObject({ isSplitCategory: false });
+    expect(
+      readPortfolioSnapshot(unassigned.content, "s.portfolio").holdings[0]
+        ?.categoryId,
+    ).toBeUndefined();
+    expect(
+      messageOf(rawClientOf(unassigned.content)).get(8)?.[0],
+    ).toStrictEqual(regionsTaxBefore);
+
+    // Split security refuses non-undefined categoryId and preserves taxonomy when categoryId is omitted.
+    expect(() =>
+      updateSecurity(unassigned.content, {
+        categoryId: "aa-eq",
+        id: "sec-split",
+        isRetired: false,
+        name: "Split Fund",
+      }),
+    ).toThrow(
+      new Refusal(
+        "This security has a split asset allocation that cannot be overwritten here",
+      ),
+    );
+    const aaBeforeSplitEdit = messageOf(rawClientOf(unassigned.content)).get(
+      8,
+    )?.[1];
+    const splitEdited = updateSecurity(unassigned.content, {
+      id: "sec-split",
+      isRetired: true,
+      name: "Split Fund Renamed",
+    });
+    expect(
+      messageOf(rawClientOf(splitEdited.content)).get(8)?.[1],
+    ).toStrictEqual(aaBeforeSplitEdit);
+
+    // Unknown categoryId is refused.
+    expect(() =>
+      updateSecurity(unassigned.content, {
+        categoryId: "missing-cat",
+        id: "sec-1",
+        isRetired: false,
+        name: "Renamed Fund",
+      }),
+    ).toThrow(new Refusal("The selected asset class was not found"));
+  });
+
+  it("deletes unreferenced securities while stripping taxonomy assignments and refuses securities with transactions", () => {
+    const base = richPortfolioFile([
+      [
+        2,
+        [
+          [1, "sec-free"],
+          [3, "Free Fund"],
+          [4, "GBP"],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-used"],
+          [3, "Used Fund"],
+          [4, "GBP"],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-1"],
+          [2, 99],
+          [14, "sec-used"],
+        ],
+      ],
+      [
+        8,
+        [
+          [1, "tax-aa"],
+          [2, "Asset Allocation"],
+          [
+            5,
+            [
+              [1, "aa-root"],
+              [3, "Root"],
+            ],
+          ],
+          [
+            5,
+            [
+              [1, "aa-eq"],
+              [2, "aa-root"],
+              [3, "Equity"],
+              [
+                9,
+                [
+                  [1, "sec-free"],
+                  [2, 10_000],
+                ],
+              ],
+              [
+                9,
+                [
+                  [1, "sec-used"],
+                  [2, 10_000],
+                ],
+              ],
+            ],
+          ],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+
+    expect(() => deleteSecurity(base, { id: "sec-used" })).toThrow(
+      new Refusal("Used by 1 transaction — retire it instead"),
+    );
+
+    const deleted = deleteSecurity(base, { id: "sec-free" });
+    expect(deleted.id).toBe("sec-free");
+    const snap = readPortfolioSnapshot(deleted.content, "sec-del.portfolio");
+    expect(snap.holdings.map((h) => h.id)).toStrictEqual(["sec-used"]);
+    expect(snap.categories[0]?.securityIds).toStrictEqual(["sec-used"]);
+  });
+});
+
+describe("updateTransaction and deleteTransaction", () => {
+  it("patches transactions in place preserving unknown fields, unknown unit types, intra-day dates, otherUuid, and unchanged units", () => {
+    const intraDayTimestamp = protobufOf([
+      [1, 1_789_042_215],
+      [2, 500_000_000],
+    ]);
+    const customGrossUnit = protobufOf([
+      [2, 100_000],
+      [4, 125_000],
+      [5, "USD"],
+      [
+        6,
+        [
+          [1, 4],
+          [2, 4],
+          [3, new Uint8Array([0x1f, 0x40])],
+        ],
+      ],
+      [99, "keep-gross-extra"],
+    ]);
+    const feeUnitA = protobufOf([
+      [1, 2],
+      [2, 300],
+      [3, "GBP"],
+      [99, "keep-fee-a"],
+    ]);
+    const feeUnitB = protobufOf([
+      [1, 2],
+      [2, 200],
+      [3, "GBP"],
+    ]);
+    const taxUnitA = protobufOf([
+      [1, 1],
+      [2, 150],
+      [3, "GBP"],
+      [99, "keep-tax-a"],
+    ]);
+    const taxUnitB = protobufOf([
+      [1, 1],
+      [2, 50],
+      [3, "GBP"],
+    ]);
+    const unknownUnit = protobufOf([
+      [1, 9],
+      [2, 777],
+      [3, "GBP"],
+    ]);
+
+    const base = richPortfolioFile([
+      [
+        2,
+        [
+          [1, "sec-usd"],
+          [3, "US Tracker"],
+          [4, "USD"],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-gbp"],
+          [3, "UK Tracker"],
+          [4, "GBP"],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-gbp"],
+          [2, "ISA Cash"],
+          [3, "GBP"],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-usd"],
+          [2, "USD Cash"],
+          [3, "USD"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-isa"],
+          [2, "Northstar ISA"],
+          [5, "cash-gbp"],
+        ],
+      ],
+      // Cross-currency purchase with intra-day date, otherUuid, multi-unit fees/taxes, custom gross, unknown unit, unknown tx field.
+      [
+        5,
+        [
+          [1, "tx-buy"],
+          [2, 0],
+          [3, "cash-gbp"],
+          [4, "port-isa"],
+          [7, "existing-other-uuid"],
+          [9, intraDayTimestamp],
+          [10, "GBP"],
+          [11, 100_700],
+          [12, 1_000_000_000],
+          [13, "Initial note"],
+          [14, "sec-usd"],
+          [15, customGrossUnit],
+          [15, feeUnitA],
+          [15, feeUnitB],
+          [15, taxUnitA],
+          [15, taxUnitB],
+          [15, unknownUnit],
+          [99, "keep-tx-unknown"],
+        ],
+      ],
+      // Simple deposit (no cross-entry, no otherUpdatedAt).
+      [
+        5,
+        [
+          [1, "tx-dep"],
+          [2, 6],
+          [3, "cash-gbp"],
+          [9, [[1, 1_789_000_000]]],
+          [10, "GBP"],
+          [11, 50_000],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+
+    // 1. Edit only note on tx-buy: date bytes, otherUuid, all 6 units, and unknown tx field stay byte-for-byte identical.
+    const noteOnly = updateTransaction(
+      base,
+      {
+        accountId: "cash-gbp",
+        amount: 1007,
+        currency: "GBP",
+        date: "2026-09-10",
+        fees: 5,
+        fxAmount: 1250,
+        id: "tx-buy",
+        note: "Updated note",
+        portfolioId: "port-isa",
+        securityId: "sec-usd",
+        shares: 10,
+        taxes: 2,
+        type: "purchase",
+      },
+      { now: new Date("2026-10-05T10:00:00Z") },
+    );
+    const buyMsg = messagesAt(messageOf(rawClientOf(noteOnly.content)), 5)[0];
+    expect(buyMsg).toBeDefined();
+    expect(textAt(buyMsg ?? new Map(), 7)).toBe("existing-other-uuid");
+    expect(buyMsg?.has(8)).toBe(true);
+    expect(textAt(buyMsg ?? new Map(), 99)).toBe("keep-tx-unknown");
+    expect(buyMsg?.get(9)?.[0]).toStrictEqual(intraDayTimestamp);
+    expect(buyMsg?.get(15)).toStrictEqual([
+      customGrossUnit,
+      feeUnitA,
+      feeUnitB,
+      taxUnitA,
+      taxUnitB,
+      unknownUnit,
+    ]);
+
+    // 2. Edit date, fees, taxes, and fxAmount: rewrites those units while preserving unknownUnit and otherUuid.
+    const changedAll = updateTransaction(
+      noteOnly.content,
+      {
+        accountId: "cash-gbp",
+        amount: 1015,
+        currency: "GBP",
+        date: "2026-09-12",
+        fees: 10,
+        fxAmount: 1300,
+        id: "tx-buy",
+        portfolioId: "port-isa",
+        securityId: "sec-usd",
+        shares: 10,
+        taxes: 5,
+        type: "purchase",
+      },
+      { now: new Date("2026-10-06T10:00:00Z") },
+    );
+    const changedBuy = messagesAt(
+      messageOf(rawClientOf(changedAll.content)),
+      5,
+    )[0];
+    expect(textAt(changedBuy ?? new Map(), 7)).toBe("existing-other-uuid");
+    const changedUnits = changedBuy?.get(15) ?? [];
+    expect(changedUnits).toHaveLength(4);
+    expect(changedUnits[3]).toStrictEqual(unknownUnit);
+    const changedSnap = readPortfolioSnapshot(
+      changedAll.content,
+      "tx.portfolio",
+    );
+    expect(changedSnap.transactions[0]).toMatchObject({
+      amount: 1015,
+      date: "2026-09-12",
+      fees: 10,
+      grossValue: {
+        amount: 1000,
+        currency: "GBP",
+        fxAmount: 1300,
+        fxCurrency: "USD",
+      },
+      id: "tx-buy",
+      taxes: 5,
+    });
+
+    // 3. Switch tx-buy to same-currency security with zero fees/taxes: drops gross, fee, and tax units while keeping unknownUnit.
+    const sameCurrency = updateTransaction(changedAll.content, {
+      accountId: "cash-gbp",
+      amount: 500,
+      currency: "GBP",
+      date: "2026-09-12",
+      fees: 0,
+      id: "tx-buy",
+      portfolioId: "port-isa",
+      securityId: "sec-gbp",
+      shares: 5,
+      taxes: 0,
+      type: "purchase",
+    });
+    const sameUnits =
+      messagesAt(messageOf(rawClientOf(sameCurrency.content)), 5)[0]?.get(15) ??
+      [];
+    expect(sameUnits).toStrictEqual([unknownUnit]);
+
+    // 4. Add gross, fee, and tax units back when previously absent.
+    const readded = updateTransaction(sameCurrency.content, {
+      accountId: "cash-gbp",
+      amount: 510,
+      currency: "GBP",
+      date: "2026-09-12",
+      fees: 6,
+      fxAmount: 650,
+      id: "tx-buy",
+      portfolioId: "port-isa",
+      securityId: "sec-usd",
+      shares: 5,
+      taxes: 4,
+      type: "purchase",
+    });
+    const readdedUnits =
+      messagesAt(messageOf(rawClientOf(readded.content)), 5)[0]?.get(15) ?? [];
+    expect(readdedUnits).toHaveLength(4);
+    expect(readdedUnits[0]).toStrictEqual(unknownUnit);
+
+    // 5. Non-cross-entry deposit does NOT write otherUpdatedAt (field 8).
+    const depEdited = updateTransaction(readded.content, {
+      accountId: "cash-gbp",
+      amount: 750,
+      currency: "GBP",
+      date: "2026-09-10",
+      fees: 0,
+      id: "tx-dep",
+      shares: 0,
+      taxes: 0,
+      type: "deposit",
+    });
+    const depMsg = messagesAt(messageOf(rawClientOf(depEdited.content)), 5)[1];
+    expect(depMsg?.has(8)).toBe(false);
+    expect(
+      readPortfolioSnapshot(
+        depEdited.content,
+        "tx.portfolio",
+      ).transactions.find((t) => t.id === "tx-dep")?.amount,
+    ).toBe(750);
+  });
+
+  it("handles duplicate existing gross units, omitted baseCurrency, type immutability, unknown enum refusal, and deleteTransaction", () => {
+    const file = portfolioFile([
+      [
+        2,
+        [
+          [1, "sec-usd"],
+          [3, "US ETF"],
+          [4, "USD"],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-gbp"],
+          [2, "ISA Cash"],
+          [3, "GBP"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-isa"],
+          [2, "ISA"],
+          [5, "cash-gbp"],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-dup-gross"],
+          [2, 0],
+          [3, "cash-gbp"],
+          [4, "port-isa"],
+          [11, 10_000],
+          [12, 100_000_000],
+          [14, "sec-usd"],
+          [
+            15,
+            [
+              [2, 10_000],
+              [4, 12_500],
+              [5, "USD"],
+            ],
+          ],
+          [
+            15,
+            [
+              [2, 10_000],
+              [4, 12_500],
+              [5, "USD"],
+            ],
+          ],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-unknown-type"],
+          [2, 99],
+        ],
+      ],
+    ]);
+
+    // Duplicate gross units collapse to a single freshly encoded gross unit.
+    const collapsed = updateTransaction(file, {
+      accountId: "cash-gbp",
+      amount: 100,
+      currency: "GBP",
+      date: "2026-09-20",
+      fees: 0,
+      fxAmount: 125,
+      id: "tx-dup-gross",
+      portfolioId: "port-isa",
+      securityId: "sec-usd",
+      shares: 1,
+      taxes: 0,
+      type: "purchase",
+    });
+    expect(
+      messagesAt(messageOf(rawClientOf(collapsed.content)), 5)[0]?.get(15),
+    ).toHaveLength(1);
+
+    // Type mismatch is refused.
+    expect(() =>
+      updateTransaction(collapsed.content, {
+        accountId: "cash-gbp",
+        amount: 100,
+        currency: "GBP",
+        date: "2026-09-20",
+        fees: 0,
+        fxAmount: 125,
+        id: "tx-dup-gross",
+        portfolioId: "port-isa",
+        securityId: "sec-usd",
+        shares: 1,
+        taxes: 0,
+        type: "sale",
+      }),
+    ).toThrow(new Refusal("Transaction type cannot be changed"));
+
+    // Unknown enum type is refused on edit, but still deletable by raw ID.
+    expect(() =>
+      updateTransaction(collapsed.content, {
+        accountId: "cash-gbp",
+        amount: 100,
+        currency: "GBP",
+        date: "2026-09-20",
+        fees: 0,
+        id: "tx-unknown-type",
+        shares: 0,
+        taxes: 0,
+        type: "deposit",
+      }),
+    ).toThrow(new Refusal("This transaction type cannot be edited"));
+
+    const deleted = deleteTransaction(collapsed.content, {
+      id: "tx-unknown-type",
+    });
+    expect(deleted.id).toBe("tx-unknown-type");
+    expect(messagesAt(messageOf(rawClientOf(deleted.content)), 5)).toHaveLength(
+      1,
+    );
+
+    expect(() =>
+      deleteTransaction(deleted.content, { id: "missing-tx" }),
+    ).toThrow(new Refusal("The selected transaction was not found"));
   });
 });

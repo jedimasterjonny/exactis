@@ -4,6 +4,12 @@ import { strToU8, zipSync } from "fflate";
 
 import type {
   CashAccount,
+  DeletePortfolioAccount,
+  DeletePortfolioSecurity,
+  DeletePortfolioTransaction,
+  EditPortfolioAccount,
+  EditPortfolioSecurity,
+  EditPortfolioTransaction,
   Holding,
   NewPortfolioAccount,
   NewPortfolioSecurity,
@@ -31,6 +37,7 @@ import {
   roundPence,
 } from "@/data/portfolio";
 import { answerOf, Refusal } from "@/lib/answer";
+import { counted } from "@/lib/count";
 import { sumOf } from "@/lib/ledger";
 import { formatPercent } from "@/lib/money";
 import { yahooFeeds } from "@/lib/portfolio-quotes";
@@ -49,6 +56,7 @@ import {
   withMessagesAt,
   withoutField,
   withReplacedMessagesAt,
+  withTextAt,
   withWholeAt,
 } from "@/lib/protobuf";
 import { unzipped } from "@/lib/workbook";
@@ -92,6 +100,30 @@ interface Opened {
   readonly parts: Unzipped;
 }
 
+// Validated transaction payload ready for appendTransaction or updateTransaction.
+interface PreparedTransaction {
+  readonly amountPence: number;
+  readonly currency: string;
+  readonly date: string;
+  readonly dateBytes: Uint8Array;
+  readonly feesPence: number;
+  readonly grossValue: GrossValueSpec | undefined;
+  readonly note: string | undefined;
+  readonly refs: ResolvedTransactionRefs;
+  readonly rule: TransactionWriteRule;
+  readonly sharesScaled: number;
+  readonly taxesPence: number;
+}
+
+// Raw protobuf transaction counts keyed by entity UUID across every
+// PTransaction message (regardless of enum type, counting self-transfers
+// once per transaction).
+interface RawTransactionCounts {
+  readonly cashAccounts: ReadonlyMap<string, number>;
+  readonly securities: ReadonlyMap<string, number>;
+  readonly securitiesAccounts: ReadonlyMap<string, number>;
+}
+
 // Validated account, portfolio and security UUIDs (plus optional
 // cross-currency counterpart) resolved for a transaction against raw
 // protobuf field-1 ids.
@@ -119,6 +151,14 @@ interface Security {
   readonly ticker: string | undefined;
 }
 
+// Single-leaf Asset Allocation assignment status for one security UUID:
+// a unique 100% root-reachable named leaf id, or split/complex status
+// when assigned across multiple classes, partial weight, or a non-leaf.
+interface SecurityCategoryStatus {
+  readonly categoryId: string | undefined;
+  readonly isSplitCategory: boolean;
+}
+
 // A named leaf class reachable from the taxonomy's root alongside the
 // trimmed ancestor class names beneath the root for disambiguation.
 interface TaxonomyLeaf {
@@ -126,6 +166,7 @@ interface TaxonomyLeaf {
   readonly assignments: readonly Assignment[];
   readonly id: string;
   readonly name: string;
+  readonly sourceClass: Class;
 }
 
 // Declarative wire and validation rule for writing each of Portfolio
@@ -192,6 +233,9 @@ const tolerance = 1e-9;
 // What a count of shares and a price are both written in:
 // hundred-millionths.
 const scaled = 1e8;
+
+// List formatter for naming referencing accounts in delete refusals.
+const listFormat = new Intl.ListFormat("en-GB");
 
 // What a pound is in each currency the reader prices on its own,
 // sterling and pence. Any other is priced at a rate read off the file's
@@ -524,7 +568,9 @@ export function appendSecurity(
     const categoryId = trimmedOptional(input.categoryId);
     const priceField = initialPriceFieldOf(input, today);
     const client = messageOf(clientBytes);
-    if (categoryId !== undefined && !hasTaxonomyLeaf(client, categoryId)) {
+    const leafIndex =
+      categoryId === undefined ? -1 : taxonomyLeafIndexOf(client, categoryId);
+    if (categoryId !== undefined && leafIndex === -1) {
       throw new Refusal("The selected asset class was not found");
     }
     id = makeId();
@@ -544,9 +590,9 @@ export function appendSecurity(
       clientBytes,
       delimitedOf(fields.client.securities, entry),
     ]);
-    return categoryId === undefined
+    return leafIndex === -1
       ? withSecurity
-      : withAssignedCategory(withSecurity, categoryId, id);
+      : withAssignedCategory(withSecurity, leafIndex, id);
   });
   return { content, id };
 }
@@ -563,63 +609,154 @@ export function appendTransaction(
   const { makeId, now } = writeContextOf(options);
   let id = "";
   const content = rewriteClient(file, (clientBytes) => {
-    const rule = transactionWriteRules[input.type];
-    const currency = currencyCodeOf(input.currency, { isPenceAllowed: false });
-    const dateBytes = isoDateToTimestampBytes(input.date);
-    const amountPence = moneyToHundredths(input.amount, "Amount", {
-      isZeroAllowed: rule.isAmountOptional,
-    });
-    if (!rule.hasCosts && (input.fees !== 0 || input.taxes !== 0)) {
-      throw new Refusal("This transaction type does not take fees or taxes");
-    }
-    const feesPence = rule.hasCosts
-      ? moneyToHundredths(input.fees, "Fees", { isZeroAllowed: true })
-      : 0;
-    const taxesPence = rule.hasCosts
-      ? moneyToHundredths(input.taxes, "Taxes", { isZeroAllowed: true })
-      : 0;
-    if (rule.isCostsBoundedByAmount && feesPence + taxesPence > amountPence) {
-      throw new Refusal("Fees and taxes cannot exceed the transaction amount");
-    }
-    if (!rule.hasShares && input.shares !== 0) {
-      throw new Refusal("This transaction type does not take shares");
-    }
-    const sharesScaled = rule.hasShares
-      ? scaledValueOf(input.shares, "Shares")
-      : 0;
-    const refs = validateTransactionRefs(messageOf(clientBytes), input, {
-      currency,
-      rule,
-    });
-    const grossValue = resolveGrossValue({
-      amountPence,
-      currency,
-      feesPence,
-      fxAmount: input.fxAmount,
-      fxCurrency: refs.fxCurrency,
-      rule,
-      taxesPence,
-    });
+    const prepared = prepareTransactionMutation(messageOf(clientBytes), input);
     id = makeId();
     const entry = buildTransactionBytes({
-      amountPence,
-      currency,
-      dateBytes,
-      feesPence,
-      grossValue,
+      amountPence: prepared.amountPence,
+      currency: prepared.currency,
+      dateBytes: prepared.dateBytes,
+      feesPence: prepared.feesPence,
+      grossValue: prepared.grossValue,
       id,
-      note: trimmedOptional(input.note),
-      otherId: rule.hasCrossEntry ? makeId() : undefined,
-      refs,
-      rule,
-      sharesScaled,
-      taxesPence,
+      note: prepared.note,
+      otherId: prepared.rule.hasCrossEntry ? makeId() : undefined,
+      refs: prepared.refs,
+      rule: prepared.rule,
+      sharesScaled: prepared.sharesScaled,
+      taxesPence: prepared.taxesPence,
       updatedAt: timestampBytesOf(now),
     });
     return joined([
       clientBytes,
       delimitedOf(fields.client.transactions, entry),
     ]);
+  });
+  return { content, id };
+}
+
+// Deletes an existing cash or securities account after verifying a
+// unique raw protobuf field-1 match, zero raw touching transactions,
+// and (for cash accounts) zero referencing securities accounts, while
+// stripping any taxonomy assignments referencing the deleted UUID.
+export function deleteAccount(
+  file: Uint8Array,
+  input: DeletePortfolioAccount,
+): { readonly content: Uint8Array<ArrayBuffer>; readonly id: string } {
+  const id = trimmedRequired(input.id, "Account");
+  const content = rewriteClient(file, (clientBytes) => {
+    const client = messageOf(clientBytes);
+    const listField =
+      input.kind === "cash" ? fields.client.accounts : fields.client.portfolios;
+    const idField =
+      input.kind === "cash" ? fields.account.id : fields.portfolio.id;
+    const label = input.kind === "cash" ? "cash account" : "securities account";
+    requireUniqueRawId(client, { idField, label, listField, targetId: id });
+    const txCounts = rawTransactionCountsOf(
+      messagesAt(client, fields.client.transactions),
+    );
+    const txCount =
+      (input.kind === "cash"
+        ? txCounts.cashAccounts.get(id)
+        : txCounts.securitiesAccounts.get(id)) ?? 0;
+    if (txCount > 0) {
+      throw new Refusal(
+        `Used by ${counted(txCount, "transaction")} — retire it instead`,
+      );
+    }
+    if (input.kind === "cash") {
+      const referencing = messagesAt(client, fields.client.portfolios)
+        .filter(
+          (portfolio) =>
+            optionalText(portfolio, fields.portfolio.reference) === id,
+        )
+        .map(
+          (portfolio) =>
+            optionalText(portfolio, fields.portfolio.name) ??
+            "a securities account",
+        );
+      if (referencing.length > 0) {
+        throw new Refusal(
+          `Referenced by ${listFormat.format(referencing)} — unlink first to delete, or retire it instead`,
+        );
+      }
+    }
+    const withoutAccount = withReplacedMessagesAt(
+      clientBytes,
+      listField,
+      (entries) =>
+        entries.filter((raw) => optionalText(messageOf(raw), idField) !== id),
+    );
+    return stripTaxonomyAssignments(withoutAccount, id, {
+      isAssetAllocationOnly: false,
+    });
+  });
+  return { content, id };
+}
+
+// Deletes an existing catalogued security after verifying a unique raw
+// protobuf field-1 match and zero raw touching transactions, stripping
+// any taxonomy assignments referencing the deleted UUID.
+export function deleteSecurity(
+  file: Uint8Array,
+  input: DeletePortfolioSecurity,
+): { readonly content: Uint8Array<ArrayBuffer>; readonly id: string } {
+  const id = trimmedRequired(input.id, "Security");
+  const content = rewriteClient(file, (clientBytes) => {
+    const client = messageOf(clientBytes);
+    requireUniqueRawId(client, {
+      idField: fields.security.id,
+      label: "security",
+      listField: fields.client.securities,
+      targetId: id,
+    });
+    const txCount =
+      rawTransactionCountsOf(
+        messagesAt(client, fields.client.transactions),
+      ).securities.get(id) ?? 0;
+    if (txCount > 0) {
+      throw new Refusal(
+        `Used by ${counted(txCount, "transaction")} — retire it instead`,
+      );
+    }
+    const withoutSecurity = withReplacedMessagesAt(
+      clientBytes,
+      fields.client.securities,
+      (entries) =>
+        entries.filter(
+          (raw) => optionalText(messageOf(raw), fields.security.id) !== id,
+        ),
+    );
+    return stripTaxonomyAssignments(withoutSecurity, id, {
+      isAssetAllocationOnly: false,
+    });
+  });
+  return { content, id };
+}
+
+// Deletes an existing transaction after verifying a unique raw protobuf
+// field-1 match, preserving every other transaction and unknown field
+// byte for byte.
+export function deleteTransaction(
+  file: Uint8Array,
+  input: DeletePortfolioTransaction,
+): { readonly content: Uint8Array<ArrayBuffer>; readonly id: string } {
+  const id = trimmedRequired(input.id, "Transaction");
+  const content = rewriteClient(file, (clientBytes) => {
+    const client = messageOf(clientBytes);
+    requireUniqueRawId(client, {
+      idField: fields.transaction.id,
+      label: "transaction",
+      listField: fields.client.transactions,
+      targetId: id,
+    });
+    return withReplacedMessagesAt(
+      clientBytes,
+      fields.client.transactions,
+      (entries) =>
+        entries.filter(
+          (raw) => optionalText(messageOf(raw), fields.transaction.id) !== id,
+        ),
+    );
   });
   return { content, id };
 }
@@ -701,8 +838,8 @@ export function readPortfolioSnapshot(
   const transactions = messagesAt(client, fields.client.transactions);
   const { counts: holdingsCounts, values: portfolioValues } =
     portfolioHoldingsOf(held, securities, pounds);
-  const { balances: cashBalances, counts: cashCounts } =
-    cashLedgerOf(transactions);
+  const cashBalances = cashBalancesOf(transactions);
+  const txCounts = rawTransactionCountsOf(transactions);
 
   const securitiesAccounts: readonly SecuritiesAccount[] = messagesAt(
     client,
@@ -724,6 +861,7 @@ export function readPortfolioSnapshot(
       name: textOf(portfolio, fields.portfolio.name),
       ...(note !== undefined && { note }),
       ...(referenceAccountId !== undefined && { referenceAccountId }),
+      transactionCount: txCounts.securitiesAccounts.get(id) ?? 0,
     };
   });
 
@@ -745,7 +883,7 @@ export function readPortfolioSnapshot(
       isRetired: int32At(account, fields.account.isRetired) !== 0,
       name: textOf(account, fields.account.name),
       ...(note !== undefined && { note }),
-      transactionCount: cashCounts.get(id) ?? 0,
+      transactionCount: txCounts.cashAccounts.get(id) ?? 0,
     };
   });
 
@@ -763,11 +901,14 @@ export function readPortfolioSnapshot(
       (account) => account.marketValue,
     ),
   );
-  const { categories, categoryBySecurity } = taxonomyInfoOf(client, securities);
+  const { categories, categoryBySecurity, categoryStatusBySecurity } =
+    taxonomyInfoOf(client, securities);
   const holdings = holdingsOf(securities, held, {
     activePortfolioIds,
     categoryBySecurity,
+    categoryStatusBySecurity,
     pounds,
+    securityTxCounts: txCounts.securities,
   });
   const accountNames = new Map(
     cashAccounts.map((account) => [account.id, account.name]),
@@ -942,6 +1083,82 @@ export function reweighted(
   });
 }
 
+// Updates an existing cash or securities account in place (name, note,
+// retired flag, and optional reference cash account for securities
+// accounts), keeping account kind, cash currency, untouched accounts,
+// and unknown fields byte for byte.
+export function updateAccount(
+  file: Uint8Array,
+  input: EditPortfolioAccount,
+  options?: WriteOptions,
+): { readonly content: Uint8Array<ArrayBuffer>; readonly id: string } {
+  const { now } = writeContextOf(options);
+  const id = trimmedRequired(input.id, "Account");
+  const content = rewriteClient(file, (clientBytes) => {
+    const client = messageOf(clientBytes);
+    const name = trimmedRequired(input.name, "Account name");
+    const note = trimmedOptional(input.note);
+    const updatedAt = timestampBytesOf(now);
+    if (input.kind === "cash") {
+      requireUniqueRawId(client, {
+        idField: fields.account.id,
+        label: "cash account",
+        listField: fields.client.accounts,
+        targetId: id,
+      });
+      return withMessagesAt(clientBytes, fields.client.accounts, (raw) => {
+        if (optionalText(messageOf(raw), fields.account.id) !== id) {
+          return raw;
+        }
+        let patched = withTextAt(raw, fields.account.name, name);
+        patched = withTextAt(patched, fields.account.note, note);
+        patched = withWholeAt(
+          patched,
+          fields.account.isRetired,
+          input.isRetired ? 1 : 0,
+        );
+        return withMessageAt(patched, fields.account.updatedAt, updatedAt);
+      });
+    }
+    requireUniqueRawId(client, {
+      idField: fields.portfolio.id,
+      label: "securities account",
+      listField: fields.client.portfolios,
+      targetId: id,
+    });
+    const referenceAccountId = trimmedOptional(input.referenceAccountId);
+    if (referenceAccountId !== undefined) {
+      const cashIds = rawIdsOf(
+        client,
+        fields.client.accounts,
+        fields.account.id,
+      );
+      if (!cashIds.has(referenceAccountId)) {
+        throw new Refusal("The selected reference cash account was not found");
+      }
+    }
+    return withMessagesAt(clientBytes, fields.client.portfolios, (raw) => {
+      if (optionalText(messageOf(raw), fields.portfolio.id) !== id) {
+        return raw;
+      }
+      let patched = withTextAt(raw, fields.portfolio.name, name);
+      patched = withTextAt(patched, fields.portfolio.note, note);
+      patched = withWholeAt(
+        patched,
+        fields.portfolio.isRetired,
+        input.isRetired ? 1 : 0,
+      );
+      patched = withTextAt(
+        patched,
+        fields.portfolio.reference,
+        referenceAccountId,
+      );
+      return withMessageAt(patched, fields.portfolio.updatedAt, updatedAt);
+    });
+  });
+  return { content, id };
+}
+
 // Upserts dated historical quotes for one or more catalogued
 // securities, keeping untouched securities and untouched historical
 // price entries byte for byte, maintaining ascending epoch-day order
@@ -991,6 +1208,128 @@ export function updateQuotes(
     );
   });
   return { content, updatedCount };
+}
+
+// Updates an existing catalogued security in place (name, ISIN, ticker,
+// note, retired flag, and single-leaf Asset Allocation class), keeping
+// currency, price history, feeds, split allocations, and untouched
+// entries byte for byte.
+export function updateSecurity(
+  file: Uint8Array,
+  input: EditPortfolioSecurity,
+  options?: WriteOptions,
+): { readonly content: Uint8Array<ArrayBuffer>; readonly id: string } {
+  const { now } = writeContextOf(options);
+  const id = trimmedRequired(input.id, "Security");
+  const content = rewriteClient(file, (clientBytes) => {
+    const client = messageOf(clientBytes);
+    requireUniqueRawId(client, {
+      idField: fields.security.id,
+      label: "security",
+      listField: fields.client.securities,
+      targetId: id,
+    });
+    const name = trimmedRequired(input.name, "Security name");
+    const isin = trimmedOptional(input.isin);
+    const ticker = trimmedOptional(input.ticker);
+    const note = trimmedOptional(input.note);
+    const categoryId = trimmedOptional(input.categoryId);
+    const existingStatus = securityCategoryStatusMapOf(client).get(id) ?? {
+      categoryId: undefined,
+      isSplitCategory: false,
+    };
+    if (existingStatus.isSplitCategory && categoryId !== undefined) {
+      throw new Refusal(
+        "This security has a split asset allocation that cannot be overwritten here",
+      );
+    }
+    const isCategoryChanged =
+      !existingStatus.isSplitCategory &&
+      categoryId !== existingStatus.categoryId;
+    const targetLeafIndex =
+      isCategoryChanged && categoryId !== undefined
+        ? taxonomyLeafIndexOf(client, categoryId)
+        : -1;
+    if (
+      isCategoryChanged &&
+      categoryId !== undefined &&
+      targetLeafIndex === -1
+    ) {
+      throw new Refusal("The selected asset class was not found");
+    }
+    const updatedAt = timestampBytesOf(now);
+    const withSecurity = withMessagesAt(
+      clientBytes,
+      fields.client.securities,
+      (raw) => {
+        if (optionalText(messageOf(raw), fields.security.id) !== id) {
+          return raw;
+        }
+        let patched = withTextAt(raw, fields.security.name, name);
+        patched = withTextAt(patched, fields.security.note, note);
+        patched = withTextAt(patched, fields.security.isin, isin);
+        patched = withTextAt(patched, fields.security.ticker, ticker);
+        patched = withWholeAt(
+          patched,
+          fields.security.isRetired,
+          input.isRetired ? 1 : 0,
+        );
+        return withMessageAt(patched, fields.security.updatedAt, updatedAt);
+      },
+    );
+    if (!isCategoryChanged) {
+      return withSecurity;
+    }
+    const stripped = stripTaxonomyAssignments(withSecurity, id, {
+      isAssetAllocationOnly: true,
+    });
+    return targetLeafIndex === -1
+      ? stripped
+      : withAssignedCategory(stripped, targetLeafIndex, id);
+  });
+  return { content, id };
+}
+
+// Updates an existing transaction in place while enforcing type
+// immutability and preserving unknown PTransaction fields, unknown
+// PTransactionUnit types (> 2), unchanged intra-day timestamps,
+// existing otherUuid, and unchanged FEE, TAX, and GROSS_VALUE units
+// byte for byte.
+export function updateTransaction(
+  file: Uint8Array,
+  input: EditPortfolioTransaction,
+  options?: WriteOptions,
+): { readonly content: Uint8Array<ArrayBuffer>; readonly id: string } {
+  const { now } = writeContextOf(options);
+  const id = trimmedRequired(input.id, "Transaction");
+  const content = rewriteClient(file, (clientBytes) => {
+    const client = messageOf(clientBytes);
+    const existing = requireUniqueRawId(client, {
+      idField: fields.transaction.id,
+      label: "transaction",
+      listField: fields.client.transactions,
+      targetId: id,
+    });
+    const existingType = transactionTypes.get(
+      int32At(existing, fields.transaction.type),
+    );
+    if (existingType === undefined) {
+      throw new Refusal("This transaction type cannot be edited");
+    }
+    if (input.type !== existingType) {
+      throw new Refusal("Transaction type cannot be changed");
+    }
+    const prepared = prepareTransactionMutation(client, input);
+    const baseCurrency =
+      optionalText(client, fields.client.baseCurrency) ?? "GBP";
+    const updatedAt = timestampBytesOf(now);
+    return withMessagesAt(clientBytes, fields.client.transactions, (raw) =>
+      optionalText(messageOf(raw), fields.transaction.id) === id
+        ? patchTransactionBytes(raw, { baseCurrency, prepared, updatedAt })
+        : raw,
+    );
+  });
+  return { content, id };
 }
 
 // Active (non-retired) securities account ids declared in PClient.
@@ -1123,6 +1462,39 @@ function buildTransactionBytes({
   ]);
 }
 
+// Each cash account's unrounded native balance, summed from every known
+// transaction naming it as account or as the receiving otherAccount of
+// a cash transfer (crediting the foreign gross-value amount for
+// cross-currency transfers).
+function cashBalancesOf(
+  transactions: readonly Message[],
+): ReadonlyMap<string, number> {
+  const balances = new Map<string, number>();
+  for (const transaction of transactions) {
+    const type = int32At(transaction, fields.transaction.type);
+    if (type < 0 || type > maxTransactionType) {
+      continue;
+    }
+    const amount = int64At(transaction, fields.transaction.amount) / hundredths;
+    const account = textOf(transaction, fields.transaction.account);
+    const otherAccount = textOf(transaction, fields.transaction.otherAccount);
+    if (account !== "") {
+      const sign = cashSigns.get(type);
+      if (sign !== undefined) {
+        balances.set(account, (balances.get(account) ?? 0) + sign * amount);
+      }
+    }
+    if (type === cashTransfer && otherAccount !== "") {
+      balances.set(
+        otherAccount,
+        (balances.get(otherAccount) ?? 0) +
+          transferCreditOf(transaction, amount),
+      );
+    }
+  }
+  return balances;
+}
+
 // Raw protobuf cash account ids mapped to their settlement currency,
 // falling back to the client's base currency when field 3 is absent.
 function cashCurrenciesOf(
@@ -1140,46 +1512,6 @@ function cashCurrenciesOf(
     }
   }
   return currencies;
-}
-
-// Each cash account's unrounded native balance and touching transaction
-// count, summed from every known transaction naming it as account or as
-// the receiving otherAccount of a cash transfer (crediting the foreign
-// gross-value amount for cross-currency transfers, and counting a
-// self-transfer once).
-function cashLedgerOf(transactions: readonly Message[]): {
-  readonly balances: ReadonlyMap<string, number>;
-  readonly counts: ReadonlyMap<string, number>;
-} {
-  const balances = new Map<string, number>();
-  const counts = new Map<string, number>();
-  for (const transaction of transactions) {
-    const type = int32At(transaction, fields.transaction.type);
-    if (type < 0 || type > maxTransactionType) {
-      continue;
-    }
-    const amount = int64At(transaction, fields.transaction.amount) / hundredths;
-    const account = textOf(transaction, fields.transaction.account);
-    const otherAccount = textOf(transaction, fields.transaction.otherAccount);
-    if (account !== "") {
-      counts.set(account, (counts.get(account) ?? 0) + 1);
-      const sign = cashSigns.get(type);
-      if (sign !== undefined) {
-        balances.set(account, (balances.get(account) ?? 0) + sign * amount);
-      }
-    }
-    if (type === cashTransfer && otherAccount !== "") {
-      if (otherAccount !== account) {
-        counts.set(otherAccount, (counts.get(otherAccount) ?? 0) + 1);
-      }
-      balances.set(
-        otherAccount,
-        (balances.get(otherAccount) ?? 0) +
-          transferCreditOf(transaction, amount),
-      );
-    }
-  }
-  return { balances, counts };
 }
 
 // The classes of the client's Asset Allocation taxonomy, as written,
@@ -1376,6 +1708,15 @@ function encodeDecimalValue(rate: number): Uint8Array {
   ]);
 }
 
+// Encodes a single FEE PTransactionUnit submessage.
+function feeUnitBytesOf(currency: string, feesPence: number): Uint8Array {
+  return joined([
+    wholeField(fields.unit.type, feeUnit),
+    wholeField(fields.unit.amount, feesPence),
+    textField(fields.unit.currency, currency),
+  ]);
+}
+
 // Counterpart foreign currency when a transaction crosses currencies,
 // or undefined for same-currency or currency-less entries.
 function fxCurrencyOf({
@@ -1434,6 +1775,17 @@ function grossAmountPenceOf({
   return amountPence;
 }
 
+// Encodes a single GROSS_VALUE PTransactionUnit submessage.
+function grossUnitBytesOf(grossValue: GrossValueSpec): Uint8Array {
+  return joined([
+    wholeField(fields.unit.amount, grossValue.amountPence),
+    textField(fields.unit.currency, grossValue.currency),
+    wholeField(fields.unit.fxAmount, grossValue.fxAmountMinor),
+    textField(fields.unit.fxCurrency, grossValue.fxCurrency),
+    delimitedOf(fields.unit.fxRateToBase, encodeDecimalValue(grossValue.rate)),
+  ]);
+}
+
 // First positive cross-currency GROSS_VALUE unit on a transaction,
 // including its optional decoded PDecimalValue exchange rate.
 function grossValueOf(
@@ -1463,14 +1815,6 @@ function grossValueOf(
   return undefined;
 }
 
-// Whether a classification id exists as a root-reachable named leaf in
-// the file's Asset Allocation taxonomy.
-function hasTaxonomyLeaf(client: Message, categoryId: string): boolean {
-  return taxonomyInfoOf(client, new Map()).categories.some(
-    (category) => category.id === categoryId,
-  );
-}
-
 // Encodes one PHistoricalPrice entry, always writing field 1 so
 // epoch-day 0 (1970-01-01) preserves wire presence.
 function historicalPriceBytesOf(
@@ -1484,19 +1828,26 @@ function historicalPriceBytesOf(
 }
 
 // Each security in the catalogue paired with its active per-account
-// share breakdown, Asset Allocation category (when present), latest
-// positive quote and GBP conversion rate.
+// share breakdown, Asset Allocation category and split status, raw
+// touching transaction count, latest positive quote and GBP rate.
 function holdingsOf(
   securities: ReadonlyMap<string, Security>,
   held: ReadonlyMap<string, ReadonlyMap<string, number>>,
   {
     activePortfolioIds,
     categoryBySecurity,
+    categoryStatusBySecurity,
     pounds,
+    securityTxCounts,
   }: {
     readonly activePortfolioIds: ReadonlySet<string>;
     readonly categoryBySecurity: ReadonlyMap<string, string>;
+    readonly categoryStatusBySecurity: ReadonlyMap<
+      string,
+      SecurityCategoryStatus
+    >;
     readonly pounds: ReadonlyMap<string, number>;
+    readonly securityTxCounts: ReadonlyMap<string, number>;
   },
 ): readonly Holding[] {
   return [...securities].map(([id, security]) => {
@@ -1509,13 +1860,21 @@ function holdingsOf(
       shares: written / scaled,
     }));
     const category = categoryBySecurity.get(id);
+    const categoryStatus = categoryStatusBySecurity.get(id) ?? {
+      categoryId: undefined,
+      isSplitCategory: false,
+    };
     return {
       ...(category !== undefined && { category }),
+      ...(categoryStatus.categoryId !== undefined && {
+        categoryId: categoryStatus.categoryId,
+      }),
       currency: security.currency === "no currency" ? "" : security.currency,
       gbpRate: pounds.get(security.currency) ?? null,
       id,
       isRetired: security.isRetired,
       ...(security.isin !== undefined && { isin: security.isin }),
+      isSplitCategory: categoryStatus.isSplitCategory,
       latestPrice: security.price > 0 ? security.price : null,
       latestPriceDate: security.quoteDate,
       name: security.name,
@@ -1523,6 +1882,7 @@ function holdingsOf(
       shares: sumOf(activeLots, ([, written]) => written) / scaled,
       sharesByAccount,
       ...(security.ticker !== undefined && { ticker: security.ticker }),
+      transactionCount: securityTxCounts.get(id) ?? 0,
     };
   });
 }
@@ -1568,6 +1928,28 @@ function initialPriceFieldOf(
   return delimitedOf(
     fields.security.prices,
     historicalPriceBytesOf(epochDay, closeScaled),
+  );
+}
+
+// Whether an existing list of GROSS_VALUE units holds a single unit
+// matching the target (grossPence, currency, fxAmountMinor, fxCurrency).
+function isMatchingGrossUnit(
+  existingGross: readonly { readonly message: Message }[],
+  grossValue: GrossValueSpec | undefined,
+  existingCurrency: string,
+): boolean {
+  const [single, extra] = existingGross;
+  if (grossValue === undefined || single === undefined || extra !== undefined) {
+    return false;
+  }
+  return (
+    int64At(single.message, fields.unit.amount) === grossValue.amountPence &&
+    (optionalText(single.message, fields.unit.currency) ?? existingCurrency) ===
+      grossValue.currency &&
+    int64At(single.message, fields.unit.fxAmount) ===
+      grossValue.fxAmountMinor &&
+    optionalText(single.message, fields.unit.fxCurrency) ===
+      grossValue.fxCurrency
   );
 }
 
@@ -1759,6 +2141,191 @@ function optionalText(message: Message, number: number): string | undefined {
   return value === undefined || value === "" ? undefined : value;
 }
 
+// Patches an existing PTransaction message in place while keeping
+// unknown fields, unknown unit types (> 2), existing otherUuid,
+// unchanged intra-day timestamps, and unchanged FEE/TAX/GROSS_VALUE
+// units byte for byte.
+function patchTransactionBytes(
+  txBytes: Uint8Array,
+  {
+    baseCurrency,
+    prepared,
+    updatedAt,
+  }: {
+    readonly baseCurrency: string;
+    readonly prepared: PreparedTransaction;
+    readonly updatedAt: Uint8Array;
+  },
+): Uint8Array {
+  const existing = messageOf(txBytes);
+  const existingCurrency =
+    optionalText(existing, fields.transaction.currency) ?? baseCurrency;
+  const existingTimestamp = dateOf(existing);
+  const isDateUnchanged =
+    existing.has(fields.transaction.date) &&
+    existingTimestamp >= minTimestamp &&
+    existingTimestamp <= maxTimestamp &&
+    isoDateOf(existingTimestamp) === prepared.date;
+
+  let patched = withTextAt(
+    txBytes,
+    fields.transaction.account,
+    prepared.refs.accountId,
+  );
+  patched = withTextAt(
+    patched,
+    fields.transaction.portfolio,
+    prepared.refs.portfolioId,
+  );
+  patched = withTextAt(
+    patched,
+    fields.transaction.otherAccount,
+    prepared.refs.otherAccountId,
+  );
+  patched = withTextAt(
+    patched,
+    fields.transaction.otherPortfolio,
+    prepared.refs.otherPortfolioId,
+  );
+  if (prepared.rule.hasCrossEntry) {
+    patched = withMessageAt(
+      patched,
+      fields.transaction.otherUpdatedAt,
+      updatedAt,
+    );
+  }
+  if (!isDateUnchanged) {
+    patched = withMessageAt(
+      patched,
+      fields.transaction.date,
+      prepared.dateBytes,
+    );
+  }
+  patched = withTextAt(patched, fields.transaction.currency, prepared.currency);
+  patched = withWholeAt(
+    patched,
+    fields.transaction.amount,
+    prepared.amountPence,
+  );
+  patched = withWholeAt(
+    patched,
+    fields.transaction.shares,
+    prepared.sharesScaled,
+  );
+  patched = withTextAt(patched, fields.transaction.note, prepared.note);
+  patched = withTextAt(
+    patched,
+    fields.transaction.security,
+    prepared.refs.securityId,
+  );
+  patched = withReplacedMessagesAt(
+    patched,
+    fields.transaction.units,
+    (existingUnits) =>
+      patchTransactionUnits(existingUnits, {
+        currency: prepared.currency,
+        existingCurrency,
+        feesPence: prepared.feesPence,
+        grossValue: prepared.grossValue,
+        taxesPence: prepared.taxesPence,
+      }),
+  );
+  return withMessageAt(patched, fields.transaction.updatedAt, updatedAt);
+}
+
+// Reconciles PTransaction.units in place: unknown unit types (> 2) and
+// unchanged GROSS_VALUE, FEE, and TAX units stay byte for byte in their
+// original positions; changed or removed units are rewritten cleanly.
+function patchTransactionUnits(
+  existingUnits: readonly Uint8Array[],
+  {
+    currency,
+    existingCurrency,
+    feesPence,
+    grossValue,
+    taxesPence,
+  }: {
+    readonly currency: string;
+    readonly existingCurrency: string;
+    readonly feesPence: number;
+    readonly grossValue: GrossValueSpec | undefined;
+    readonly taxesPence: number;
+  },
+): readonly Uint8Array[] {
+  const decoded = existingUnits.map((raw) => {
+    const message = messageOf(raw);
+    return { message, raw, type: int32At(message, fields.unit.type) };
+  });
+  const isGrossUnchanged = isMatchingGrossUnit(
+    decoded.filter((entry) => entry.type === grossValueUnit),
+    grossValue,
+    existingCurrency,
+  );
+  const isFeesUnchanged =
+    currency === existingCurrency &&
+    sumOf(
+      decoded.filter((entry) => entry.type === feeUnit),
+      ({ message }) => int64At(message, fields.unit.amount),
+    ) === feesPence;
+  const isTaxesUnchanged =
+    currency === existingCurrency &&
+    sumOf(
+      decoded.filter((entry) => entry.type === taxUnit),
+      ({ message }) => int64At(message, fields.unit.amount),
+    ) === taxesPence;
+
+  const slots = new Map<
+    number,
+    {
+      isPlaced: boolean;
+      readonly isUnchanged: boolean;
+      readonly next: readonly Uint8Array[];
+    }
+  >([
+    [
+      feeUnit,
+      {
+        isPlaced: false,
+        isUnchanged: isFeesUnchanged,
+        next: feesPence > 0 ? [feeUnitBytesOf(currency, feesPence)] : [],
+      },
+    ],
+    [
+      grossValueUnit,
+      {
+        isPlaced: false,
+        isUnchanged: isGrossUnchanged,
+        next: grossValue === undefined ? [] : [grossUnitBytesOf(grossValue)],
+      },
+    ],
+    [
+      taxUnit,
+      {
+        isPlaced: false,
+        isUnchanged: isTaxesUnchanged,
+        next: taxesPence > 0 ? [taxUnitBytesOf(currency, taxesPence)] : [],
+      },
+    ],
+  ]);
+
+  const result: Uint8Array[] = [];
+  for (const { raw, type } of decoded) {
+    const slot = slots.get(type);
+    if (slot === undefined || slot.isUnchanged) {
+      result.push(raw);
+    } else if (!slot.isPlaced) {
+      result.push(...slot.next);
+      slot.isPlaced = true;
+    }
+  }
+  for (const slot of slots.values()) {
+    if (!slot.isUnchanged && !slot.isPlaced) {
+      result.push(...slot.next);
+    }
+  }
+  return result;
+}
+
 // Each securities account's count of held catalogued securities and
 // sterling market value summed from penny-rounded per-security lots,
 // skipping unlisted security IDs and unconvertible valuations without
@@ -1820,6 +2387,61 @@ function poundsPer(client: Message): ReadonlyMap<string, number> {
     applyFxUnits(rates, units, { isGrossOnly: true, txCurrency });
   }
   return new Map([...rates, ...factors]);
+}
+
+// Validates and normalizes a transaction payload shared by
+// appendTransaction and updateTransaction.
+function prepareTransactionMutation(
+  client: Message,
+  input: NewPortfolioTransaction,
+): PreparedTransaction {
+  const rule = transactionWriteRules[input.type];
+  const currency = currencyCodeOf(input.currency, { isPenceAllowed: false });
+  const dateBytes = isoDateToTimestampBytes(input.date);
+  const amountPence = moneyToHundredths(input.amount, "Amount", {
+    isZeroAllowed: rule.isAmountOptional,
+  });
+  if (!rule.hasCosts && (input.fees !== 0 || input.taxes !== 0)) {
+    throw new Refusal("This transaction type does not take fees or taxes");
+  }
+  const feesPence = rule.hasCosts
+    ? moneyToHundredths(input.fees, "Fees", { isZeroAllowed: true })
+    : 0;
+  const taxesPence = rule.hasCosts
+    ? moneyToHundredths(input.taxes, "Taxes", { isZeroAllowed: true })
+    : 0;
+  if (rule.isCostsBoundedByAmount && feesPence + taxesPence > amountPence) {
+    throw new Refusal("Fees and taxes cannot exceed the transaction amount");
+  }
+  if (!rule.hasShares && input.shares !== 0) {
+    throw new Refusal("This transaction type does not take shares");
+  }
+  const sharesScaled = rule.hasShares
+    ? scaledValueOf(input.shares, "Shares")
+    : 0;
+  const refs = validateTransactionRefs(client, input, { currency, rule });
+  const grossValue = resolveGrossValue({
+    amountPence,
+    currency,
+    feesPence,
+    fxAmount: input.fxAmount,
+    fxCurrency: refs.fxCurrency,
+    rule,
+    taxesPence,
+  });
+  return {
+    amountPence,
+    currency,
+    date: input.date,
+    dateBytes,
+    feesPence,
+    grossValue,
+    note: trimmedOptional(input.note),
+    refs,
+    rule,
+    sharesScaled,
+    taxesPence,
+  };
 }
 
 // A single historical or latest price entry decoded into its price and
@@ -1888,6 +2510,53 @@ function rawIdsOf(
     }
   }
   return ids;
+}
+
+// Counts raw protobuf transaction references for every cash account,
+// securities account, and security UUID across all PTransaction entries
+// (regardless of enum type, counting self-transfers once per transaction)
+// so snapshot counts and server delete guards always agree.
+function rawTransactionCountsOf(
+  rawTransactions: readonly Message[],
+): RawTransactionCounts {
+  const cashAccounts = new Map<string, number>();
+  const securitiesAccounts = new Map<string, number>();
+  const securities = new Map<string, number>();
+  for (const transaction of rawTransactions) {
+    const account = optionalText(transaction, fields.transaction.account);
+    const otherAccount = optionalText(
+      transaction,
+      fields.transaction.otherAccount,
+    );
+    if (account !== undefined) {
+      cashAccounts.set(account, (cashAccounts.get(account) ?? 0) + 1);
+    }
+    if (otherAccount !== undefined && otherAccount !== account) {
+      cashAccounts.set(otherAccount, (cashAccounts.get(otherAccount) ?? 0) + 1);
+    }
+    const portfolio = optionalText(transaction, fields.transaction.portfolio);
+    const otherPortfolio = optionalText(
+      transaction,
+      fields.transaction.otherPortfolio,
+    );
+    if (portfolio !== undefined) {
+      securitiesAccounts.set(
+        portfolio,
+        (securitiesAccounts.get(portfolio) ?? 0) + 1,
+      );
+    }
+    if (otherPortfolio !== undefined && otherPortfolio !== portfolio) {
+      securitiesAccounts.set(
+        otherPortfolio,
+        (securitiesAccounts.get(otherPortfolio) ?? 0) + 1,
+      );
+    }
+    const security = optionalText(transaction, fields.transaction.security);
+    if (security !== undefined) {
+      securities.set(security, (securities.get(security) ?? 0) + 1);
+    }
+  }
+  return { cashAccounts, securities, securitiesAccounts };
 }
 
 // What each securities account a Portfolio Performance file lists held
@@ -1979,6 +2648,42 @@ function readTargetsFromClient(client: Message): readonly Target[] {
     classesIn(client),
     worthOf(client, securitiesOf(client), sharesHeld(client)),
   );
+}
+
+// Verifies that exactly one raw protobuf message in `listField` carries
+// `targetId` under `idField`, returning that decoded message or
+// refusing on 0 (not found) or > 1 (duplicate id).
+function requireUniqueRawId(
+  client: Message,
+  {
+    idField,
+    label,
+    listField,
+    targetId,
+  }: {
+    readonly idField: number;
+    readonly label: string;
+    readonly listField: number;
+    readonly targetId: string;
+  },
+): Message {
+  let matched: Message | undefined;
+  let matches = 0;
+  for (const entry of messagesAt(client, listField)) {
+    if (optionalText(entry, idField) === targetId) {
+      matched = entry;
+      matches += 1;
+    }
+  }
+  if (matched === undefined) {
+    throw new Refusal(`The selected ${label} was not found`);
+  }
+  if (matches > 1) {
+    throw new Refusal(
+      `Multiple ${label} entries share this id, so it cannot be changed safely`,
+    );
+  }
+  return matched;
 }
 
 function resolveCashRef(
@@ -2195,6 +2900,45 @@ function securitiesOf(client: Message): ReadonlyMap<string, Security> {
   );
 }
 
+// Scans every classification in the first Asset Allocation taxonomy to
+// determine each assigned vehicle's single-leaf status: exactly one
+// 100% assignment on a root-reachable named leaf yields categoryId and
+// isSplitCategory: false; any other assignment shape yields
+// isSplitCategory: true.
+function securityCategoryStatusMapOf(
+  client: Message,
+): ReadonlyMap<string, SecurityCategoryStatus> {
+  const found = messagesAt(client, fields.client.taxonomies).find(
+    (each) => textAt(each, fields.taxonomy.name) === taxonomy,
+  );
+  if (found === undefined) {
+    return new Map();
+  }
+  const classes = messagesAt(found, fields.taxonomy.classes).map(classOf);
+  const root = classes.find((each) => each.parent === undefined);
+  const leafClasses =
+    root === undefined
+      ? new Set<Class>()
+      : new Set(
+          taxonomyLeavesOf(classes, root).map((leaf) => leaf.sourceClass),
+        );
+  const statusByVehicle = new Map<string, SecurityCategoryStatus>();
+  for (const cls of classes) {
+    const isLeaf = leafClasses.has(cls);
+    for (const { vehicle, weight } of cls.assignments) {
+      const isSingleFullLeaf =
+        !statusByVehicle.has(vehicle) && isLeaf && weight === whole;
+      statusByVehicle.set(
+        vehicle,
+        isSingleFullLeaf
+          ? { categoryId: cls.id, isSplitCategory: false }
+          : { categoryId: undefined, isSplitCategory: true },
+      );
+    }
+  }
+  return statusByVehicle;
+}
+
 // Raw protobuf security ids mapped to their optional quote currency
 // (empty string when omitted in field 4).
 function securityCurrenciesOf(client: Message): ReadonlyMap<string, string> {
@@ -2248,6 +2992,61 @@ function sharesHeld(
   return held;
 }
 
+// Strips every assignment referencing `vehicleId` from taxonomies
+// (either only the first Asset Allocation taxonomy or every taxonomy),
+// rewriting only affected taxonomies and classes so untouched entries
+// stay byte for byte identical.
+function stripTaxonomyAssignments(
+  clientBytes: Uint8Array,
+  vehicleId: string,
+  { isAssetAllocationOnly }: { readonly isAssetAllocationOnly: boolean },
+): Uint8Array {
+  let hasVisitedAssetAllocation = false;
+  return withMessagesAt(clientBytes, fields.client.taxonomies, (taxBytes) => {
+    const parsedTax = messageOf(taxBytes);
+    if (isAssetAllocationOnly) {
+      if (
+        hasVisitedAssetAllocation ||
+        textAt(parsedTax, fields.taxonomy.name) !== taxonomy
+      ) {
+        return taxBytes;
+      }
+      hasVisitedAssetAllocation = true;
+    }
+    const hasTaxMatch = messagesAt(parsedTax, fields.taxonomy.classes).some(
+      (cls) =>
+        messagesAt(cls, fields.class.assignments).some(
+          (assignment) =>
+            textOf(assignment, fields.assignment.vehicle) === vehicleId,
+        ),
+    );
+    if (!hasTaxMatch) {
+      return taxBytes;
+    }
+    return withMessagesAt(taxBytes, fields.taxonomy.classes, (classBytes) => {
+      const hasClassMatch = messagesAt(
+        messageOf(classBytes),
+        fields.class.assignments,
+      ).some(
+        (assignment) =>
+          textOf(assignment, fields.assignment.vehicle) === vehicleId,
+      );
+      if (!hasClassMatch) {
+        return classBytes;
+      }
+      return withReplacedMessagesAt(
+        classBytes,
+        fields.class.assignments,
+        (assignments) =>
+          assignments.filter(
+            (raw) =>
+              textOf(messageOf(raw), fields.assignment.vehicle) !== vehicleId,
+          ),
+      );
+    });
+  });
+}
+
 // The categories of a taxonomy's classes, from its root down, each
 // worth what the holdings assigned to it come to. A category with no
 // name, which the household keeps none of, is refused in words saying
@@ -2293,8 +3092,9 @@ function targetsOf(
 }
 
 // Optional root-reachable leaf categories (with their classification
-// ids, disambiguated by ancestor path when two leaves share a name) and
-// sorted security assignments from the file's Asset Allocation taxonomy,
+// ids, disambiguated by ancestor path when two leaves share a name),
+// sorted security assignment labels, and complete single-leaf / split
+// assignment status from the file's Asset Allocation taxonomy,
 // returning empty results rather than refusing when the taxonomy or root
 // is absent.
 function taxonomyInfoOf(
@@ -2303,17 +3103,30 @@ function taxonomyInfoOf(
 ): {
   readonly categories: readonly PortfolioCategory[];
   readonly categoryBySecurity: ReadonlyMap<string, string>;
+  readonly categoryStatusBySecurity: ReadonlyMap<
+    string,
+    SecurityCategoryStatus
+  >;
 } {
+  const categoryStatusBySecurity = securityCategoryStatusMapOf(client);
   const found = messagesAt(client, fields.client.taxonomies).find(
     (each) => textAt(each, fields.taxonomy.name) === taxonomy,
   );
   if (found === undefined) {
-    return { categories: [], categoryBySecurity: new Map() };
+    return {
+      categories: [],
+      categoryBySecurity: new Map(),
+      categoryStatusBySecurity,
+    };
   }
   const classes = messagesAt(found, fields.taxonomy.classes).map(classOf);
   const root = classes.find((each) => each.parent === undefined);
   if (root === undefined) {
-    return { categories: [], categoryBySecurity: new Map() };
+    return {
+      categories: [],
+      categoryBySecurity: new Map(),
+      categoryStatusBySecurity,
+    };
   }
   const leaves = taxonomyLeavesOf(classes, root);
   const seenNames = new Set<string>();
@@ -2372,7 +3185,28 @@ function taxonomyInfoOf(
           .join(", "),
       ]),
     ),
+    categoryStatusBySecurity,
   };
+}
+
+// Index of the first root-reachable named leaf matching categoryId in
+// the file's Asset Allocation taxonomy, or -1 when absent.
+function taxonomyLeafIndexOf(client: Message, categoryId: string): number {
+  const found = messagesAt(client, fields.client.taxonomies).find(
+    (each) => textAt(each, fields.taxonomy.name) === taxonomy,
+  );
+  if (found === undefined) {
+    return -1;
+  }
+  const classes = messagesAt(found, fields.taxonomy.classes).map(classOf);
+  const root = classes.find((each) => each.parent === undefined);
+  if (root === undefined) {
+    return -1;
+  }
+  const leaf = taxonomyLeavesOf(classes, root).find(
+    (entry) => entry.id === categoryId,
+  );
+  return leaf === undefined ? -1 : classes.indexOf(leaf.sourceClass);
 }
 
 // Named leaf classes reachable from a taxonomy's root, ignoring blank
@@ -2406,6 +3240,7 @@ function taxonomyLeavesOf(
           assignments: node.assignments,
           id: node.id,
           name: trimmedName,
+          sourceClass: node,
         });
       }
       return;
@@ -2421,6 +3256,15 @@ function taxonomyLeavesOf(
   };
   walk(root, [], new Set());
   return leaves;
+}
+
+// Encodes a single TAX PTransactionUnit submessage.
+function taxUnitBytesOf(currency: string, taxesPence: number): Uint8Array {
+  return joined([
+    wholeField(fields.unit.type, taxUnit),
+    wholeField(fields.unit.amount, taxesPence),
+    textField(fields.unit.currency, currency),
+  ]);
 }
 
 // The text written under a number, or nothing where none was, as an id
@@ -2499,30 +3343,14 @@ function transactionUnitsOf({
   const units: Uint8Array[] = [];
   if (grossValue !== undefined) {
     units.push(
-      delimitedOf(
-        fields.transaction.units,
-        joined([
-          wholeField(fields.unit.amount, grossValue.amountPence),
-          textField(fields.unit.currency, grossValue.currency),
-          wholeField(fields.unit.fxAmount, grossValue.fxAmountMinor),
-          textField(fields.unit.fxCurrency, grossValue.fxCurrency),
-          delimitedOf(
-            fields.unit.fxRateToBase,
-            encodeDecimalValue(grossValue.rate),
-          ),
-        ]),
-      ),
+      delimitedOf(fields.transaction.units, grossUnitBytesOf(grossValue)),
     );
   }
   if (feesPence > 0) {
     units.push(
       delimitedOf(
         fields.transaction.units,
-        joined([
-          wholeField(fields.unit.type, feeUnit),
-          wholeField(fields.unit.amount, feesPence),
-          textField(fields.unit.currency, currency),
-        ]),
+        feeUnitBytesOf(currency, feesPence),
       ),
     );
   }
@@ -2530,11 +3358,7 @@ function transactionUnitsOf({
     units.push(
       delimitedOf(
         fields.transaction.units,
-        joined([
-          wholeField(fields.unit.type, taxUnit),
-          wholeField(fields.unit.amount, taxesPence),
-          textField(fields.unit.currency, currency),
-        ]),
+        taxUnitBytesOf(currency, taxesPence),
       ),
     );
   }
@@ -2752,13 +3576,13 @@ function weightsOf(
   return weights;
 }
 
-// Appends one full-weight (100%) vehicle assignment to the matching
-// leaf classification in the first Asset Allocation taxonomy (matching
-// taxonomyInfoOf), keeping every other taxonomy and classification byte
-// for byte.
+// Appends one full-weight (100%) vehicle assignment to the target leaf
+// classification by index in the first Asset Allocation taxonomy
+// (matching taxonomyLeafIndexOf), keeping every other taxonomy and
+// classification byte for byte.
 function withAssignedCategory(
   clientBytes: Uint8Array,
-  categoryId: string,
+  targetClassIndex: number,
   vehicleId: string,
 ): Uint8Array {
   let hasUpdated = false;
@@ -2770,11 +3594,14 @@ function withAssignedCategory(
       return written;
     }
     hasUpdated = true;
+    let classIndex = 0;
     return withMessagesAt(written, fields.taxonomy.classes, (each) => {
-      const parsed = messageOf(each);
-      if (textOf(parsed, fields.class.id) !== categoryId) {
+      const currentIndex = classIndex;
+      classIndex += 1;
+      if (currentIndex !== targetClassIndex) {
         return each;
       }
+      const parsed = messageOf(each);
       const ranks = messagesAt(parsed, fields.class.assignments).map((item) =>
         int32At(item, fields.assignment.rank),
       );

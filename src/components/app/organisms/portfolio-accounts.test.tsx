@@ -56,6 +56,7 @@ const isaSecurities: SecuritiesAccount = {
   name: "Northstar ISA",
   note: "Tax wrapper",
   referenceAccountId: "cash-isa",
+  transactionCount: 12,
 };
 
 const jointSecurities: SecuritiesAccount = {
@@ -65,6 +66,7 @@ const jointSecurities: SecuritiesAccount = {
   marketValue: 11_000.15,
   name: "Joint Dealing",
   referenceAccountId: "cash-isa",
+  transactionCount: 4,
 };
 
 const unlinkedSecurities: SecuritiesAccount = {
@@ -73,6 +75,7 @@ const unlinkedSecurities: SecuritiesAccount = {
   isRetired: false,
   marketValue: 0,
   name: "Unlinked Dealing",
+  transactionCount: 0,
 };
 
 const retiredSecurities: SecuritiesAccount = {
@@ -82,6 +85,7 @@ const retiredSecurities: SecuritiesAccount = {
   marketValue: 100,
   name: "Closed Account",
   referenceAccountId: "cash-old",
+  transactionCount: 2,
 };
 
 function renderAccounts(
