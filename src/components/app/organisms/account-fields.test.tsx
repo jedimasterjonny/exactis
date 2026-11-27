@@ -421,12 +421,78 @@ describe("AccountFields", () => {
       [
         { ...isa, growth: "fixed", portfolio: null },
         portfolio,
+        "Links to prefill the month-end balance; bespoke growth applies on the plan rate",
+      ],
+      [
+        { ...isa, growth: "fixed", portfolio: null },
+        { ...portfolio, hasLivePortfolio: false },
         "Only applies on the plan rate",
       ],
       [
         { ...isa, growth: "fixed", portfolio: "Balanced ISA" },
         portfolio,
+        "Fixed rate overrides Portfolio growth · prefills month-end balance",
+      ],
+      [
+        { ...isa, growth: "fixed", portfolio: "Balanced ISA" },
+        { ...portfolio, hasLivePortfolio: false },
         "Fixed rate overrides Portfolio growth",
+      ],
+      [
+        { ...isa, growth: "fixed", portfolio: "Cash Reserve" },
+        {
+          ...portfolio,
+          cashAccounts: ["Cash Reserve"],
+          rates: { ...portfolio.rates, "Cash Reserve": { kind: "cash" } },
+        },
+        "Fixed rate · prefills month-end balance",
+      ],
+      [
+        { ...isa, growth: "plan", portfolio: "Cash Reserve" },
+        {
+          ...portfolio,
+          cashAccounts: ["Cash Reserve"],
+          rates: { ...portfolio.rates, "Cash Reserve": { kind: "cash" } },
+        },
+        "Uses the plan rate, 5.00% · prefills month-end balance",
+      ],
+      [
+        { ...isa, growth: "fixed", portfolio: "Old ISA" },
+        {
+          ...portfolio,
+          rates: {
+            ...portfolio.rates,
+            "Old ISA": { kind: "unavailable", reason: "Retired in Portfolio" },
+          },
+        },
+        "Retired in Portfolio · fixed rate applies",
+      ],
+      [
+        { ...isa, growth: "plan", portfolio: "Old ISA" },
+        {
+          ...portfolio,
+          hasGlide: true,
+          rates: {
+            ...portfolio.rates,
+            "Old ISA": { kind: "unavailable", reason: "Retired in Portfolio" },
+          },
+        },
+        "Retired in Portfolio · uses the plan rate, 5.00% now",
+      ],
+      [
+        { ...isa, growth: "plan", portfolio: "Old ISA" },
+        {
+          ...portfolio,
+          rates: {
+            ...portfolio.rates,
+            "Old ISA": {
+              bespoke: { rate: 0.065, stocks: 0.7 },
+              kind: "unavailable",
+              reason: "Multiple Portfolio accounts share this name",
+            },
+          },
+        },
+        "Grows 6.50% a year · 70% stocks, 30% bonds · Multiple Portfolio accounts share this name (month-end prefill off)",
       ],
       [
         { ...isa, portfolio: "All Stocks" },
@@ -508,8 +574,85 @@ describe("AccountFields", () => {
       unmount();
     }
 
-    // Stale link stays selectable even when portfolio.accounts is empty.
-    const { unmount: unmountStale } = render(
+    // Stale link stays selectable even when portfolio.accounts is empty,
+    // and adapts its suffix for retired, unavailable, or missing links.
+    const staleSuffixCases: readonly [string, PortfolioOptions, string][] = [
+      ["Old ISA", { ...portfolio, accounts: [] }, "Old ISA (not in Portfolio)"],
+      [
+        "Missing ISA",
+        {
+          ...portfolio,
+          accounts: [],
+          rates: {
+            "Missing ISA": {
+              kind: "unavailable",
+              reason: "Not found in Portfolio",
+            },
+          },
+        },
+        "Missing ISA (not in Portfolio)",
+      ],
+      [
+        "Retired ISA",
+        {
+          ...portfolio,
+          accounts: [],
+          rates: {
+            "Retired ISA": {
+              kind: "unavailable",
+              reason: "Retired in Portfolio",
+            },
+          },
+        },
+        "Retired ISA (retired)",
+      ],
+      [
+        "Paired Cash",
+        {
+          ...portfolio,
+          accounts: [],
+          rates: {
+            "Paired Cash": {
+              kind: "unavailable",
+              reason: "Paired as reference cash for Balanced ISA",
+            },
+          },
+        },
+        "Paired Cash (unavailable)",
+      ],
+      [
+        "Unlisted ISA",
+        { ...portfolio, accounts: [], rates: {} },
+        "Unlisted ISA (not in Portfolio)",
+      ],
+    ];
+    for (const [linkName, options, expectedLabel] of staleSuffixCases) {
+      const { unmount } = render(
+        <AccountFields
+          draft={{ ...isa, portfolio: linkName }}
+          initial={{ ...isa, portfolio: linkName }}
+          onAmend={vi.fn<(patch: Partial<AccountValues>) => void>()}
+          onFundingChange={vi.fn<(funding: Funding) => void>()}
+          onKindChange={vi.fn<(kind: AccountKind) => void>()}
+          owners={owners}
+          portfolio={options}
+        />,
+      );
+      const staleSelect = screen.getByRole("combobox", {
+        name: "Portfolio account",
+      });
+      expect(staleSelect).toHaveValue(linkName);
+      expect(
+        within(staleSelect)
+          .getAllByRole("option")
+          .map((option) => option.textContent),
+      ).toStrictEqual(["Not linked", expectedLabel]);
+      unmount();
+    }
+
+    // Optgroups render only when both securities and cash accounts exist;
+    // a cash-only list renders flat without optgroups.
+    const { unmount: unmountGrouped } = render(
       <AccountFields
         draft={{ ...isa, portfolio: "Old ISA" }}
         initial={{ ...isa, portfolio: "Old ISA" }}
@@ -517,22 +660,58 @@ describe("AccountFields", () => {
         onFundingChange={vi.fn<(funding: Funding) => void>()}
         onKindChange={vi.fn<(kind: AccountKind) => void>()}
         owners={owners}
-        portfolio={{ ...portfolio, accounts: [] }}
+        portfolio={{
+          ...portfolio,
+          accounts: ["Balanced ISA"],
+          cashAccounts: ["Cash Reserve"],
+        }}
       />,
     );
-    const staleSelect = screen.getByRole("combobox", {
+    const groupedSelect = screen.getByRole("combobox", {
       name: "Portfolio account",
     });
-    expect(staleSelect).toHaveValue("Old ISA");
     expect(
-      within(staleSelect)
+      within(groupedSelect)
+        .getAllByRole("group")
+        .map((group) => group.getAttribute("label")),
+    ).toStrictEqual(["Securities accounts", "Cash accounts"]);
+    expect(
+      within(groupedSelect)
         .getAllByRole("option")
         .map((option) => option.textContent),
-    ).toStrictEqual(["Not linked", "Old ISA (not in Portfolio)"]);
-    expect(staleSelect).toHaveAccessibleDescription(
-      "Uses the plan rate, 5.00%. Not found in Portfolio.",
+    ).toStrictEqual([
+      "Not linked",
+      "Old ISA (not in Portfolio)",
+      "Balanced ISA",
+      "Cash Reserve",
+    ]);
+    unmountGrouped();
+
+    const { unmount: unmountCashOnly } = render(
+      <AccountFields
+        draft={{ ...isa, kind: "cash", owner: null, portfolio: null }}
+        initial={{ ...isa, kind: "cash", owner: null, portfolio: null }}
+        onAmend={vi.fn<(patch: Partial<AccountValues>) => void>()}
+        onFundingChange={vi.fn<(funding: Funding) => void>()}
+        onKindChange={vi.fn<(kind: AccountKind) => void>()}
+        owners={owners}
+        portfolio={{
+          ...portfolio,
+          accounts: [],
+          cashAccounts: ["Cash Reserve"],
+        }}
+      />,
     );
-    unmountStale();
+    const cashOnlySelect = screen.getByRole("combobox", {
+      name: "Portfolio account",
+    });
+    expect(within(cashOnlySelect).queryByRole("group")).not.toBeInTheDocument();
+    expect(
+      within(cashOnlySelect)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toStrictEqual(["Not linked", "Cash Reserve"]);
+    unmountCashOnly();
 
     // Hides when no live accounts exist on an unlinked saving, and hides
     // on non-savings even when live accounts exist.
