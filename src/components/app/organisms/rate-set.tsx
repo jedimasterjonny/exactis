@@ -197,7 +197,8 @@ export function RateSet({
     <>
       {chosen === "custom" && (
         <Caution title="Custom rates are live">
-          They do not follow a new CMA or BoE curve.
+          They do not follow a new CMA or BoE curve, and accounts linked to
+          Portfolio fall back to the plan rate.
         </Caution>
       )}
       <SectionCard

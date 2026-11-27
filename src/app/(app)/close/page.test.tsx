@@ -1362,7 +1362,7 @@ describe("Where the invested balances landed", () => {
       lines: [
         "Over the month since July 2026's close, the invested balances landed in the middle half of the futures its plan drew.",
         "£190,412 invested on 25 Aug 2026. The middle future of the 1,000 came to £191,000; the middle half ran from £186,000 to £197,000, and the middle 80% from £180,000 to £202,000.",
-        "Invested balances are the accounts growing at the plan rate that were checked at both closes, as their statements give them. 1 of them was not checked at both and is left out.",
+        "Invested balances are the accounts on the plan or Portfolio rate that were checked at both closes, as their statements give them. 1 of them was not checked at both and is left out.",
         "The futures count paid in as Portfolio gives it for Stocks & shares ISA, £300 more than the plan paid, and as the plan paid for the rest.",
       ],
     });
@@ -1393,7 +1393,7 @@ describe("Where the invested balances landed", () => {
       lines: [
         "Over the 5 months since March 2026's close, the invested balances landed in the bottom quarter of the futures its plan drew.",
         "£183,250 invested on 25 Aug 2026. The middle future of the 1,000 came to £191,000; the middle half ran from £186,000 to £197,000, and the middle 80% from £180,000 to £202,000.",
-        "Invested balances are the accounts growing at the plan rate that were checked at both closes, as their statements give them. 2 of them were not checked at both and are left out.",
+        "Invested balances are the accounts on the plan or Portfolio rate that were checked at both closes, as their statements give them. 2 of them were not checked at both and are left out.",
         "The futures count paid in as Portfolio gives it for Stocks & shares ISA and Workplace pension, £300 less than the plan paid.",
         "February 2026's close is passed over, since it is in a form this app cannot read.",
       ],
@@ -1424,7 +1424,7 @@ describe("Where the invested balances landed", () => {
     expect(landing().lines).toStrictEqual([
       "Over the year since August 2025's close, the invested balances landed in the top tenth of the futures its plan drew.",
       "£250,000 invested on 25 Aug 2026. The middle future of the 1,000 came to £191,000; the middle half ran from £186,000 to £197,000, and the middle 80% from £180,000 to £202,000.",
-      "Invested balances are the accounts growing at the plan rate that were checked at both closes, as their statements give them.",
+      "Invested balances are the accounts on the plan or Portfolio rate that were checked at both closes, as their statements give them.",
       "The futures count paid in as the plan paid it, since the portfolio file was last updated before this close.",
       "The plan draws on the savings in at least one of these months, but the futures here draw nothing, so the invested balances can land lower among them than the markets alone would put them.",
     ]);

@@ -4,9 +4,12 @@ import type { JSX } from "react";
 import { CalendarCheck } from "lucide-react";
 import Link from "next/link";
 
+import type { PortfolioRate } from "@/components/app/organisms/account-fields";
+
 import { BalanceDates } from "@/components/app/atoms/balance-dates";
 import { Screen } from "@/components/app/templates/screen";
 import { buttonVariants } from "@/components/kit/button";
+import { accountGrowthOf } from "@/data/cma";
 import { moveChoices } from "@/data/houses";
 import { markersOf } from "@/data/milestones";
 import { laidOut } from "@/engine/projection";
@@ -15,6 +18,7 @@ import { formatGbp } from "@/lib/money";
 import { formatMonth, monthBefore, today } from "@/lib/months";
 import { accountsAndAssets, monthEnd, sectionLabel } from "@/lib/nav";
 import { getHousehold } from "@/store/household";
+import { getPortfolioFeed } from "@/store/portfolio";
 
 import { AccountLedger } from "./account-ledger";
 
@@ -47,15 +51,62 @@ export const metadata: Metadata = { title: accountsAndAssets.label };
 // it. No-break spaces bind "a net worth", so no line breaks inside it.
 // Beneath the sentence the strip says how fresh the balances are, as
 // the assumptions screen's says how fresh its sources are, over the
-// sections the ledger lays out. The day is read once on the server.
+// sections the ledger lays out. Beside the household, the page reads
+// the stored Portfolio Performance feed to gather live securities
+// account candidates (falling back to synced target portfolios when no
+// feed is stored) and derives bespoke or fallback CMA rate previews
+// for live and stale links. The day is read once on the server.
 export default async function Accounts(): Promise<JSX.Element> {
-  const household = await getHousehold();
+  const [household, owned] = await Promise.all([
+    getHousehold(),
+    getPortfolioFeed(),
+  ]);
   const { accounts, owners } = household;
   const { plan, schedule } = laidOut(
     accounts,
     household.schedule,
     household.plan,
   );
+  const portfolios = [
+    ...new Set(
+      [
+        ...(owned === null
+          ? (household.targets?.portfolios?.map(({ name }) => name) ?? [])
+          : owned.feed.handoff.securitiesAccounts.map(({ name }) => name)),
+        ...(household.targets?.categories.flatMap(
+          ({ accounts: held }) => held?.map(({ name }) => name) ?? [],
+        ) ?? []),
+      ]
+        .map((name) => name.trim())
+        .filter((name) => name !== ""),
+    ),
+  ].toSorted((one, other) => one.localeCompare(other));
+  const live = new Set(portfolios);
+  const candidateNames = new Set([
+    ...portfolios,
+    ...accounts.flatMap(({ portfolio }) =>
+      portfolio === undefined ? [] : [portfolio],
+    ),
+  ]);
+  const portfolioRates: Readonly<Record<string, PortfolioRate>> =
+    Object.fromEntries(
+      [...candidateNames].map((name): readonly [string, PortfolioRate] => {
+        if (!live.has(name)) {
+          return [name, { kind: "fallback", reason: "Not found in Portfolio" }];
+        }
+        const derived = accountGrowthOf(household, plan, name);
+        return [
+          name,
+          derived.kind === "bespoke"
+            ? {
+                kind: "bespoke",
+                rate: derived.rate.rate,
+                stocks: derived.stocks,
+              }
+            : { kind: "fallback", reason: derived.reason },
+        ];
+      }),
+    );
   const day = today();
   return (
     <Screen
@@ -87,6 +138,12 @@ export default async function Accounts(): Promise<JSX.Element> {
         )}
         owners={owners}
         plan={plan}
+        portfolio={{
+          accounts: portfolios,
+          hasGlide: household.glide.length > 0,
+          planRate: plan.rate,
+          rates: portfolioRates,
+        }}
       />
     </Screen>
   );

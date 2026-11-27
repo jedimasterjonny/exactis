@@ -2,6 +2,7 @@
 
 import type { JSX } from "react";
 
+import type { PortfolioOptions } from "@/components/app/organisms/account-fields";
 import type {
   Account,
   AccountDraft,
@@ -33,6 +34,7 @@ interface AccountDialogProps {
   readonly onSaved: (account: Account) => void;
   readonly opens: Month;
   readonly owners: readonly Owner[];
+  readonly portfolio?: PortfolioOptions | undefined;
 }
 
 // What the dialog holds while it is open: the account's values, flat, so
@@ -81,7 +83,9 @@ const blank: Draft = {
 // dialog opened on goes with the save, so the store refuses a save over
 // an account changed meanwhile rather than writing it back. The owners are
 // handed down for an ISA or a pension to name its own, a new one
-// opening on the first. The save holds while the account is unnamed,
+// opening on the first, and Portfolio options are handed down for a
+// saving to link to a Portfolio Performance securities account and
+// preview its bespoke CMA rate. The save holds while the account is unnamed,
 // while it is a wrapper with no owner, which is only while the plan has
 // none to give it, while it states a fixed sum past its allowance on its
 // own, which the amount's hint says the most of, or while it is on its
@@ -103,6 +107,7 @@ export function AccountDialog({
   onSaved,
   opens,
   owners,
+  portfolio,
 }: AccountDialogProps): JSX.Element | null {
   const feeders = account === null ? [] : feeding(account.id, lines);
   const opening = openingOf(account ?? kind, feeders, owners);
@@ -137,7 +142,9 @@ export function AccountDialog({
   // pension's and comes back as the account opened with it, which is
   // what the choice mounts showing when a pension is chosen again. The
   // growth goes to a fixed rate with a debt and comes back as the
-  // account opened with it where the debt took it away, as below.
+  // account opened with it where the debt took it away, as below. Any
+  // Portfolio link goes with a non-saving treatment and comes back as
+  // the account opened with it when returning to a saving, as below.
   function treat(current: Entry<Draft>, kind: AccountKind): void {
     const willTakeSpare = takesSpare({ kind });
     const treated = {
@@ -145,6 +152,7 @@ export function AccountDialog({
       isDroppable: isPension({ kind }) && current.initial.isDroppable,
       kind,
       owner: ownerAfter(current, kind, owners),
+      portfolio: portfolioAfter(current, kind),
     };
     if (!willTakeSpare && current.draft.funding === "spare") {
       amend(current, { ...treated, ...fundedBy(current, "fixed") });
@@ -196,6 +204,7 @@ export function AccountDialog({
           treat(entry, kind);
         }}
         owners={owners}
+        portfolio={portfolio}
       >
         {feeders.length > 0 && (
           <SacrificeFields
@@ -322,4 +331,20 @@ function ownerAfter(
   return isOwned(current.draft)
     ? current.draft.owner
     : ownerFor(current.initial.owner, owners);
+}
+
+// The portfolio link the draft is left with by a treatment: none for a
+// kind that takes no spare money; the one it has for a saving made
+// another, since the Portfolio account field stays mounted; and for a
+// non-saving made a saving, the one the field mounts showing.
+function portfolioAfter(
+  current: Entry<Draft>,
+  kind: AccountKind,
+): null | string {
+  if (!takesSpare({ kind })) {
+    return null;
+  }
+  return takesSpare(current.draft)
+    ? current.draft.portfolio
+    : current.initial.portfolio;
 }

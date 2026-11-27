@@ -165,6 +165,84 @@ describe("BalanceSheet", () => {
     ).toBeNull();
   });
 
+  // Linked plan-rate savings stack their Portfolio growth line beneath
+  // their owner/droppable line (or alone when unowned), showing bespoke
+  // positive, negative, and zero rates, "now" on a glide path, matching
+  // vs distinct Portfolio names, fallback copy, and nothing when fixed.
+  it("surfaces bespoke Portfolio growth rates and fallback notes on linked plan-rate savings", () => {
+    renderSheet({
+      accountRates: { 2: { rate: 0.075 }, 6: { rate: -0.02 }, 8: { rate: 0 } },
+      hasGlide: true,
+      savings: [
+        { ...pension, portfolio: "Workplace pension" },
+        { ...isa, portfolio: "Brokerage ISA" },
+        {
+          balance: 15_000,
+          growth: { kind: "plan" },
+          id: 8,
+          kind: "taxable",
+          name: "Flat GIA",
+          portfolio: "Flat GIA",
+        },
+        {
+          balance: 10_000,
+          growth: { kind: "plan" },
+          id: 9,
+          kind: "taxable",
+          name: "Fallback GIA",
+          portfolio: "Empty Account",
+        },
+        {
+          ...cash,
+          growth: { kind: "fixed", rate: 0.03 },
+          portfolio: "Ignored Cash",
+        },
+      ],
+    });
+
+    expect(rowsOf("Pensions · tax-deferred")).toStrictEqual([
+      "1Workplace pension£391,640Meloses 2.00% a year now · Portfolio",
+    ]);
+    expect(rowsOf("ISAs · tax-free")).toStrictEqual([
+      "2Stocks & shares ISA£271,930Megrows 7.50% a year now · Brokerage ISA in Portfolio",
+    ]);
+    expect(rowsOf("GIAs · taxable")).toStrictEqual([
+      "3Flat GIA£15,000holds its value now · Portfolio",
+      "4Fallback GIA£10,000at the plan rate · Empty Account in Portfolio",
+    ]);
+    expect(rowsOf("Cash")).toStrictEqual([
+      "5Current account£16,900grows 3.00% a year",
+    ]);
+  });
+
+  it("omits 'now' on bespoke Portfolio growth lines when no glide path is active", () => {
+    renderSheet({
+      accountRates: { 2: { rate: 0.08 }, 6: { rate: -0.01 }, 8: { rate: 0 } },
+      savings: [
+        { ...pension, portfolio: "Workplace pension" },
+        { ...isa, portfolio: "Stocks & shares ISA" },
+        {
+          balance: 15_000,
+          growth: { kind: "plan" },
+          id: 8,
+          kind: "taxable",
+          name: "Flat GIA",
+          portfolio: "Flat GIA",
+        },
+      ],
+    });
+
+    expect(rowsOf("Pensions · tax-deferred")).toStrictEqual([
+      "1Workplace pension£391,640Meloses 1.00% a year · Portfolio",
+    ]);
+    expect(rowsOf("ISAs · tax-free")).toStrictEqual([
+      "2Stocks & shares ISA£271,930Megrows 8.00% a year · Portfolio",
+    ]);
+    expect(rowsOf("GIAs · taxable")).toStrictEqual([
+      "3Flat GIA£15,000holds its value · Portfolio",
+    ]);
+  });
+
   // The mortgage is level with the house it is secured on, and the
   // line paying it says when its payments clear it; the PCP on the car
   // leaves a balloon. The bar under each asset is its equity's share of

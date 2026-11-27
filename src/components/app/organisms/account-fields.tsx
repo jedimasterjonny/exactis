@@ -15,10 +15,24 @@ import {
   takesSpare,
 } from "@/data/accounts";
 import { cadenceOptions } from "@/lib/cadence";
-import { formatGbp } from "@/lib/money";
+import { formatGbp, formatPercent, formatWholePercent } from "@/lib/money";
 import { optionsOf } from "@/lib/options";
 import { ownerFor, ownerOptions } from "@/lib/owners";
 import { mostFixedOf } from "@/lib/tax";
+
+export interface PortfolioOptions {
+  readonly accounts: readonly string[];
+  readonly hasGlide: boolean;
+  readonly planRate: number;
+  readonly rates: Readonly<Record<string, PortfolioRate>>;
+}
+
+// What the Accounts UI shows for a candidate Portfolio Performance
+// securities account: either its bespoke nominal return and current
+// stocks share, or why it falls back to the global plan rate.
+export type PortfolioRate =
+  | { readonly kind: "bespoke"; readonly rate: number; readonly stocks: number }
+  | { readonly kind: "fallback"; readonly reason: string };
 
 interface AccountFieldsProps {
   readonly children?: ReactNode;
@@ -30,6 +44,7 @@ interface AccountFieldsProps {
   readonly onFundingChange: (funding: Funding) => void;
   readonly onKindChange: (kind: AccountKind) => void;
   readonly owners: readonly Owner[];
+  readonly portfolio?: PortfolioOptions | undefined;
 }
 
 const fundings = [
@@ -89,6 +104,11 @@ const kinds = optionsOf(kindLabels, [
 // paid in at all. The balance says a debt's is negative only while the
 // treatment is a debt, where it is the one thing to know about the
 // figure; beneath a pension's it was a line about something else.
+// Beneath the growth row, a saving shows a full-width Portfolio
+// account selector whenever live Portfolio Performance accounts exist
+// or the account already carries a link; it stays mounted across
+// growth toggles and previews its bespoke or fallback growth rate in
+// its hint.
 export function AccountFields({
   children,
   draft,
@@ -99,7 +119,12 @@ export function AccountFields({
   onFundingChange,
   onKindChange,
   owners,
+  portfolio,
 }: AccountFieldsProps): JSX.Element {
+  const isShowingPortfolio =
+    takesSpare(draft) &&
+    portfolio !== undefined &&
+    (portfolio.accounts.length > 0 || initial.portfolio !== null);
   return (
     <div className="grid gap-4">
       <FieldRow layout={isOwned(draft) ? "triple" : "named"}>
@@ -231,6 +256,20 @@ export function AccountFields({
         </div>
         {children}
       </FieldRow>
+      {isShowingPortfolio && (
+        <SelectField
+          defaultValue={initial.portfolio ?? ""}
+          hint={portfolioHint(draft, portfolio)}
+          label="Portfolio account"
+          onValueChange={(value) => {
+            onAmend({ portfolio: value === "" ? null : value });
+          }}
+          options={portfolioSelectOptions(
+            portfolio.accounts,
+            initial.portfolio,
+          )}
+        />
+      )}
     </div>
   );
 }
@@ -252,6 +291,17 @@ function amountHint(kind: AccountKind, isFed: boolean): string | undefined {
   return isFed ? `${limit}, less the sacrifice` : limit;
 }
 
+// How a bespoke Portfolio rate moves a year in the Account dialog preview.
+function bespokeMoveOf(rate: number, hasGlide: boolean): string {
+  const nowSuffix = hasGlide ? " now" : "";
+  if (rate > 0) {
+    return `Grows ${formatPercent(rate)} a year${nowSuffix}`;
+  }
+  return rate < 0
+    ? `Loses ${formatPercent(-rate)} a year${nowSuffix}`
+    : `Holds its value${nowSuffix}`;
+}
+
 // What the cap field says a cap of nothing means for an ISA or a
 // pension: the kind's allowance, which a cap can only lower.
 function capHint(kind: AccountKind): string | undefined {
@@ -259,4 +309,60 @@ function capHint(kind: AccountKind): string | undefined {
   return allowance === null
     ? undefined
     : `Nothing for the full ${formatGbp(allowance)} allowance`;
+}
+
+// Live growth preview beneath the Portfolio account selector.
+function portfolioHint(
+  draft: Pick<AccountValues, "growth" | "portfolio">,
+  { hasGlide, planRate, rates }: PortfolioOptions,
+): string {
+  if (draft.growth === "fixed") {
+    return draft.portfolio === null
+      ? "Only applies on the plan rate"
+      : "Fixed rate overrides Portfolio growth";
+  }
+  const nowSuffix = hasGlide ? " now" : "";
+  const preview =
+    draft.portfolio !== null && Object.hasOwn(rates, draft.portfolio)
+      ? rates[draft.portfolio]
+      : undefined;
+  if (preview === undefined) {
+    return `Uses the plan rate, ${formatPercent(planRate)}${nowSuffix}`;
+  }
+  if (preview.kind === "fallback") {
+    return `Uses the plan rate, ${formatPercent(planRate)}${nowSuffix}. ${preview.reason}.`;
+  }
+  const mix = hasGlide
+    ? "following the glide path"
+    : splitLabelOf(preview.stocks);
+  return `${bespokeMoveOf(preview.rate, hasGlide)} · ${mix}`;
+}
+
+// The options offered by the Portfolio account selector: unlinked,
+// live/synced accounts, and any stale saved link on this account.
+function portfolioSelectOptions(
+  accounts: readonly string[],
+  initial: null | string,
+): readonly { readonly label: string; readonly value: string }[] {
+  return [
+    { label: "Not linked", value: "" },
+    ...accounts.map((name) => ({ label: name, value: name })),
+    ...(initial !== null && !accounts.includes(initial)
+      ? [{ label: `${initial} (not in Portfolio)`, value: initial }]
+      : []),
+  ];
+}
+
+// The equity/bond mix label for a bespoke Portfolio preview without a
+// glide path, rounding stocks once so stocks and bonds always sum to
+// 100%.
+function splitLabelOf(stocks: number): string {
+  if (stocks === 1) {
+    return "100% stocks";
+  }
+  if (stocks === 0) {
+    return "100% bonds";
+  }
+  const stocksPercent = Math.min(99, Math.max(1, Math.round(stocks * 100)));
+  return `${formatWholePercent(stocksPercent / 100)} stocks, ${formatWholePercent((100 - stocksPercent) / 100)} bonds`;
 }

@@ -7,6 +7,7 @@ import { useId } from "react";
 import type { Account } from "@/data/accounts";
 import type { ExpenseLine } from "@/data/expenses";
 import type { Owner } from "@/data/owners";
+import type { Plan } from "@/data/plan";
 import type { Secured } from "@/data/secured";
 
 import { Ledger } from "@/components/app/atoms/ledger";
@@ -29,9 +30,11 @@ import { formatGbp, formatPercent, negated } from "@/lib/money";
 import { monthName } from "@/lib/months";
 
 interface BalanceSheetProps {
+  readonly accountRates?: Plan["accountRates"];
   readonly assets: readonly Secured[];
   readonly debts: readonly Account[];
   readonly expenses: readonly ExpenseLine[];
+  readonly hasGlide?: boolean;
   readonly onAddDebt: () => void;
   readonly onEdit: (account: Account) => void;
   readonly owners: readonly Owner[];
@@ -83,9 +86,11 @@ const groups = [
 // words beneath the total owed say what is owed, above nothing. An
 // empty sheet draws its empty state instead.
 export function BalanceSheet({
+  accountRates,
   assets,
   debts,
   expenses,
+  hasGlide = false,
   onAddDebt,
   onEdit,
   owners,
@@ -139,7 +144,7 @@ export function BalanceSheet({
                           isOrdered ? savings.indexOf(account) + 1 : undefined
                         }
                       >
-                        {aboutOf(account, owners)}
+                        {aboutOf(account, { accountRates, hasGlide, owners })}
                       </Row>
                     ))}
                   </Group>
@@ -238,17 +243,36 @@ export function BalanceSheet({
 // said its kind: whose it is, when it is anyone's, a rate of its own
 // where it does not grow at the plan's, and a pension marked droppable
 // saying so in words, since every other pension is kept paid when the
-// month runs short; or no line for one with none of them.
+// month runs short; and, stacked beneath, its bespoke Portfolio growth
+// rate or fallback note when linked to a Portfolio Performance account
+// on the plan rate; or no line for one with none of them.
 function aboutOf(
   account: Account,
-  owners: readonly Owner[],
+  {
+    accountRates,
+    hasGlide,
+    owners,
+  }: {
+    readonly accountRates: Plan["accountRates"];
+    readonly hasGlide: boolean;
+    readonly owners: readonly Owner[];
+  },
 ): JSX.Element | undefined {
   const said = [
     owners.find(({ id }) => id === account.owner)?.name,
     account.growth.kind === "fixed" ? growthOf(account) : undefined,
     account.isDroppable === true ? "dropped when short" : undefined,
   ].filter((part) => part !== undefined);
-  return said.length === 0 ? undefined : <span>{said.join(" · ")}</span>;
+  const linked = portfolioLineOf(account, accountRates, hasGlide);
+  if (said.length === 0 && linked === undefined) {
+    return undefined;
+  }
+  return (
+    <>
+      {said.length > 0 && <span>{said.join(" · ")}</span>}
+      {linked !== undefined && <span>{linked}</span>}
+    </>
+  );
 }
 
 // An asset's lines: what it is and how its value moves, then the equity
@@ -380,6 +404,33 @@ function Page({ children }: { readonly children: string }): JSX.Element {
   return (
     <p className="font-heading text-sm font-medium folded:hidden">{children}</p>
   );
+}
+
+// The Portfolio growth line for a saving on the plan rate linked to a
+// Portfolio Performance securities account, or undefined otherwise.
+function portfolioLineOf(
+  account: Account,
+  accountRates: Plan["accountRates"],
+  hasGlide: boolean,
+): string | undefined {
+  if (account.growth.kind !== "plan" || account.portfolio === undefined) {
+    return undefined;
+  }
+  const label =
+    account.portfolio === account.name
+      ? "Portfolio"
+      : `${account.portfolio} in Portfolio`;
+  const bespoke = accountRates?.[account.id];
+  if (bespoke === undefined) {
+    return `at the plan rate · ${label}`;
+  }
+  const nowSuffix = hasGlide ? " now" : "";
+  if (bespoke.rate > 0) {
+    return `grows ${formatPercent(bespoke.rate)} a year${nowSuffix} · ${label}`;
+  }
+  return bespoke.rate < 0
+    ? `loses ${formatPercent(-bespoke.rate)} a year${nowSuffix} · ${label}`
+    : `holds its value${nowSuffix} · ${label}`;
 }
 
 // A row of the sheet: the account's name and balance, opening the

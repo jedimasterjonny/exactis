@@ -3,19 +3,26 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/data/accounts";
 import type { ExpenseLine } from "@/data/expenses";
+import type { Household } from "@/data/household";
+import type { PortfolioFeed } from "@/data/portfolio";
 
 import { accounts } from "@/data/accounts.fixture";
 import { children } from "@/data/children.fixture";
+import { cma, mappings } from "@/data/cma.fixture";
 import { expenseLines } from "@/data/expenses.fixture";
 import { soundKept } from "@/data/household";
 import { blank } from "@/data/household.fixture";
 import { incomeLines, plan } from "@/data/income.fixture";
+import { curve } from "@/data/inflation.fixture";
 import { owners } from "@/data/owners.fixture";
+import { portfolios, targets } from "@/data/targets.fixture";
 import { getHousehold } from "@/store/household";
+import { getPortfolioFeed } from "@/store/portfolio";
 
 import Accounts, { metadata } from "./page";
 
 vi.mock("@/store/household", () => ({ getHousehold: vi.fn() }));
+vi.mock("@/store/portfolio", () => ({ getPortfolioFeed: vi.fn() }));
 vi.mock("@/actions/accounts", () => ({
   removeAccount: vi.fn(),
   saveAccount: vi.fn(),
@@ -33,11 +40,25 @@ vi.mock("@/actions/owners", () => ({
 // the accounts and expense lines a test gives.
 async function renderAccounts({
   expenses = [],
+  feed = null,
   held = accounts,
+  household: overrides = {},
 }: {
   readonly expenses?: readonly ExpenseLine[];
+  readonly feed?: null | PortfolioFeed;
   readonly held?: readonly Account[];
+  readonly household?: Partial<Household>;
 } = {}): Promise<void> {
+  vi.mocked(getPortfolioFeed).mockResolvedValue(
+    feed === null
+      ? null
+      : {
+          feed,
+          fileName: "household.portfolio",
+          savedOn: "2026-09-15",
+          version: 1,
+        },
+  );
   vi.mocked(getHousehold).mockResolvedValue({
     ...soundKept(blank).household,
     accounts: [...held],
@@ -45,6 +66,7 @@ async function renderAccounts({
     owners,
     plan,
     schedule: { expenses, income: [...incomeLines] },
+    ...overrides,
   });
   render(await Accounts());
 }
@@ -162,5 +184,146 @@ describe("Accounts", () => {
     ).toHaveAccessibleDescription(
       "Salary stops feeding it: what it sacrifices is paid as salary instead, and the employer's minimum and match go with it.",
     );
+  });
+
+  // Live candidates merge the stored portfolio feed and category account
+  // holdings (trimming names, dropping blanks, excluding retired empty
+  // targets.portfolios entries when a feed is stored, and excluding stale
+  // links); bespoke rates surface on the Balance sheet with the
+  // "Unlinked savings..." caption and flow into the dialog preview.
+  it("collects live portfolio candidates, renders bespoke Balance sheet growth, and derives dialog previews", async () => {
+    const heldTargets = {
+      ...targets,
+      categories: targets.categories.map(
+        ({ classes, id, isImplemented, name, share, value }) =>
+          name === "UK equity"
+            ? {
+                accounts: [
+                  { name: " Alpha ISA ", value: 40_000 },
+                  { name: "  ", value: 100 },
+                ],
+                classes,
+                id,
+                isImplemented,
+                name,
+                share,
+                value,
+              }
+            : { classes, id, isImplemented, name, share, value },
+      ),
+      portfolios: [...portfolios, { cash: 0, name: "Retired Empty", paid: [] }],
+    };
+    const linkedPension: Account = { ...accounts[0], portfolio: "Alpha ISA" };
+    const staleIsa: Account = { ...accounts[1], portfolio: "Retired ISA" };
+    await renderAccounts({
+      feed: {
+        handoff: {
+          securitiesAccounts: [
+            { id: "p-1", name: " Zeta SIPP " },
+            { id: "p-2", name: "Alpha ISA" },
+          ],
+          securitiesByCategory: {},
+        },
+        latestQuoteDate: "2026-09-15",
+        latestTransactionDate: "2026-09-15",
+        targets: {
+          kind: "saved",
+          value: { categories: heldTargets.categories, portfolios },
+        },
+      },
+      held: [linkedPension, staleIsa],
+      household: {
+        cma: { latest: cma, previous: null },
+        curve,
+        deductions: { dividends: 0.02, fees: 0.002 },
+        glide: [{ age: 60, bonds: 0.4 }],
+        mappings,
+        plan: {
+          ...plan,
+          accountRates: { [linkedPension.id]: { rate: 0.07956 } },
+        },
+        rateSet: "cma",
+        targets: heldTargets,
+      },
+    });
+
+    // Balance sheet renders bespoke growth on the linked saving and
+    // qualifies the caption with "Unlinked savings" and "now".
+    expect(
+      screen.getByText(
+        "Unlinked savings grow at the plan rate, 5.00% now, unless set otherwise",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("grows 7.96% a year now · Alpha ISA in Portfolio"),
+    ).toBeInTheDocument();
+
+    // Opening the pension excludes stale "Retired ISA" and retired empty
+    // "Retired Empty" from targets.portfolios (since a live feed exists),
+    // deduplicates trimmed "Alpha ISA", and previews both bespoke and
+    // fallback live candidates.
+    fireEvent.click(screen.getByRole("button", { name: "Workplace pension" }));
+    const pensionDialog = screen.getByRole("dialog", {
+      name: "Workplace pension",
+    });
+    const selector = within(pensionDialog).getByRole("combobox", {
+      name: "Portfolio account",
+    });
+    expect(
+      within(selector)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toStrictEqual(["Not linked", "Alpha ISA", "Zeta SIPP"]);
+
+    expect(selector).toHaveAccessibleDescription(
+      /Grows .* now · following the glide path/,
+    );
+
+    fireEvent.change(selector, { target: { value: "Zeta SIPP" } });
+    expect(selector).toHaveAccessibleDescription(
+      /No categorised holdings synced from Portfolio/,
+    );
+
+    fireEvent.click(
+      within(pensionDialog).getByRole("button", { name: "Cancel" }),
+    );
+
+    // Opening the account with the stale link shows "Not found in Portfolio".
+    fireEvent.click(
+      screen.getByRole("button", { name: "Stocks & shares ISA" }),
+    );
+    const isaDialog = screen.getByRole("dialog", {
+      name: "Stocks & shares ISA",
+    });
+    expect(
+      within(isaDialog).getByRole("combobox", { name: "Portfolio account" }),
+    ).toHaveAccessibleDescription(
+      "Uses the plan rate, 5.00% now. Not found in Portfolio.",
+    );
+  });
+
+  // When no live portfolio feed is stored, candidate names fall back to
+  // synced targets.portfolios alongside category account holdings.
+  it("falls back to targets.portfolios when no portfolio feed is stored", async () => {
+    await renderAccounts({
+      feed: null,
+      held: [accounts[0]],
+      household: { targets: { ...targets, portfolios } },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Workplace pension" }));
+    const selector = within(
+      screen.getByRole("dialog", { name: "Workplace pension" }),
+    ).getByRole("combobox", { name: "Portfolio account" });
+    expect(
+      within(selector)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toStrictEqual([
+      "Not linked",
+      "Brokerage",
+      "Stocks & shares ISA",
+      "Workplace pension",
+    ]);
   });
 });

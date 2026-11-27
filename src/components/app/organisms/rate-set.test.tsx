@@ -87,7 +87,7 @@ describe("RateSet", () => {
     renderSet();
 
     expect(screen.getByRole("note")).toHaveTextContent(
-      "Custom rates are liveThey do not follow a new CMA or BoE curve.",
+      "Custom rates are liveThey do not follow a new CMA or BoE curve, and accounts linked to Portfolio fall back to the plan rate.",
     );
   });
 
