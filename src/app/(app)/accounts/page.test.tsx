@@ -217,6 +217,7 @@ describe("Accounts", () => {
     const staleIsa: Account = { ...accounts[1], portfolio: "Retired ISA" };
     await renderAccounts({
       feed: {
+        accounts: { cash: [], securities: [] },
         handoff: {
           securitiesAccounts: [
             { id: "p-1", name: " Zeta SIPP " },

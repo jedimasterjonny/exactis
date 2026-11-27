@@ -100,6 +100,29 @@ interface Opened {
   readonly parts: Unzipped;
 }
 
+// Per-securities-account valuation and completeness diagnostics shared
+// by readPortfolioSnapshot and readPortfolioFeed.
+interface PortfolioValuation {
+  readonly foreignCurrencies: readonly string[];
+  readonly hasUncurrenciedHoldings: boolean;
+  readonly holdingsCount: number;
+  readonly marketValueGbp: number;
+  readonly noFxCurrencies: readonly string[];
+  readonly oldestQuoteDate: null | string;
+  readonly unpricedCount: number;
+}
+
+interface PortfolioValuationAccumulator {
+  readonly foreignCurrencies: Set<string>;
+  hasUncurrenciedHoldings: boolean;
+  hasUndatedQuote: boolean;
+  holdingsCount: number;
+  readonly noFxCurrencies: Set<string>;
+  oldestQuoteDate: null | string;
+  unpricedCount: number;
+  valueSum: number;
+}
+
 // Validated transaction payload ready for appendTransaction or updateTransaction.
 interface PreparedTransaction {
   readonly amountPence: number;
@@ -113,6 +136,18 @@ interface PreparedTransaction {
   readonly rule: TransactionWriteRule;
   readonly sharesScaled: number;
   readonly taxesPence: number;
+}
+
+// Shared decoded cash-account base fields used by both
+// readPortfolioSnapshot and readPortfolioFeed so balances reconcile.
+interface RawCashAccount {
+  readonly balance: number;
+  readonly balanceGbp: null | number;
+  readonly currency: string;
+  readonly id: string;
+  readonly isRetired: boolean;
+  readonly name: string;
+  readonly note: string | undefined;
 }
 
 // Raw protobuf transaction counts keyed by entity UUID across every
@@ -770,7 +805,14 @@ export function readPortfolioFeed(file: Uint8Array): PortfolioFeed {
   const client = messageOf(opened(file).client);
   const securities = securitiesOf(client);
   const held = sharesHeld(client);
+  const pounds = poundsPer(client);
   const rawTransactions = messagesAt(client, fields.client.transactions);
+  const accounts = feedAccountsOf(client, {
+    held,
+    pounds,
+    rawTransactions,
+    securities,
+  });
   const latestQuoteDate = latestQuoteDateOf(
     securities,
     held,
@@ -808,6 +850,7 @@ export function readPortfolioFeed(file: Uint8Array): PortfolioFeed {
     ]),
   );
   return {
+    accounts,
     handoff: { securitiesAccounts, securitiesByCategory },
     latestQuoteDate,
     latestTransactionDate,
@@ -836,8 +879,7 @@ export function readPortfolioSnapshot(
   const held = sharesHeld(client);
   const pounds = poundsPer(client);
   const transactions = messagesAt(client, fields.client.transactions);
-  const { counts: holdingsCounts, values: portfolioValues } =
-    portfolioHoldingsOf(held, securities, pounds);
+  const valuations = portfolioValuationsOf(held, securities, pounds);
   const cashBalances = cashBalancesOf(transactions);
   const txCounts = rawTransactionCountsOf(transactions);
 
@@ -853,11 +895,12 @@ export function readPortfolioSnapshot(
       portfolio,
       fields.portfolio.reference,
     );
+    const valuation = valuations.get(id);
     return {
-      holdingsCount: holdingsCounts.get(id) ?? 0,
+      holdingsCount: valuation?.holdingsCount ?? 0,
       id,
       isRetired: int32At(portfolio, fields.portfolio.isRetired) !== 0,
-      marketValue: roundPence(portfolioValues.get(id) ?? 0),
+      marketValue: valuation?.marketValueGbp ?? 0,
       name: textOf(portfolio, fields.portfolio.name),
       ...(note !== undefined && { note }),
       ...(referenceAccountId !== undefined && { referenceAccountId }),
@@ -865,27 +908,15 @@ export function readPortfolioSnapshot(
     };
   });
 
-  const cashAccounts: readonly CashAccount[] = messagesAt(
-    client,
-    fields.client.accounts,
-  ).map((account, index) => {
-    const id =
-      optionalText(account, fields.account.id) ?? `account-${String(index)}`;
-    const currency =
-      optionalText(account, fields.account.currency) ?? baseCurrency;
-    const balance = roundPence(cashBalances.get(id) ?? 0);
-    const note = optionalText(account, fields.account.note);
-    return {
-      balance,
-      balanceGbp: balanceInGbp(balance, pounds.get(currency)),
-      currency,
-      id,
-      isRetired: int32At(account, fields.account.isRetired) !== 0,
-      name: textOf(account, fields.account.name),
-      ...(note !== undefined && { note }),
-      transactionCount: txCounts.cashAccounts.get(id) ?? 0,
-    };
-  });
+  const cashAccounts: readonly CashAccount[] = rawCashAccountsOf(client, {
+    baseCurrency,
+    cashBalances,
+    pounds,
+  }).map(({ note, ...account }) => ({
+    ...account,
+    ...(note !== undefined && { note }),
+    transactionCount: txCounts.cashAccounts.get(account.id) ?? 0,
+  }));
 
   const { totalGbp: totalCash } = cashTotalsOf(
     cashAccounts.filter((account) => !account.isRetired),
@@ -1332,6 +1363,44 @@ export function updateTransaction(
   return { content, id };
 }
 
+// Most recent valid ISO transaction date per cash account and per
+// securities account across known transaction types with in-range
+// timestamps.
+function accountTransactionDatesOf(rawTransactions: readonly Message[]): {
+  readonly cash: ReadonlyMap<string, string>;
+  readonly securities: ReadonlyMap<string, string>;
+} {
+  const cash = new Map<string, string>();
+  const securities = new Map<string, string>();
+  for (const entry of rawTransactions) {
+    const date = validTransactionDateOf(entry);
+    if (date === null) {
+      continue;
+    }
+    recordLatestDate(
+      cash,
+      optionalText(entry, fields.transaction.account),
+      date,
+    );
+    recordLatestDate(
+      cash,
+      optionalText(entry, fields.transaction.otherAccount),
+      date,
+    );
+    recordLatestDate(
+      securities,
+      optionalText(entry, fields.transaction.portfolio),
+      date,
+    );
+    recordLatestDate(
+      securities,
+      optionalText(entry, fields.transaction.otherPortfolio),
+      date,
+    );
+  }
+  return { cash, securities };
+}
+
 // Active (non-retired) securities account ids declared in PClient.
 function activePortfolioIdsOf(client: Message): ReadonlySet<string> {
   const ids = new Set<string>();
@@ -1345,6 +1414,43 @@ function activePortfolioIdsOf(client: Message): ReadonlySet<string> {
     }
   }
   return ids;
+}
+
+// Accumulates one positive-share holding into its securities account's
+// valuation and completeness diagnostics.
+function addHoldingToValuation(
+  acc: PortfolioValuationAccumulator,
+  written: number,
+  {
+    factor,
+    security,
+  }: { readonly factor: number | undefined; readonly security: Security },
+): void {
+  acc.holdingsCount += 1;
+  if (security.price <= 0) {
+    acc.unpricedCount += 1;
+    return;
+  }
+  if (security.quoteDate === null) {
+    acc.hasUndatedQuote = true;
+  } else if (
+    acc.oldestQuoteDate === null ||
+    security.quoteDate < acc.oldestQuoteDate
+  ) {
+    acc.oldestQuoteDate = security.quoteDate;
+  }
+  if (security.currency === "no currency") {
+    acc.hasUncurrenciedHoldings = true;
+    return;
+  }
+  if (factor === undefined) {
+    acc.noFxCurrencies.add(security.currency);
+    return;
+  }
+  acc.valueSum += roundPence((written / scaled) * security.price * factor);
+  if (security.currency !== "GBP" && security.currency !== "GBX") {
+    acc.foreignCurrencies.add(security.currency);
+  }
 }
 
 // Record positive GBP FX rates from a transaction's units (in either
@@ -1708,6 +1814,107 @@ function encodeDecimalValue(rate: number): Uint8Array {
   ]);
 }
 
+// Per-account valuation, reference-cash pairing, and quote/transaction
+// freshness summaries exposed on PortfolioFeed unconditionally (even
+// when Asset Allocation targets are refused).
+function feedAccountsOf(
+  client: Message,
+  {
+    held,
+    pounds,
+    rawTransactions,
+    securities,
+  }: {
+    readonly held: ReadonlyMap<string, ReadonlyMap<string, number>>;
+    readonly pounds: ReadonlyMap<string, number>;
+    readonly rawTransactions: readonly Message[];
+    readonly securities: ReadonlyMap<string, Security>;
+  },
+): PortfolioFeed["accounts"] {
+  const baseCurrency =
+    optionalText(client, fields.client.baseCurrency) ?? "GBP";
+  const valuations = portfolioValuationsOf(held, securities, pounds);
+  const cashBalances = cashBalancesOf(rawTransactions);
+  const txDates = accountTransactionDatesOf(rawTransactions);
+  const rawCash = rawCashAccountsOf(client, {
+    baseCurrency,
+    cashBalances,
+    pounds,
+  });
+  const rawPortfolios = messagesAt(client, fields.client.portfolios).map(
+    (portfolio, index) => ({
+      id:
+        optionalText(portfolio, fields.portfolio.id) ??
+        `portfolio-${String(index)}`,
+      isRetired: int32At(portfolio, fields.portfolio.isRetired) !== 0,
+      name: textOf(portfolio, fields.portfolio.name),
+      referenceAccountId: optionalText(portfolio, fields.portfolio.reference),
+    }),
+  );
+
+  const referencedById = new Map<string, Set<string>>();
+  const referenceCountById = new Map<string, number>();
+  for (const portfolio of rawPortfolios) {
+    if (!portfolio.isRetired && portfolio.referenceAccountId !== undefined) {
+      const refId = portfolio.referenceAccountId;
+      referenceCountById.set(refId, (referenceCountById.get(refId) ?? 0) + 1);
+      const trimmed = portfolio.name.trim();
+      const label = trimmed === "" ? "a securities account" : trimmed;
+      const names = referencedById.get(refId) ?? new Set<string>();
+      names.add(label);
+      referencedById.set(refId, names);
+    }
+  }
+
+  const cash = rawCash.map((account) => ({
+    balance: account.balance,
+    balanceGbp: account.balanceGbp,
+    currency: account.currency,
+    id: account.id,
+    isRetired: account.isRetired,
+    lastTransactionDate: txDates.cash.get(account.id) ?? null,
+    name: account.name,
+    referencedBy: [...(referencedById.get(account.id) ?? [])],
+  }));
+  const cashById = new Map(cash.map((account) => [account.id, account]));
+
+  const securitiesAccounts = rawPortfolios.map((portfolio) => {
+    const valuation = valuations.get(portfolio.id);
+    const linkedCash =
+      portfolio.referenceAccountId === undefined
+        ? undefined
+        : cashById.get(portfolio.referenceAccountId);
+    return {
+      foreignCurrencies: valuation?.foreignCurrencies ?? [],
+      hasUncurrenciedHoldings: valuation?.hasUncurrenciedHoldings ?? false,
+      holdingsCount: valuation?.holdingsCount ?? 0,
+      id: portfolio.id,
+      isRetired: portfolio.isRetired,
+      lastTransactionDate: txDates.securities.get(portfolio.id) ?? null,
+      marketValueGbp: valuation?.marketValueGbp ?? 0,
+      name: portfolio.name,
+      noFxCurrencies: valuation?.noFxCurrencies ?? [],
+      oldestQuoteDate: valuation?.oldestQuoteDate ?? null,
+      referenceCash:
+        linkedCash === undefined
+          ? null
+          : {
+              balance: linkedCash.balance,
+              balanceGbp: linkedCash.balanceGbp,
+              currency: linkedCash.currency,
+              id: linkedCash.id,
+              isRetired: linkedCash.isRetired,
+              isShared: (referenceCountById.get(linkedCash.id) ?? 0) > 1,
+              lastTransactionDate: linkedCash.lastTransactionDate,
+              name: linkedCash.name,
+            },
+      unpricedCount: valuation?.unpricedCount ?? 0,
+    };
+  });
+
+  return { cash, securities: securitiesAccounts };
+}
+
 // Encodes a single FEE PTransactionUnit submessage.
 function feeUnitBytesOf(currency: string, feesPence: number): Uint8Array {
   return joined([
@@ -2046,18 +2253,8 @@ function latestTransactionDateOf(
 ): null | string {
   let latest: null | string = null;
   for (const entry of rawTransactions) {
-    if (
-      !transactionTypes.has(int32At(entry, fields.transaction.type)) ||
-      !entry.has(fields.transaction.date)
-    ) {
-      continue;
-    }
-    const timestamp = dateOf(entry);
-    if (timestamp < minTimestamp || timestamp > maxTimestamp) {
-      continue;
-    }
-    const date = isoDateOf(timestamp);
-    if (latest === null || date > latest) {
+    const date = validTransactionDateOf(entry);
+    if (date !== null && (latest === null || date > latest)) {
       latest = date;
     }
   }
@@ -2326,20 +2523,15 @@ function patchTransactionUnits(
   return result;
 }
 
-// Each securities account's count of held catalogued securities and
-// sterling market value summed from penny-rounded per-security lots,
-// skipping unlisted security IDs and unconvertible valuations without
-// dropping catalogued holding counts.
-function portfolioHoldingsOf(
+// Each securities account's count of held catalogued securities,
+// penny-reconciled sterling market value, quote freshness, and FX or
+// pricing completeness diagnostics.
+function portfolioValuationsOf(
   held: ReadonlyMap<string, ReadonlyMap<string, number>>,
   securities: ReadonlyMap<string, Security>,
   pounds: ReadonlyMap<string, number>,
-): {
-  readonly counts: ReadonlyMap<string, number>;
-  readonly values: ReadonlyMap<string, number>;
-} {
-  const counts = new Map<string, number>();
-  const values = new Map<string, number>();
+): ReadonlyMap<string, PortfolioValuation> {
+  const accumulators = new Map<string, PortfolioValuationAccumulator>();
   for (const [securityId, inAccounts] of held) {
     const security = securities.get(securityId);
     if (security === undefined) {
@@ -2347,18 +2539,45 @@ function portfolioHoldingsOf(
     }
     const factor = pounds.get(security.currency);
     for (const [portfolioId, written] of inAccounts) {
-      if (written > 0) {
-        counts.set(portfolioId, (counts.get(portfolioId) ?? 0) + 1);
-        if (factor !== undefined) {
-          const lotValue = roundPence(
-            (written / scaled) * security.price * factor,
-          );
-          values.set(portfolioId, (values.get(portfolioId) ?? 0) + lotValue);
-        }
+      if (written <= 0) {
+        continue;
       }
+      let acc = accumulators.get(portfolioId);
+      if (acc === undefined) {
+        acc = {
+          foreignCurrencies: new Set(),
+          hasUncurrenciedHoldings: false,
+          hasUndatedQuote: false,
+          holdingsCount: 0,
+          noFxCurrencies: new Set(),
+          oldestQuoteDate: null,
+          unpricedCount: 0,
+          valueSum: 0,
+        };
+        accumulators.set(portfolioId, acc);
+      }
+      addHoldingToValuation(acc, written, { factor, security });
     }
   }
-  return { counts, values };
+
+  return new Map(
+    [...accumulators].map(([portfolioId, acc]) => [
+      portfolioId,
+      {
+        foreignCurrencies: [...acc.foreignCurrencies].toSorted((one, other) =>
+          one.localeCompare(other),
+        ),
+        hasUncurrenciedHoldings: acc.hasUncurrenciedHoldings,
+        holdingsCount: acc.holdingsCount,
+        marketValueGbp: roundPence(acc.valueSum),
+        noFxCurrencies: [...acc.noFxCurrencies].toSorted((one, other) =>
+          one.localeCompare(other),
+        ),
+        oldestQuoteDate: acc.hasUndatedQuote ? null : acc.oldestQuoteDate,
+        unpricedCount: acc.unpricedCount,
+      },
+    ]),
+  );
 }
 
 // What a pound is in each currency the file gives a rate for, beside
@@ -2493,6 +2712,38 @@ function quoteUpdatesMapOf(
     });
   }
   return updates;
+}
+
+// Decoded cash accounts with penny-rounded native and sterling balances,
+// shared between readPortfolioSnapshot and readPortfolioFeed.
+function rawCashAccountsOf(
+  client: Message,
+  {
+    baseCurrency,
+    cashBalances,
+    pounds,
+  }: {
+    readonly baseCurrency: string;
+    readonly cashBalances: ReadonlyMap<string, number>;
+    readonly pounds: ReadonlyMap<string, number>;
+  },
+): readonly RawCashAccount[] {
+  return messagesAt(client, fields.client.accounts).map((account, index) => {
+    const id =
+      optionalText(account, fields.account.id) ?? `account-${String(index)}`;
+    const currency =
+      optionalText(account, fields.account.currency) ?? baseCurrency;
+    const balance = roundPence(cashBalances.get(id) ?? 0);
+    return {
+      balance,
+      balanceGbp: balanceInGbp(balance, pounds.get(currency)),
+      currency,
+      id,
+      isRetired: int32At(account, fields.account.isRetired) !== 0,
+      name: textOf(account, fields.account.name),
+      note: optionalText(account, fields.account.note),
+    };
+  });
 }
 
 // The set of non-blank raw protobuf field-1 ids present under a
@@ -2648,6 +2899,20 @@ function readTargetsFromClient(client: Message): readonly Target[] {
     classesIn(client),
     worthOf(client, securitiesOf(client), sharesHeld(client)),
   );
+}
+
+function recordLatestDate(
+  dates: Map<string, string>,
+  id: string | undefined,
+  date: string,
+): void {
+  if (id === undefined) {
+    return;
+  }
+  const existing = dates.get(id);
+  if (existing === undefined || date > existing) {
+    dates.set(id, date);
+  }
 }
 
 // Verifies that exactly one raw protobuf message in `listField` carries
@@ -3539,6 +3804,21 @@ function validateTransactionRefs(
     portfolioId,
     securityId,
   };
+}
+
+// ISO calendar date of a known-type transaction carrying an explicit
+// in-range timestamp, or null otherwise.
+function validTransactionDateOf(entry: Message): null | string {
+  if (
+    !transactionTypes.has(int32At(entry, fields.transaction.type)) ||
+    !entry.has(fields.transaction.date)
+  ) {
+    return null;
+  }
+  const timestamp = dateOf(entry);
+  return timestamp < minTimestamp || timestamp > maxTimestamp
+    ? null
+    : isoDateOf(timestamp);
 }
 
 // The weight of every class beneath the root, by its id, for the

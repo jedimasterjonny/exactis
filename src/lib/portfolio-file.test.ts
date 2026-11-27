@@ -4962,6 +4962,87 @@ describe("readPortfolioFeed", () => {
     const { categories, portfolios } = readPortfolioTargets(file);
 
     expect(readPortfolioFeed(file)).toStrictEqual({
+      accounts: {
+        cash: [
+          {
+            balance: 750,
+            balanceGbp: 750,
+            currency: "GBP",
+            id: "cash-isa",
+            isRetired: false,
+            lastTransactionDate: "2026-09-12",
+            name: "Northstar ISA Cash",
+            referencedBy: ["Northstar ISA"],
+          },
+        ],
+        securities: [
+          {
+            foreignCurrencies: [],
+            hasUncurrenciedHoldings: false,
+            holdingsCount: 1,
+            id: "port-isa",
+            isRetired: false,
+            lastTransactionDate: "2026-09-12",
+            marketValueGbp: 1250,
+            name: "Northstar ISA",
+            noFxCurrencies: [],
+            oldestQuoteDate: "2026-09-25",
+            referenceCash: {
+              balance: 750,
+              balanceGbp: 750,
+              currency: "GBP",
+              id: "cash-isa",
+              isRetired: false,
+              isShared: false,
+              lastTransactionDate: "2026-09-12",
+              name: "Northstar ISA Cash",
+            },
+            unpricedCount: 0,
+          },
+          {
+            foreignCurrencies: [],
+            hasUncurrenciedHoldings: false,
+            holdingsCount: 1,
+            id: "port-old",
+            isRetired: true,
+            lastTransactionDate: "2026-09-11",
+            marketValueGbp: 625,
+            name: "Closed ISA",
+            noFxCurrencies: [],
+            oldestQuoteDate: "2026-09-25",
+            referenceCash: null,
+            unpricedCount: 0,
+          },
+          {
+            foreignCurrencies: [],
+            hasUncurrenciedHoldings: false,
+            holdingsCount: 0,
+            id: "portfolio-2",
+            isRetired: false,
+            lastTransactionDate: null,
+            marketValueGbp: 0,
+            name: "No Id Portfolio",
+            noFxCurrencies: [],
+            oldestQuoteDate: null,
+            referenceCash: null,
+            unpricedCount: 0,
+          },
+          {
+            foreignCurrencies: [],
+            hasUncurrenciedHoldings: false,
+            holdingsCount: 0,
+            id: "port-blank",
+            isRetired: false,
+            lastTransactionDate: null,
+            marketValueGbp: 0,
+            name: "   ",
+            noFxCurrencies: [],
+            oldestQuoteDate: null,
+            referenceCash: null,
+            unpricedCount: 0,
+          },
+        ],
+      },
       handoff: {
         securitiesAccounts: [{ id: "port-isa", name: "Northstar ISA" }],
         securitiesByCategory: {
@@ -4981,6 +5062,25 @@ describe("readPortfolioFeed", () => {
   it("wraps target taxonomy, share-bound, sum-to-100%, and FX refusals in targets without dropping freshness dates", () => {
     const withoutTaxonomy = portfolioFile(clientOf([]));
     expect(readPortfolioFeed(withoutTaxonomy)).toStrictEqual({
+      accounts: {
+        cash: [],
+        securities: [
+          {
+            foreignCurrencies: [],
+            hasUncurrenciedHoldings: false,
+            holdingsCount: 1,
+            id: "portfolio-1",
+            isRetired: false,
+            lastTransactionDate: null,
+            marketValueGbp: 21_401.2,
+            name: "Brokerage",
+            noFxCurrencies: [],
+            oldestQuoteDate: "2024-10-05",
+            referenceCash: null,
+            unpricedCount: 0,
+          },
+        ],
+      },
       handoff: {
         securitiesAccounts: [{ id: "portfolio-1", name: "Brokerage" }],
         securitiesByCategory: {},
@@ -5123,6 +5223,590 @@ describe("readPortfolioFeed", () => {
       ],
     ]);
     expect(readPortfolioFeed(tooLate).latestTransactionDate).toBeNull();
+  });
+
+  it("computes per-account valuation diagnostics, shared/dangling reference cash, quote freshness, and penny reconciliation with readPortfolioSnapshot", () => {
+    // Epoch days: 20_710 = 2026-09-14, 20_715 = 2026-09-19, 20_720 = 2026-09-24.
+    const file = portfolioFile([
+      [1, 66],
+      // GBP security with newer quote.
+      [
+        2,
+        [
+          [1, "sec-gbp"],
+          [3, "UK Core Fund"],
+          [4, "GBP"],
+          [
+            13,
+            [
+              [1, 20_720],
+              [2, 10_010_000_000],
+            ],
+          ],
+        ],
+      ],
+      // GBX security with older quote (should not count as foreign currency).
+      [
+        2,
+        [
+          [1, "sec-gbx"],
+          [3, "UK Pence ETF"],
+          [4, "GBX"],
+          [
+            13,
+            [
+              [1, 20_710],
+              [2, 333_330_000_000],
+            ],
+          ],
+        ],
+      ],
+      // USD & EUR securities with FX rates (sorted foreignCurrencies).
+      [
+        2,
+        [
+          [1, "sec-usd"],
+          [3, "US Index"],
+          [4, "USD"],
+          [
+            13,
+            [
+              [1, 20_715],
+              [2, 10_000_000_000],
+            ],
+          ],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-eur"],
+          [3, "Euro Index"],
+          [4, "EUR"],
+          [
+            13,
+            [
+              [1, 20_720],
+              [2, 5_000_000_000],
+            ],
+          ],
+        ],
+      ],
+      // Priced holding with undated quote poisons oldestQuoteDate to null.
+      [
+        2,
+        [
+          [1, "sec-undated"],
+          [3, "Undated Trust"],
+          [4, "GBP"],
+          [16, [[2, 5_000_000_000]]],
+        ],
+      ],
+      // Priced holding with no currency sets hasUncurrenciedHoldings without leaking into noFxCurrencies.
+      [
+        2,
+        [
+          [1, "sec-nocur"],
+          [3, "Currency Free Fund"],
+          [
+            13,
+            [
+              [1, 20_720],
+              [2, 2_000_000_000],
+            ],
+          ],
+        ],
+      ],
+      // Unpriced holding increments unpricedCount.
+      [
+        2,
+        [
+          [1, "sec-unpriced"],
+          [3, "Unpriced Fund"],
+          [4, "GBP"],
+        ],
+      ],
+      // Missing FX holdings (JPY & CHF -> sorted noFxCurrencies).
+      [
+        2,
+        [
+          [1, "sec-jpy"],
+          [3, "Tokyo Tracker"],
+          [4, "JPY"],
+          [
+            13,
+            [
+              [1, 20_720],
+              [2, 10_000_000_000],
+            ],
+          ],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-chf"],
+          [3, "Zurich Tracker"],
+          [4, "CHF"],
+          [
+            13,
+            [
+              [1, 20_720],
+              [2, 10_000_000_000],
+            ],
+          ],
+        ],
+      ],
+      // Cash accounts: shared GBP cash, standalone USD cash, retired GBP cash.
+      [
+        3,
+        [
+          [1, "cash-shared"],
+          [2, "Shared Settlement"],
+          [3, "GBP"],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-solo"],
+          [2, "Dollar Reserve"],
+          [3, "USD"],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-retired"],
+          [2, "Old Cash"],
+          [3, "GBP"],
+          [5, 1],
+        ],
+      ],
+      // Securities accounts: two active sharing cash-shared, one with dangling ref, one retired referencing cash-shared.
+      [
+        4,
+        [
+          [1, "port-main"],
+          [2, " Main ISA "],
+          [5, "cash-shared"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-diag"],
+          [2, "Diagnostic GIA"],
+          [5, "cash-shared"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-dangling"],
+          [2, "Dangling Ref Account"],
+          [5, "cash-missing"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-retired"],
+          [2, "Retired Broker"],
+          [4, 1],
+          [5, "cash-shared"],
+        ],
+      ],
+      // FX rate transactions (USD = 0.80 GBP, EUR = 0.85 GBP) and cash transfer (account + otherAccount).
+      [
+        5,
+        [
+          [1, "tx-usd-fx"],
+          [2, 0],
+          [3, "cash-shared"],
+          [4, "port-main"],
+          [9, [[1, 1_789_000_000]]],
+          [10, "GBP"],
+          [11, 80_000],
+          [12, 1_000_000_000],
+          [14, "sec-usd"],
+          [
+            15,
+            [
+              [1, 0],
+              [2, 80_000],
+              [3, "GBP"],
+              [4, 100_000],
+              [5, "USD"],
+            ],
+          ],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-eur-fx"],
+          [2, 0],
+          [3, "cash-shared"],
+          [4, "port-main"],
+          [9, [[1, 1_789_300_000]]],
+          [10, "GBP"],
+          [11, 42_500],
+          [12, 1_000_000_000],
+          [14, "sec-eur"],
+          [
+            15,
+            [
+              [1, 0],
+              [2, 42_500],
+              [3, "GBP"],
+              [4, 50_000],
+              [5, "EUR"],
+            ],
+          ],
+        ],
+      ],
+      // Deliver GBP and GBX into port-main (older date after newer date to test date comparison both ways).
+      [
+        5,
+        [
+          [1, "tx-gbp"],
+          [2, 2],
+          [4, "port-main"],
+          [9, [[1, 1_788_800_000]]],
+          [12, 100_000_000],
+          [14, "sec-gbp"],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-gbx"],
+          [2, 2],
+          [4, "port-main"],
+          [9, [[1, 1_789_100_000]]],
+          [12, 30_000_000],
+          [14, "sec-gbx"],
+        ],
+      ],
+      // Cash transfer from cash-shared to cash-solo (updates otherAccount lastTransactionDate).
+      [
+        5,
+        [
+          [1, "tx-cash-xfer"],
+          [2, 5],
+          [3, "cash-shared"],
+          [5, "cash-solo"],
+          [9, [[1, 1_789_400_000]]],
+          [10, "GBP"],
+          [11, 200_000],
+          [
+            15,
+            [
+              [1, 0],
+              [2, 200_000],
+              [3, "GBP"],
+              [4, 250_000],
+              [5, "USD"],
+            ],
+          ],
+        ],
+      ],
+      // Diagnostic holdings in port-diag: undated + uncurrencied + unpriced + missing FX (JPY & CHF).
+      [
+        5,
+        [
+          [1, "tx-diag-1"],
+          [2, 2],
+          [4, "port-diag"],
+          [9, [[1, 1_789_000_000]]],
+          [12, 100_000_000],
+          [14, "sec-gbp"],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-diag-2"],
+          [2, 2],
+          [4, "port-diag"],
+          [12, 100_000_000],
+          [14, "sec-undated"],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-diag-3"],
+          [2, 2],
+          [4, "port-diag"],
+          [12, 100_000_000],
+          [14, "sec-nocur"],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-diag-4"],
+          [2, 2],
+          [4, "port-diag"],
+          [12, 100_000_000],
+          [14, "sec-unpriced"],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-diag-5"],
+          [2, 2],
+          [4, "port-diag"],
+          [12, 100_000_000],
+          [14, "sec-jpy"],
+        ],
+      ],
+      [
+        5,
+        [
+          [1, "tx-diag-6"],
+          [2, 2],
+          [4, "port-diag"],
+          [12, 100_000_000],
+          [14, "sec-chf"],
+        ],
+      ],
+      // Security transfer into port-dangling updates otherPortfolio lastTransactionDate.
+      [
+        5,
+        [
+          [1, "tx-sec-xfer"],
+          [2, 4],
+          [4, "port-retired"],
+          [6, "port-dangling"],
+          [9, [[1, 1_789_500_000]]],
+          [12, 100_000_000],
+          [14, "sec-gbp"],
+        ],
+      ],
+      // Deposit into cash-shared earlier than tx-cash-xfer.
+      [
+        5,
+        [
+          [1, "tx-deposit"],
+          [2, 6],
+          [3, "cash-shared"],
+          [9, [[1, 1_788_500_000]]],
+          [10, "GBP"],
+          [11, 500_000],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+
+    const feed = readPortfolioFeed(file);
+    const snapshot = readPortfolioSnapshot(file, "diag.portfolio");
+
+    // Targets are refused (no Asset Allocation taxonomy), yet accounts are populated in full.
+    expect(feed.targets.kind).toBe("refused");
+
+    // Every securities account marketValueGbp & holdingsCount reconciles penny-for-penny with readPortfolioSnapshot.
+    expect(
+      feed.accounts.securities.map((account) => ({
+        holdingsCount: account.holdingsCount,
+        id: account.id,
+        marketValueGbp: account.marketValueGbp,
+      })),
+    ).toStrictEqual(
+      snapshot.securitiesAccounts.map((account) => ({
+        holdingsCount: account.holdingsCount,
+        id: account.id,
+        marketValueGbp: account.marketValue,
+      })),
+    );
+    expect(
+      feed.accounts.cash.map((account) => ({
+        balance: account.balance,
+        balanceGbp: account.balanceGbp,
+        id: account.id,
+      })),
+    ).toStrictEqual(
+      snapshot.cashAccounts.map((account) => ({
+        balance: account.balance,
+        balanceGbp: account.balanceGbp,
+        id: account.id,
+      })),
+    );
+
+    const bySecId = new Map(
+      feed.accounts.securities.map((account) => [account.id, account]),
+    );
+    const byCashId = new Map(
+      feed.accounts.cash.map((account) => [account.id, account]),
+    );
+
+    // Shared cash lists only active referencing portfolios (trimmed), excluding port-retired.
+    expect(byCashId.get("cash-shared")).toMatchObject({
+      isRetired: false,
+      lastTransactionDate: "2026-09-14",
+      referencedBy: ["Main ISA", "Diagnostic GIA"],
+    });
+    expect(byCashId.get("cash-solo")).toMatchObject({
+      balance: 2500,
+      balanceGbp: 2000,
+      currency: "USD",
+      isRetired: false,
+      lastTransactionDate: "2026-09-14",
+      referencedBy: [],
+    });
+    expect(byCashId.get("cash-retired")).toMatchObject({
+      isRetired: true,
+      lastTransactionDate: null,
+      referencedBy: [],
+    });
+
+    expect(bySecId.get("port-main")).toMatchObject({
+      foreignCurrencies: ["EUR", "USD"],
+      hasUncurrenciedHoldings: false,
+      holdingsCount: 4,
+      lastTransactionDate: "2026-09-13",
+      noFxCurrencies: [],
+      oldestQuoteDate: "2026-09-14",
+      referenceCash: {
+        id: "cash-shared",
+        isRetired: false,
+        isShared: true,
+        name: "Shared Settlement",
+      },
+      unpricedCount: 0,
+    });
+    expect(bySecId.get("port-diag")).toMatchObject({
+      foreignCurrencies: [],
+      hasUncurrenciedHoldings: true,
+      holdingsCount: 6,
+      lastTransactionDate: "2026-09-10",
+      noFxCurrencies: ["CHF", "JPY"],
+      oldestQuoteDate: null,
+      referenceCash: { id: "cash-shared", isShared: true },
+      unpricedCount: 1,
+    });
+    expect(bySecId.get("port-dangling")).toMatchObject({
+      holdingsCount: 1,
+      lastTransactionDate: "2026-09-15",
+      oldestQuoteDate: "2026-09-24",
+      referenceCash: null,
+    });
+
+    // Out-of-range transaction timestamps on cash accounts are ignored without throwing in readPortfolioFeed.
+    const outOfRangeFeed = readPortfolioFeed(
+      portfolioFile([
+        [
+          3,
+          [
+            [1, "cash-bad"],
+            [2, "Bad Date Cash"],
+            [3, "GBP"],
+          ],
+        ],
+        [
+          5,
+          [
+            [1, "tx-bad-date"],
+            [2, 6],
+            [3, "cash-bad"],
+            [9, [[1, 300_000_000_000]]],
+            [10, "GBP"],
+            [11, 1000],
+          ],
+        ],
+        [12, "GBP"],
+      ]),
+    );
+    expect(outOfRangeFeed.accounts.cash[0]?.lastTransactionDate).toBeNull();
+
+    // Blank-named referencing securities accounts fall back to "a securities account",
+    // duplicate active referencing names are deduplicated while keeping isShared true,
+    // and retired portfolios referencing an otherwise unreferenced cash account keep isShared false.
+    const refEdgeFeed = readPortfolioFeed(
+      portfolioFile([
+        [
+          3,
+          [
+            [1, "cash-dup"],
+            [2, "Duplicate Pair Cash"],
+            [3, "GBP"],
+          ],
+        ],
+        [
+          3,
+          [
+            [1, "cash-blank"],
+            [2, "Blank Ref Cash"],
+            [3, "GBP"],
+          ],
+        ],
+        [
+          3,
+          [
+            [1, "cash-retired-only"],
+            [2, "Retired Ref Cash"],
+            [3, "GBP"],
+          ],
+        ],
+        [
+          4,
+          [
+            [1, "port-dup-1"],
+            [2, "Shared ISA"],
+            [5, "cash-dup"],
+          ],
+        ],
+        [
+          4,
+          [
+            [1, "port-dup-2"],
+            [2, " Shared ISA "],
+            [5, "cash-dup"],
+          ],
+        ],
+        [
+          4,
+          [
+            [1, "port-blank"],
+            [2, "   "],
+            [5, "cash-blank"],
+          ],
+        ],
+        [
+          4,
+          [
+            [1, "port-ret-only"],
+            [2, "Old ISA"],
+            [4, 1],
+            [5, "cash-retired-only"],
+          ],
+        ],
+        [12, "GBP"],
+      ]),
+    );
+    const refCashById = new Map(
+      refEdgeFeed.accounts.cash.map((account) => [account.id, account]),
+    );
+    const refSecById = new Map(
+      refEdgeFeed.accounts.securities.map((account) => [account.id, account]),
+    );
+    expect(refCashById.get("cash-dup")?.referencedBy).toStrictEqual([
+      "Shared ISA",
+    ]);
+    expect(refSecById.get("port-dup-1")?.referenceCash?.isShared).toBe(true);
+    expect(refCashById.get("cash-blank")?.referencedBy).toStrictEqual([
+      "a securities account",
+    ]);
+    expect(refSecById.get("port-blank")?.referenceCash?.isShared).toBe(false);
+    expect(refCashById.get("cash-retired-only")?.referencedBy).toStrictEqual(
+      [],
+    );
+    expect(refSecById.get("port-ret-only")?.referenceCash?.isShared).toBe(
+      false,
+    );
   });
 });
 

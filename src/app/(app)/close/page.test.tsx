@@ -206,6 +206,7 @@ function feedOf({
 } = {}): OwnedFeed {
   return {
     feed: {
+      accounts: { cash: [], securities: [] },
       handoff: { securitiesAccounts: [], securitiesByCategory: {} },
       latestQuoteDate,
       latestTransactionDate,
