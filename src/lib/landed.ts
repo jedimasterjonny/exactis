@@ -206,7 +206,7 @@ function landedOver(
       if (closed === undefined) {
         return [];
       }
-      const said = actual.get(closed.name);
+      const said = actual.get(closed.id);
       return said === undefined ? [] : [{ beyond: said - paid, ...closed }];
     },
   );

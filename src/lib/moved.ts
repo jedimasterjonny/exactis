@@ -6,6 +6,7 @@ import type { Month } from "@/data/schedule";
 import type { Future } from "@/engine/futures";
 import type { MonthsOn } from "@/engine/projection";
 
+import { takesSpare } from "@/data/accounts";
 import { accountTargetsOf } from "@/data/cma";
 import { soundKept } from "@/data/household";
 import { blendedBy, deductedBy } from "@/data/moves";
@@ -463,30 +464,53 @@ export function movedSince(
   };
 }
 
-// What Portfolio Performance says was paid into each of its securities
-// accounts, by name, after the cut of the month the balances stood at,
-// up to and on the cut of the month they stand at now, but for a name
-// two of the household's accounts carry; or nothing, where the file was
-// imported before that cut, or before what was paid in was read, since
-// it need not hold all that was paid by then.
-export function paidIn(now: Kept, from: Month): ReadonlyMap<string, number> {
+// What Portfolio Performance says was paid into each saving account,
+// by id, after the cut of the month the balances stood at, up to and on
+// the cut of the month they stand at now. Each saving resolves to its
+// linked Portfolio Performance account name, or its own trimmed name
+// when unlinked; non-savings (assets and debts), blank or duplicate
+// trimmed Portfolio names, and keys claimed by two or more household
+// savings are left out so inflows are never misattributed or counted
+// twice. Returns nothing where the file was imported before that cut,
+// or before what was paid in was read, since it need not hold all that
+// was paid by then.
+export function paidIn(now: Kept, from: Month): ReadonlyMap<number, number> {
   const to = cutOf(now.asOf);
   const after = cutOf(from);
   const { targets } = now;
-  const names = now.accounts.map(({ name }) => name);
-  return targets?.portfolios === undefined || targets.importedOn < to
-    ? new Map()
-    : new Map(
-        targets.portfolios
-          .filter(({ name }) => names.indexOf(name) === names.lastIndexOf(name))
-          .map(({ name, paid }) => [
-            name,
-            sumOf(
-              paid.filter(({ on }) => on > after && on <= to),
-              ({ amount }) => amount,
-            ),
-          ]),
-      );
+  if (targets?.portfolios === undefined || targets.importedOn < to) {
+    return new Map();
+  }
+  const trimmedPortfolios = targets.portfolios
+    .map(({ name, paid }) => ({ name: name.trim(), paid }))
+    .filter(({ name }) => name !== "");
+  const portfolioNames = trimmedPortfolios.map(({ name }) => name);
+  const byName = new Map(
+    trimmedPortfolios
+      .filter(
+        ({ name }) =>
+          portfolioNames.indexOf(name) === portfolioNames.lastIndexOf(name),
+      )
+      .map(({ name, paid }) => [
+        name,
+        sumOf(
+          paid.filter(({ on }) => on > after && on <= to),
+          ({ amount }) => amount,
+        ),
+      ]),
+  );
+  const keyed = now.accounts
+    .filter(takesSpare)
+    .map((account) => ({ id: account.id, key: portfolioKeyOf(account) }));
+  const keys = keyed.map(({ key }) => key);
+  return new Map(
+    keyed.flatMap(({ id, key }) => {
+      const amount = byName.get(key);
+      return amount !== undefined && keys.indexOf(key) === keys.lastIndexOf(key)
+        ? [[id, amount] as const]
+        : [];
+    }),
+  );
 }
 
 // What a kept household comes to at its own rates, as the dashboard's
@@ -516,14 +540,14 @@ export function standingOf(kept: Kept): NonNullable<KeptPoint["standing"]> {
 
 // The balances the close set against those it closed from, over the
 // accounts both hold: one whose day moved was checked, and was paid what
-// Portfolio Performance says was paid into the securities account of its
-// name, where it says, or else what the plan carried into it, the rest
-// of its difference having moved it; one whose day did not was left as
-// it stood.
+// Portfolio Performance says was paid into its linked or same-named
+// securities account, where it says, or else what the plan carried into
+// it, the rest of its difference having moved it; one whose day did not
+// was left as it stood.
 function balancesOf(
   carried: readonly MonthsOn[],
   now: ReadonlyMap<number, Account>,
-  actual: ReadonlyMap<string, number>,
+  actual: ReadonlyMap<number, number>,
 ): Balances {
   const both = carried.flatMap((reached) => {
     const closed = now.get(reached.account.id);
@@ -536,14 +560,14 @@ function balancesOf(
   const paid = Math.round(
     sumOf(
       checked,
-      ({ closed, paid: planned }) => actual.get(closed.name) ?? planned,
+      ({ closed, paid: planned }) => actual.get(closed.id) ?? planned,
     ),
   );
   const total = sumOf(both, ({ closed }) => closed.balance);
   return {
     actual: checked
-      .map(({ closed }) => closed.name)
-      .filter((name) => actual.has(name)),
+      .filter(({ closed }) => actual.has(closed.id))
+      .map(({ closed }) => closed.name),
     expected: sumOf(both, ({ balance }) => Math.round(balance)),
     moved: total - stood - paid,
     now: total,
@@ -588,6 +612,13 @@ function linkedPortfoliosOf(kept: Kept): readonly string[] {
       ),
     ),
   ].toSorted((one, other) => one.localeCompare(other));
+}
+
+// The Portfolio Performance account key an Exactis account resolves to:
+// its explicit link when non-blank, otherwise its own trimmed name.
+function portfolioKeyOf(account: Pick<Account, "name" | "portfolio">): string {
+  const linked = account.portfolio?.trim() ?? "";
+  return linked === "" ? account.name.trim() : linked;
 }
 
 // What a future stands at: when its owner retires, and its liquid net
