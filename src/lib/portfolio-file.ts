@@ -10,6 +10,7 @@ import type {
   NewPortfolioTransaction,
   PortfolioCategory,
   PortfolioFeed,
+  PortfolioGrossValue,
   PortfolioQuoteBatch,
   PortfolioQuoteUpdate,
   PortfolioSnapshot,
@@ -32,6 +33,7 @@ import { answerOf, Refusal } from "@/lib/answer";
 import { sumOf } from "@/lib/ledger";
 import { formatPercent } from "@/lib/money";
 import {
+  bytesAt,
   delimitedOf,
   int32At,
   int64At,
@@ -220,6 +222,11 @@ const taxUnit = 1;
 const feeUnit = 2;
 const maxTransactionType = 14;
 
+// Bounds for decoding PDecimalValue exchange rates without overflowing
+// JS Number precision or allocating huge exponents.
+const maxDecimalBytes = 16;
+const maxDecimalScale = 18;
+
 // Safe epoch-day and epoch-second ranges producing valid four-digit ISO
 // years (1000..9999).
 const minEpochDay = -354_285;
@@ -293,6 +300,7 @@ const fields = {
     taxonomies: 8,
     transactions: 5,
   },
+  decimal: { precision: 2, scale: 1, value: 3 },
   portfolio: {
     id: 1,
     isRetired: 4,
@@ -334,7 +342,14 @@ const fields = {
     units: 15,
     updatedAt: 16,
   },
-  unit: { amount: 2, currency: 3, fxAmount: 4, fxCurrency: 5, type: 1 },
+  unit: {
+    amount: 2,
+    currency: 3,
+    fxAmount: 4,
+    fxCurrency: 5,
+    fxRateToBase: 6,
+    type: 1,
+  },
 } as const;
 
 const baseRule: Omit<TransactionWriteRule, "code"> = {
@@ -746,6 +761,7 @@ export function readPortfolioSnapshot(
     cashAccounts,
     categories,
     fileName,
+    gbpRates: Object.fromEntries(pounds),
     holdings,
     latestQuoteDate: latestQuoteDateOf(securities, held, activePortfolioIds),
     securitiesAccounts,
@@ -938,24 +954,34 @@ function activePortfolioIdsOf(client: Message): ReadonlySet<string> {
   return ids;
 }
 
-// Record positive GBP FX rates from a transaction's units, filtered to
-// gross-value or non-gross units so gross rates take precedence over
-// rounded fee or tax units on the same transaction.
+// Record positive GBP FX rates from a transaction's units (in either
+// direction: GBP -> foreign or foreign -> GBP), filtered to gross-value
+// or non-gross units so gross rates take precedence over rounded fee or
+// tax units on the same transaction.
 function applyFxUnits(
   rates: Map<string, number>,
   units: readonly Message[],
-  isGrossOnly: boolean,
+  {
+    isGrossOnly,
+    txCurrency,
+  }: { readonly isGrossOnly: boolean; readonly txCurrency: string },
 ): void {
   for (const unit of units) {
     const isGross = int32At(unit, fields.unit.type) === grossValueUnit;
     if (isGross !== isGrossOnly) {
       continue;
     }
-    const currency = textAt(unit, fields.unit.fxCurrency);
+    const unitCurrency = optionalText(unit, fields.unit.currency) ?? txCurrency;
+    const fxCurrency = optionalText(unit, fields.unit.fxCurrency);
     const amount = int64At(unit, fields.unit.amount);
     const foreign = int64At(unit, fields.unit.fxAmount);
-    if (currency !== undefined && amount > 0 && foreign > 0) {
-      rates.set(currency, amount / foreign);
+    if (amount <= 0 || foreign <= 0 || fxCurrency === undefined) {
+      continue;
+    }
+    if (unitCurrency === "GBP") {
+      rates.set(fxCurrency, amount / foreign);
+    } else if (fxCurrency === "GBP") {
+      rates.set(unitCurrency, foreign / amount);
     }
   }
 }
@@ -1155,6 +1181,32 @@ function dayOf(transaction: Message): string {
   return isoDateOf(dateOf(transaction));
 }
 
+// Decodes a positive Portfolio Performance PDecimalValue (scale,
+// precision, big-endian signed two's-complement BigInteger bytes),
+// returning undefined for missing, negative, zero, or out-of-bounds
+// values.
+function decodeDecimalValue(message: Message): number | undefined {
+  const scale = int32At(message, fields.decimal.scale);
+  const raw = bytesAt(message, fields.decimal.value);
+  const first = raw?.[0];
+  if (
+    raw === undefined ||
+    first === undefined ||
+    first >= 0x80 ||
+    raw.length > maxDecimalBytes ||
+    scale < 0 ||
+    scale > maxDecimalScale
+  ) {
+    return undefined;
+  }
+  let unscaled = 0n;
+  for (const byte of raw) {
+    unscaled = (unscaled << 8n) | BigInt(byte);
+  }
+  const value = Number(unscaled) / 10 ** scale;
+  return value > 0 ? value : undefined;
+}
+
 // One decoded transaction alongside its original index for stable
 // tie-breaking, or null for an unknown future enum value.
 function decodeTransaction(
@@ -1198,7 +1250,10 @@ function decodeTransaction(
   const otherPortfolioName = lookupName(portfolioNames, otherPortfolioId);
   const securityName =
     securityId === undefined ? undefined : securities.get(securityId)?.name;
+  const currency =
+    optionalText(entry, fields.transaction.currency) ?? baseCurrency;
   const { fees, taxes } = transactionCostsOf(entry);
+  const grossValue = grossValueOf(entry, currency);
 
   return {
     index,
@@ -1208,10 +1263,10 @@ function decodeTransaction(
       amount: roundPence(
         int64At(entry, fields.transaction.amount) / hundredths,
       ),
-      currency:
-        optionalText(entry, fields.transaction.currency) ?? baseCurrency,
+      currency,
       date: isoDateOf(timestamp),
       fees,
+      ...(grossValue !== undefined && { grossValue }),
       id: optionalText(entry, fields.transaction.id) ?? `tx-${String(index)}`,
       ...(note !== undefined && { note }),
       ...(otherAccountId !== undefined && { otherAccountId }),
@@ -1228,6 +1283,35 @@ function decodeTransaction(
       type,
     },
   };
+}
+
+// First positive cross-currency GROSS_VALUE unit on a transaction,
+// including its optional decoded PDecimalValue exchange rate.
+function grossValueOf(
+  entry: Message,
+  txCurrency: string,
+): PortfolioGrossValue | undefined {
+  for (const unit of messagesAt(entry, fields.transaction.units)) {
+    if (int32At(unit, fields.unit.type) !== grossValueUnit) {
+      continue;
+    }
+    const rawAmount = int64At(unit, fields.unit.amount);
+    const rawFxAmount = int64At(unit, fields.unit.fxAmount);
+    const fxCurrency = optionalText(unit, fields.unit.fxCurrency);
+    if (rawAmount > 0 && rawFxAmount > 0 && fxCurrency !== undefined) {
+      const rawRate = messagesAt(unit, fields.unit.fxRateToBase).at(-1);
+      const exchangeRate =
+        rawRate === undefined ? undefined : decodeDecimalValue(rawRate);
+      return {
+        amount: roundPence(rawAmount / hundredths),
+        currency: optionalText(unit, fields.unit.currency) ?? txCurrency,
+        ...(exchangeRate !== undefined && { exchangeRate }),
+        fxAmount: roundPence(rawFxAmount / hundredths),
+        fxCurrency,
+      };
+    }
+  }
+  return undefined;
 }
 
 // Whether a classification id exists as a root-reachable named leaf in
@@ -1562,26 +1646,29 @@ function portfolioHoldingsOf(
 }
 
 // What a pound is in each currency the file gives a rate for, beside
-// sterling and pence. Portfolio Performance writes a transaction made
-// in pounds on a security priced in another currency with its gross
-// value, and a fee or a tax in that currency, in both: the pounds over
-// the other is the rate the transaction was made at. The file holds no
-// rate of the day, so the latest transaction's is taken, by date rather
-// than by the order written, since the file writes them in neither. A
-// transaction made in some other currency is not read, since its rate
-// is to that currency rather than the pound, and a unit worth nothing
-// in either currency gives no rate; on any transaction, gross-value
-// units take precedence over rounded fee or tax units.
+// sterling and pence. Portfolio Performance writes a cross-currency
+// transaction with its gross value (and any foreign fee or tax) in both
+// currencies: GBP over the foreign amount (or foreign GBP credit over
+// the transaction amount for inverse foreign -> GBP entries) gives the
+// rate the transaction was made at. The file holds no rate of the day,
+// so the latest transaction's is taken, by date rather than by the
+// order written, since the file writes them in neither. A transaction
+// involving neither currency as GBP is skipped, and a unit worth
+// nothing in either currency gives no rate; on any transaction,
+// gross-value units take precedence over rounded fee or tax units.
 function poundsPer(client: Message): ReadonlyMap<string, number> {
+  const baseCurrency =
+    optionalText(client, fields.client.baseCurrency) ?? "GBP";
   const rates = new Map<string, number>();
   const dated = messagesAt(client, fields.client.transactions)
-    .filter((each) => textAt(each, fields.transaction.currency) === "GBP")
     .map((each) => [dateOf(each), each] as const)
     .toSorted(([one], [other]) => one - other);
   for (const [, transaction] of dated) {
+    const txCurrency =
+      optionalText(transaction, fields.transaction.currency) ?? baseCurrency;
     const units = messagesAt(transaction, fields.transaction.units);
-    applyFxUnits(rates, units, false);
-    applyFxUnits(rates, units, true);
+    applyFxUnits(rates, units, { isGrossOnly: false, txCurrency });
+    applyFxUnits(rates, units, { isGrossOnly: true, txCurrency });
   }
   return new Map([...rates, ...factors]);
 }
@@ -1663,10 +1750,15 @@ function rawIdsOf(
 // reference account each read its cash whole; split it by what each
 // bought if a file ever shares one.
 function readPortfoliosFromClient(client: Message): readonly Portfolio[] {
+  const baseCurrency =
+    optionalText(client, fields.client.baseCurrency) ?? "GBP";
   const sterling = new Set(
-    messagesAt(client, fields.client.accounts)
-      .filter((each) => textAt(each, fields.account.currency) === "GBP")
-      .map((each) => textOf(each, fields.account.id)),
+    messagesAt(client, fields.client.accounts).flatMap((each) => {
+      const id = optionalText(each, fields.account.id);
+      const currency =
+        optionalText(each, fields.account.currency) ?? baseCurrency;
+      return id !== undefined && currency === "GBP" ? [id] : [];
+    }),
   );
   const references = new Map<string, Set<string>>();
   for (const portfolio of messagesAt(client, fields.client.portfolios)) {
@@ -1692,17 +1784,22 @@ function readPortfoliosFromClient(client: Message): readonly Portfolio[] {
           int64At(transaction, fields.transaction.amount) / hundredths;
         const from = textOf(transaction, fields.transaction.account);
         const to = textOf(transaction, fields.transaction.otherAccount);
-        const sign =
-          (accounts.has(from) ? (cashSigns.get(type) ?? 0) : 0) +
-          (type === cashTransfer && accounts.has(to) ? 1 : 0);
-        cash += sign * amount;
+        const debit = accounts.has(from)
+          ? (cashSigns.get(type) ?? 0) * amount
+          : 0;
+        const credit =
+          type === cashTransfer && accounts.has(to)
+            ? transferCreditOf(transaction, amount)
+            : 0;
+        const delta = debit + credit;
+        cash += delta;
         const isPaid =
           type === deposit ||
           type === removal ||
           (type === cashTransfer && !(inside.has(from) && inside.has(to)));
-        if (sign !== 0 && isPaid) {
+        if (delta !== 0 && isPaid) {
           const on = dayOf(transaction);
-          paid.set(on, (paid.get(on) ?? 0) + sign * amount);
+          paid.set(on, (paid.get(on) ?? 0) + delta);
         }
       }
       return {

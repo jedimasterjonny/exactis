@@ -5,6 +5,7 @@ import { Refusal } from "@/lib/answer";
 import { protobufOf } from "@/lib/protobuf.fixture";
 
 import {
+  bytesAt,
   int32At,
   int64At,
   joined,
@@ -143,6 +144,29 @@ describe("int64At", () => {
 
   it("reads a negative int64 back through its widening", () => {
     expect(int64At(messageOf(protobufOf([[1, -3]])), 1)).toBe(-3);
+  });
+});
+
+describe("bytesAt", () => {
+  it("reads the raw bytes written last under the number given", () => {
+    const message = messageOf(
+      protobufOf([
+        [3, raw(0x01, 0x02)],
+        [3, raw(0x00, 0x80, 0xff)],
+      ]),
+    );
+
+    expect(bytesAt(message, 3)).toStrictEqual(raw(0x00, 0x80, 0xff));
+  });
+
+  it("reads nothing for a field never written", () => {
+    expect(bytesAt(messageOf(protobufOf([[3, raw(1)]])), 2)).toBeUndefined();
+  });
+
+  it("refuses a number where bytes are read", () => {
+    expect(() => bytesAt(messageOf(protobufOf([[3, 7]])), 3)).toThrow(
+      new Refusal("The data holds a number where field 3's bytes are read"),
+    );
   });
 });
 

@@ -36,6 +36,16 @@ const longest = 10;
 
 const cutShort = "The data is cut short partway through a field";
 
+// The bytes written last under a number, or nothing when none was, for
+// a length-delimited bytes field such as PDecimalValue.value.
+export function bytesAt(
+  message: Message,
+  number: number,
+): Uint8Array | undefined {
+  const value = message.get(number)?.at(-1);
+  return value === undefined ? undefined : bytesOf(value, number);
+}
+
 // Bytes written under a number as a length-delimited field: its key,
 // how long they are and the bytes.
 export function delimitedOf(number: number, bytes: Uint8Array): Uint8Array {
