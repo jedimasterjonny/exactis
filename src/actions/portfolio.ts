@@ -10,10 +10,12 @@ import type {
 } from "@/data/portfolio";
 import type { StoredPortfolio } from "@/db/portfolio";
 import type { Answer } from "@/lib/answer";
+import type { FetchedQuote } from "@/lib/portfolio-quotes";
 import type { SavedPortfolio, SavedPortfolioMutation } from "@/store/portfolio";
 
 import {
   afterVersionSchema,
+  fetchPortfolioQuotesInputSchema,
   maxPortfolioBytes,
   newPortfolioAccountSchema,
   newPortfolioSecuritySchema,
@@ -21,17 +23,23 @@ import {
   portfolioQuoteBatchSchema,
   portfolioTooLarge,
 } from "@/data/portfolio";
-import { refusalOf, refused } from "@/lib/answer";
+import { answerOf, refusalOf, refused, saved } from "@/lib/answer";
 import { today } from "@/lib/months";
 import {
   appendAccount,
   appendSecurity,
   appendTransaction,
+  readQuotableSecurities,
   updateQuotes,
 } from "@/lib/portfolio-file";
+import { fetchYahooQuotes } from "@/lib/portfolio-quotes";
 import { openedScenario } from "@/lib/scenario";
 import { requireSession } from "@/lib/session";
-import { amendPortfolio, storePortfolio } from "@/store/portfolio";
+import {
+  amendPortfolio,
+  readStoredPortfolio,
+  storePortfolio,
+} from "@/store/portfolio";
 
 // Postgres int4 max minus 1 so latest + 1 always fits in portfolio_files.version.
 const maxAfterVersion = 2_147_483_646;
@@ -90,8 +98,33 @@ export async function addPortfolioTransaction(
   );
 }
 
-// Records a batch of historical quotes dated to one calendar date
-// across one or more catalogued securities in a single new version.
+// Fetches latest online quotes for requested securities from the
+// household's stored .portfolio file without mutating Postgres, using
+// only server-stored ticker/feed metadata to prevent SSRF.
+export async function fetchPortfolioQuotes(input: {
+  readonly securityIds: readonly string[];
+}): Promise<Answer<readonly FetchedQuote[]>> {
+  await requireSession();
+  const parsed = fetchPortfolioQuotesInputSchema.parse(input);
+  if ((await openedScenario()) !== null) {
+    return refused("Leave the scenario to fetch quotes");
+  }
+  const stored = await readStoredPortfolio();
+  if (stored === null) {
+    return refused("Upload a portfolio file before fetching quotes");
+  }
+  const targets = answerOf(() =>
+    readQuotableSecurities(stored.content, parsed.securityIds),
+  );
+  if (targets.kind === "refused") {
+    return targets;
+  }
+  return saved(await fetchYahooQuotes(targets.value));
+}
+
+// Records a batch of dated historical quotes across one or more
+// catalogued securities in a single new version, using each quote's
+// optional date or falling back to the batch date.
 export async function updatePortfolioQuotes(
   afterVersion: number,
   input: PortfolioQuoteBatch,

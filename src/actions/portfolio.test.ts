@@ -7,6 +7,7 @@ import { today } from "@/data/household.fixture";
 import { maxPortfolioBytes, portfolioTooLarge } from "@/data/portfolio";
 import { inMemory } from "@/db/memory.fixture";
 import { readLatestPortfolio } from "@/db/portfolio";
+import { portfolioFiles } from "@/db/schema";
 import { standUp } from "@/db/store.fixture";
 import { acceptedOf, refused, saved } from "@/lib/answer";
 import { dayOf } from "@/lib/months";
@@ -19,6 +20,7 @@ import {
   addPortfolioAccount,
   addPortfolioSecurity,
   addPortfolioTransaction,
+  fetchPortfolioQuotes,
   updatePortfolioQuotes,
   uploadPortfolio,
 } from "./portfolio";
@@ -583,6 +585,85 @@ describe("portfolio write-back actions", () => {
         date: "2026-09-25",
         quotes: [{ price: 100, securityId: "sec-world" }],
       }),
+    ).rejects.toThrow("redirected");
+  });
+});
+
+describe("fetchPortfolioQuotes", () => {
+  it("fetches latest quotes using only server-stored security metadata without mutating Postgres", async () => {
+    await uploadPortfolio(uploadForm("0", samplePortfolioFile()));
+    const fetchMock = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            chart: {
+              result: [
+                {
+                  meta: {
+                    currency: "GBP",
+                    exchangeTimezoneName: "Europe/London",
+                    regularMarketPrice: 128.75,
+                    regularMarketTime: 1_790_350_200,
+                  },
+                },
+              ],
+            },
+          }),
+          { headers: { "Content-Type": "application/json" }, status: 200 },
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const answer = await fetchPortfolioQuotes({
+      securityIds: ["sec-world", "missing-id"],
+    });
+
+    expect(answer).toStrictEqual(
+      saved([
+        {
+          date: "2026-09-25",
+          price: 128.75,
+          securityId: "sec-world",
+          status: "fetched",
+        },
+      ]),
+    );
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(await readLatestPortfolio(db)).toMatchObject({ version: 1 });
+  });
+
+  it("refuses scenarios, missing uploads, and unreadable stored bytes, and throws on invalid input or missing session", async () => {
+    expect(
+      await fetchPortfolioQuotes({ securityIds: ["sec-world"] }),
+    ).toStrictEqual(refused("Upload a portfolio file before fetching quotes"));
+
+    vi.mocked(openedScenario).mockResolvedValue("Retire early");
+    expect(
+      await fetchPortfolioQuotes({ securityIds: ["sec-world"] }),
+    ).toStrictEqual(refused("Leave the scenario to fetch quotes"));
+    vi.mocked(openedScenario).mockResolvedValue(null);
+
+    await db
+      .insert(portfolioFiles)
+      .values({
+        content: Buffer.from("<client/>"),
+        fileName: "broken.portfolio",
+        version: 1,
+      });
+    expect(
+      await fetchPortfolioQuotes({ securityIds: ["sec-world"] }),
+    ).toStrictEqual(
+      refused(
+        "The file is saved as XML, and only a Portfolio Performance file saved in binary can be read",
+      ),
+    );
+
+    await expect(fetchPortfolioQuotes({ securityIds: [] })).rejects.toThrow();
+
+    vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+    await expect(
+      fetchPortfolioQuotes({ securityIds: ["sec-world"] }),
     ).rejects.toThrow("redirected");
   });
 });

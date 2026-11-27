@@ -14,6 +14,7 @@ import {
   afterVersionSchema,
   cashTotalsOf,
   effectiveSyncedOn,
+  fetchPortfolioQuotesInputSchema,
   holdingsViewOf,
   isIsoCalendarDate,
   newPortfolioAccountSchema,
@@ -859,12 +860,24 @@ describe("portfolio write-back schemas", () => {
     expect(
       portfolioQuoteBatchSchema.parse({
         date: "2026-09-25",
-        quotes: [{ price: 125.5, securityId: "sec-1" }],
+        quotes: [
+          { price: 125.5, securityId: "sec-1" },
+          { date: "2026-09-24", price: 88.25, securityId: "sec-2" },
+        ],
       }),
     ).toStrictEqual({
       date: "2026-09-25",
-      quotes: [{ price: 125.5, securityId: "sec-1" }],
+      quotes: [
+        { price: 125.5, securityId: "sec-1" },
+        { date: "2026-09-24", price: 88.25, securityId: "sec-2" },
+      ],
     });
+    expect(
+      portfolioQuoteBatchSchema.safeParse({
+        date: "2026-09-25",
+        quotes: [{ date: "2026-02-31", price: 10, securityId: "sec-1" }],
+      }).success,
+    ).toBe(false);
     expect(
       portfolioQuoteBatchSchema.safeParse({ date: "2026-09-25", quotes: [] })
         .success,
@@ -885,6 +898,27 @@ describe("portfolio write-back schemas", () => {
           price: 10,
           securityId: `sec-${String(i)}`,
         })),
+      }).success,
+    ).toBe(false);
+  });
+
+  it("validates fetchPortfolioQuotesInputSchema for bounds and uniqueness", () => {
+    expect(
+      fetchPortfolioQuotesInputSchema.parse({
+        securityIds: ["sec-1", "sec-2"],
+      }),
+    ).toStrictEqual({ securityIds: ["sec-1", "sec-2"] });
+    expect(
+      fetchPortfolioQuotesInputSchema.safeParse({ securityIds: [] }).success,
+    ).toBe(false);
+    expect(
+      fetchPortfolioQuotesInputSchema.safeParse({
+        securityIds: ["sec-1", "sec-1"],
+      }).success,
+    ).toBe(false);
+    expect(
+      fetchPortfolioQuotesInputSchema.safeParse({
+        securityIds: Array.from({ length: 101 }, (_, i) => `sec-${String(i)}`),
       }).success,
     ).toBe(false);
   });
