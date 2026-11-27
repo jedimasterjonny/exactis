@@ -1,11 +1,19 @@
 // How long a source has to send its file, which is a few hundred KB
 // and arrives in a second or two.
-const patience = 30_000;
+const defaultPatience = 30_000;
 
 // The most of a file read from a source, in bytes: thirty times the
 // 350 KB the largest of them sends, and far short of filling the memory
 // a server has to read it in.
-const limit = 10_000_000;
+const defaultLimit = 10_000_000;
+
+interface DownloadOptions {
+  readonly limit?: number;
+  readonly patience?: number;
+  readonly signal?: AbortSignal;
+  readonly what: string;
+  readonly who: string;
+}
 
 // The file at the address, fresh rather than any copy a cache holds, or
 // why it did not come, saying who was asked for what: the status they
@@ -23,11 +31,28 @@ export async function download(
   who: string,
   what: string,
 ): Promise<string | Uint8Array> {
+  return downloadBounded(address, { what, who });
+}
+
+// Hardened fetch with caller-specified byte cap, per-request timeout,
+// and optional outer abort signal (for batch time budgets).
+export async function downloadBounded(
+  address: Request | string,
+  {
+    limit = defaultLimit,
+    patience = defaultPatience,
+    signal,
+    what,
+    who,
+  }: DownloadOptions,
+): Promise<string | Uint8Array> {
   try {
+    const timeout = AbortSignal.timeout(patience);
     const response = await fetch(address, {
       cache: "no-store",
       redirect: "manual",
-      signal: AbortSignal.timeout(patience),
+      signal:
+        signal === undefined ? timeout : AbortSignal.any([signal, timeout]),
     });
     if (!response.ok) {
       await response.body?.cancel();
@@ -38,7 +63,7 @@ export async function download(
     for await (const chunk of response.body ?? []) {
       size += chunk.length;
       if (size > limit) {
-        return `${who} sent more than 10 MB, far past the size of ${what}`;
+        return `${who} sent more than ${limitLabelOf(limit)}, far past the size of ${what}`;
       }
       chunks.push(chunk);
     }
@@ -46,4 +71,10 @@ export async function download(
   } catch {
     return `${who} did not send ${what}`;
   }
+}
+
+function limitLabelOf(bytes: number): string {
+  return bytes >= 1_000_000
+    ? `${String(Math.round(bytes / 1_000_000))} MB`
+    : `${String(Math.round(bytes / 1000))} KB`;
 }

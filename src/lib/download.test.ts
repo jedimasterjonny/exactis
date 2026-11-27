@@ -3,7 +3,7 @@ import type { Mock } from "vitest";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { download } from "./download";
+import { download, downloadBounded } from "./download";
 
 const address = "https://example.com/latest.zip";
 
@@ -117,5 +117,49 @@ describe("download", () => {
     expect(await download(address, "The source", "its file")).toBe(
       "The source answered 301 rather than sending its file",
     );
+  });
+
+  it("supports custom KB limits, timeouts, and outer abort signals via downloadBounded", async () => {
+    sourceSends(new Response(new Uint8Array(600_000)));
+
+    expect(
+      await downloadBounded(address, {
+        limit: 512_000,
+        patience: 5000,
+        what: "quotes",
+        who: "Yahoo Finance",
+      }),
+    ).toBe("Yahoo Finance sent more than 512 KB, far past the size of quotes");
+
+    const controller = new AbortController();
+    let seenSignal: AbortSignal | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async (_input: unknown, init?: RequestInit): Promise<Response> =>
+          new Promise((_resolve, reject) => {
+            seenSignal = init?.signal ?? undefined;
+            seenSignal?.addEventListener(
+              "abort",
+              () => {
+                reject(new DOMException("aborted", "AbortError"));
+              },
+              { once: true },
+            );
+          }),
+      ),
+    );
+
+    const pending = downloadBounded(address, {
+      limit: 512_000,
+      patience: 5000,
+      signal: controller.signal,
+      what: "quotes",
+      who: "Yahoo Finance",
+    });
+    expect(seenSignal?.aborted).toBe(false);
+    controller.abort();
+    expect(seenSignal?.aborted).toBe(true);
+    expect(await pending).toBe("Yahoo Finance did not send quotes");
   });
 });
