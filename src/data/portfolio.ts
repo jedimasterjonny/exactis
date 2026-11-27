@@ -447,9 +447,84 @@ const transactionTypeValues: readonly [TransactionType, ...TransactionType[]] =
     "tax-refund",
   ];
 
+const portfolioTransactionShape = {
+  accountId: optionalId,
+  amount: nonNegativeMoney,
+  currency: cashCurrency,
+  date: isoDate,
+  fees: nonNegativeMoney,
+  fxAmount: positiveMoney.exactOptional(),
+  note: optionalNote,
+  otherAccountId: optionalId,
+  otherPortfolioId: optionalId,
+  portfolioId: optionalId,
+  securityId: optionalId,
+  shares: nonNegativeScaled,
+  taxes: nonNegativeMoney,
+  type: z.enum(transactionTypeValues),
+};
+
 // Optimistic version for in-place portfolio file mutations: 1 up to
 // Postgres int4 max minus 1 so version + 1 always fits.
 export const afterVersionSchema = z.number().int().min(1).max(2_147_483_646);
+
+// Server-side validation schema for deleting a cash or securities account.
+export const deletePortfolioAccountSchema = z.object({
+  id: requiredId,
+  kind: z.enum(["cash", "securities"]),
+}) satisfies z.ZodType<DeletePortfolioAccount>;
+
+// Server-side validation schema for deleting a catalogued security.
+export const deletePortfolioSecuritySchema = z.object({
+  id: requiredId,
+}) satisfies z.ZodType<DeletePortfolioSecurity>;
+
+// Server-side validation schema for deleting a transaction.
+export const deletePortfolioTransactionSchema = z.object({
+  id: requiredId,
+}) satisfies z.ZodType<DeletePortfolioTransaction>;
+
+// Server-side validation schema for editing or retiring a cash or
+// securities account (kind and cash currency are immutable).
+export const editPortfolioAccountSchema = z.discriminatedUnion("kind", [
+  z.object({
+    id: requiredId,
+    isRetired: z.boolean(),
+    kind: z.literal("cash"),
+    name: singleLineText(200, nameLimitMessage),
+    note: optionalNote,
+  }),
+  z.object({
+    id: requiredId,
+    isRetired: z.boolean(),
+    kind: z.literal("securities"),
+    name: singleLineText(200, nameLimitMessage),
+    note: optionalNote,
+    referenceAccountId: optionalId,
+  }),
+]) satisfies z.ZodType<EditPortfolioAccount>;
+
+// Server-side validation schema for editing or retiring a catalogued
+// security (quote currency is immutable).
+export const editPortfolioSecuritySchema = z.object({
+  categoryId: optionalId,
+  id: requiredId,
+  isin: optionalSingleLineText(32, isinLimitMessage),
+  isRetired: z.boolean(),
+  name: singleLineText(200, nameLimitMessage),
+  note: optionalNote,
+  ticker: optionalSingleLineText(32, tickerLimitMessage),
+}) satisfies z.ZodType<EditPortfolioSecurity>;
+
+// Server-side validation schema for editing an existing transaction
+// (transaction type is immutable and verified against stored bytes).
+export const editPortfolioTransactionSchema = z
+  .object({ ...portfolioTransactionShape, id: requiredId })
+  .refine(hasValidTransactionAmount, "Amount must be greater than zero")
+  .refine(
+    hasValidTransactionShares,
+    "Shares must be greater than zero",
+  ) satisfies z.ZodType<EditPortfolioTransaction>;
 
 // Server-side validation schema for requesting online quote lookups
 // against stored securities in the household's .portfolio file.
@@ -495,28 +570,10 @@ export const newPortfolioSecuritySchema = z.object({
 // Server-side validation schema for appending any of Portfolio
 // Performance's fifteen transaction types.
 export const newPortfolioTransactionSchema = z
-  .object({
-    accountId: optionalId,
-    amount: nonNegativeMoney,
-    currency: cashCurrency,
-    date: isoDate,
-    fees: nonNegativeMoney,
-    fxAmount: positiveMoney.exactOptional(),
-    note: optionalNote,
-    otherAccountId: optionalId,
-    otherPortfolioId: optionalId,
-    portfolioId: optionalId,
-    securityId: optionalId,
-    shares: nonNegativeScaled,
-    taxes: nonNegativeMoney,
-    type: z.enum(transactionTypeValues),
-  })
+  .object(portfolioTransactionShape)
+  .refine(hasValidTransactionAmount, "Amount must be greater than zero")
   .refine(
-    (tx) => tx.type === "security-transfer" || Math.round(tx.amount * 100) >= 1,
-    "Amount must be greater than zero",
-  )
-  .refine(
-    (tx) => !hasShareMovement(tx.type) || Math.round(tx.shares * 1e8) >= 1,
+    hasValidTransactionShares,
     "Shares must be greater than zero",
   ) satisfies z.ZodType<NewPortfolioTransaction>;
 
@@ -855,6 +912,20 @@ function hasShareMovement(type: TransactionType): boolean {
     type === "outbound-delivery" ||
     type === "security-transfer"
   );
+}
+
+function hasValidTransactionAmount(tx: {
+  readonly amount: number;
+  readonly type: TransactionType;
+}): boolean {
+  return tx.type === "security-transfer" || Math.round(tx.amount * 100) >= 1;
+}
+
+function hasValidTransactionShares(tx: {
+  readonly shares: number;
+  readonly type: TransactionType;
+}): boolean {
+  return !hasShareMovement(tx.type) || Math.round(tx.shares * 1e8) >= 1;
 }
 
 // One security's share count, account count and sterling valuation

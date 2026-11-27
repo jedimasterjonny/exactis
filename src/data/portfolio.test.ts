@@ -13,6 +13,12 @@ import {
   accountsLayoutOf,
   afterVersionSchema,
   cashTotalsOf,
+  deletePortfolioAccountSchema,
+  deletePortfolioSecuritySchema,
+  deletePortfolioTransactionSchema,
+  editPortfolioAccountSchema,
+  editPortfolioSecuritySchema,
+  editPortfolioTransactionSchema,
   effectiveSyncedOn,
   fetchPortfolioQuotesInputSchema,
   holdingsViewOf,
@@ -941,6 +947,111 @@ describe("portfolio write-back schemas", () => {
         securityIds: Array.from({ length: 101 }, (_, i) => `sec-${String(i)}`),
       }).success,
     ).toBe(false);
+  });
+
+  it("validates edit and delete portfolio schemas across accounts, securities, and transactions", () => {
+    expect(
+      editPortfolioAccountSchema.parse({
+        id: "  cash-1  ",
+        isRetired: true,
+        kind: "cash",
+        name: "  Reserve Cash  ",
+        note: "  Closed  ",
+      }),
+    ).toStrictEqual({
+      id: "cash-1",
+      isRetired: true,
+      kind: "cash",
+      name: "Reserve Cash",
+      note: "Closed",
+    });
+    expect(
+      editPortfolioAccountSchema.parse({
+        id: "port-1",
+        isRetired: false,
+        kind: "securities",
+        name: "Northstar ISA",
+        referenceAccountId: "cash-1",
+      }),
+    ).toStrictEqual({
+      id: "port-1",
+      isRetired: false,
+      kind: "securities",
+      name: "Northstar ISA",
+      referenceAccountId: "cash-1",
+    });
+    expect(
+      editPortfolioAccountSchema.safeParse({
+        id: "   ",
+        isRetired: false,
+        kind: "cash",
+        name: "Ok",
+      }).success,
+    ).toBe(false);
+
+    expect(
+      deletePortfolioAccountSchema.parse({ id: "cash-1", kind: "cash" }),
+    ).toStrictEqual({ id: "cash-1", kind: "cash" });
+    expect(
+      deletePortfolioAccountSchema.safeParse({ id: "cash-1", kind: "other" })
+        .success,
+    ).toBe(false);
+
+    expect(
+      editPortfolioSecuritySchema.parse({
+        categoryId: "aa-eq",
+        id: "sec-1",
+        isin: " GB00TEST0001 ",
+        isRetired: true,
+        name: " Global Equity ",
+        ticker: " GEIDX ",
+      }),
+    ).toStrictEqual({
+      categoryId: "aa-eq",
+      id: "sec-1",
+      isin: "GB00TEST0001",
+      isRetired: true,
+      name: "Global Equity",
+      ticker: "GEIDX",
+    });
+    expect(deletePortfolioSecuritySchema.parse({ id: "sec-1" })).toStrictEqual({
+      id: "sec-1",
+    });
+
+    expect(
+      editPortfolioTransactionSchema.parse({
+        accountId: "cash-isa",
+        amount: 250,
+        currency: "GBP",
+        date: "2026-09-25",
+        fees: 2,
+        id: "tx-1",
+        portfolioId: "port-isa",
+        securityId: "sec-1",
+        shares: 2,
+        taxes: 0,
+        type: "purchase",
+      }),
+    ).toMatchObject({ amount: 250, id: "tx-1", type: "purchase" });
+    expect(
+      editPortfolioTransactionSchema.safeParse({
+        accountId: "cash-isa",
+        amount: 0,
+        currency: "GBP",
+        date: "2026-09-25",
+        fees: 0,
+        id: "tx-1",
+        shares: 0,
+        taxes: 0,
+        type: "deposit",
+      }).success,
+    ).toBe(false);
+    expect(
+      deletePortfolioTransactionSchema.parse({ id: "tx-1" }),
+    ).toStrictEqual({ id: "tx-1" });
+    expect(deletePortfolioTransactionSchema.safeParse({ id: "" }).success).toBe(
+      false,
+    );
   });
 });
 

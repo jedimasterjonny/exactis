@@ -20,6 +20,12 @@ import {
   addPortfolioAccount,
   addPortfolioSecurity,
   addPortfolioTransaction,
+  deletePortfolioAccount,
+  deletePortfolioSecurity,
+  deletePortfolioTransaction,
+  editPortfolioAccount,
+  editPortfolioSecurity,
+  editPortfolioTransaction,
   fetchPortfolioQuotes,
   updatePortfolioQuotes,
   uploadPortfolio,
@@ -664,6 +670,179 @@ describe("fetchPortfolioQuotes", () => {
     vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
     await expect(
       fetchPortfolioQuotes({ securityIds: ["sec-world"] }),
+    ).rejects.toThrow("redirected");
+  });
+});
+
+describe("portfolio edit and delete actions", () => {
+  it("edits, retires, and deletes accounts, securities, and transactions end to end", async () => {
+    await uploadPortfolio(uploadForm("0", samplePortfolioFile()));
+
+    // Edit & retire existing cash account, securities account, security, and transaction.
+    expect(
+      await editPortfolioAccount(1, {
+        id: "cash-reserve",
+        isRetired: true,
+        kind: "cash",
+        name: "Reserve Cash Retired",
+        note: "Closed pot",
+      }),
+    ).toMatchObject({
+      kind: "saved",
+      value: { id: "cash-reserve", version: 2 },
+    });
+
+    expect(
+      await editPortfolioAccount(2, {
+        id: "port-isa",
+        isRetired: false,
+        kind: "securities",
+        name: "Northstar ISA Main",
+        referenceAccountId: "cash-isa",
+      }),
+    ).toMatchObject({ kind: "saved", value: { id: "port-isa", version: 3 } });
+
+    expect(
+      await editPortfolioSecurity(3, {
+        categoryId: "aa-equity",
+        id: "sec-world",
+        isin: "GB00TEST0001",
+        isRetired: false,
+        name: "Global Equity Index Renamed",
+        ticker: "GEIDX",
+      }),
+    ).toMatchObject({ kind: "saved", value: { id: "sec-world", version: 4 } });
+
+    expect(
+      await editPortfolioTransaction(4, {
+        accountId: "cash-reserve",
+        amount: 750,
+        currency: "GBP",
+        date: "2026-09-12",
+        fees: 0,
+        id: "tx-3",
+        note: "Amended deposit",
+        shares: 0,
+        taxes: 0,
+        type: "deposit",
+      }),
+    ).toMatchObject({ kind: "saved", value: { id: "tx-3", version: 5 } });
+
+    // Deleting a transaction frees cash-reserve so it can be deleted.
+    expect(
+      await deletePortfolioAccount(5, { id: "cash-reserve", kind: "cash" }),
+    ).toStrictEqual(refused("Used by 1 transaction — retire it instead"));
+
+    expect(await deletePortfolioTransaction(5, { id: "tx-3" })).toMatchObject({
+      kind: "saved",
+      value: { id: "tx-3", version: 6 },
+    });
+
+    expect(
+      await deletePortfolioAccount(6, { id: "cash-reserve", kind: "cash" }),
+    ).toMatchObject({
+      kind: "saved",
+      value: { id: "cash-reserve", version: 7 },
+    });
+
+    // Add a fresh security with zero transactions and delete it.
+    const addedSec = await addPortfolioSecurity(7, {
+      currency: "GBP",
+      latestPrice: null,
+      name: "Temporary Tracker",
+    });
+    const tempSecId = acceptedOf(addedSec).id;
+    expect(await deletePortfolioSecurity(8, { id: tempSecId })).toMatchObject({
+      kind: "saved",
+      value: { id: tempSecId, version: 9 },
+    });
+
+    const latest = await readLatestPortfolio(db);
+    expect(latest?.version).toBe(9);
+    const snapshot = readPortfolioSnapshot(
+      latest?.content ?? new Uint8Array(),
+      latest?.fileName ?? "northstar.portfolio",
+    );
+    expect(snapshot.cashAccounts.map((a) => a.id)).toStrictEqual(["cash-isa"]);
+    expect(snapshot.securitiesAccounts[0]?.name).toBe("Northstar ISA Main");
+    expect(snapshot.holdings.map((h) => [h.id, h.name])).toStrictEqual([
+      ["sec-world", "Global Equity Index Renamed"],
+    ]);
+    expect(snapshot.transactions.map((t) => t.id)).toStrictEqual([
+      "tx-2",
+      "tx-1",
+    ]);
+  });
+
+  it("refuses domain, text-limit, scenario, and stale violations and throws on forged payloads or missing sessions", async () => {
+    await uploadPortfolio(uploadForm("0", samplePortfolioFile()));
+
+    // Refuses linked cash account delete and transaction-referenced security delete.
+    expect(
+      await deletePortfolioAccount(1, { id: "cash-isa", kind: "cash" }),
+    ).toStrictEqual(refused("Used by 2 transactions — retire it instead"));
+    expect(await deletePortfolioSecurity(1, { id: "sec-world" })).toStrictEqual(
+      refused("Used by 1 transaction — retire it instead"),
+    );
+    expect(
+      await editPortfolioTransaction(1, {
+        accountId: "cash-isa",
+        amount: 2000,
+        currency: "GBP",
+        date: "2026-09-10",
+        fees: 0,
+        id: "tx-1",
+        shares: 0,
+        taxes: 0,
+        type: "removal",
+      }),
+    ).toStrictEqual(refused("Transaction type cannot be changed"));
+
+    // User-reachable text cap returns Refusal.
+    expect(
+      await editPortfolioSecurity(1, {
+        id: "sec-world",
+        isRetired: false,
+        name: "a".repeat(201),
+      }),
+    ).toStrictEqual(refused("Name must be one line of up to 200 characters"));
+
+    // Stale version returns a calm Refusal and refreshes the screen.
+    expect(
+      await editPortfolioAccount(99, {
+        id: "cash-isa",
+        isRetired: false,
+        kind: "cash",
+        name: "Stale Name",
+      }),
+    ).toStrictEqual(
+      refused(
+        "The portfolio file changed while this was being saved, so nothing was",
+      ),
+    );
+
+    // Open scenario refuses edits and deletes.
+    vi.mocked(openedScenario).mockResolvedValue("Retire early");
+    expect(await deletePortfolioTransaction(1, { id: "tx-1" })).toStrictEqual(
+      refused("Leave the scenario to update the portfolio file"),
+    );
+    vi.mocked(openedScenario).mockResolvedValue(null);
+
+    // Forged payloads throw loudly.
+    await expect(
+      editPortfolioAccount(0, {
+        id: "cash-isa",
+        isRetired: false,
+        kind: "cash",
+        name: "Bad Version",
+      }),
+    ).rejects.toThrow("Invalid afterVersion");
+    await expect(deletePortfolioTransaction(1, { id: "" })).rejects.toThrow();
+
+    // Missing session rejects.
+    vi.mocked(requireSession).mockRejectedValue(new Error("redirected"));
+    await expect(
+      deletePortfolioSecurity(1, { id: "sec-world" }),
     ).rejects.toThrow("redirected");
   });
 });
