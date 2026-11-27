@@ -73,6 +73,7 @@ interface PortfolioScreenProps {
 type PortfolioTab = "Accounts" | "Holdings" | "Transactions";
 
 interface ResolvedHandoff {
+  readonly amountGbp?: number;
   readonly draft: PortfolioTransactionDraft;
   readonly suggestedCategory?: SuggestedCategory;
 }
@@ -486,6 +487,9 @@ function OwnedPortfolioTabs({
           today={today}
           version={version}
           {...(handoff !== null && {
+            ...(handoff.amountGbp !== undefined && {
+              handoffAmountGbp: handoff.amountGbp,
+            }),
             initialDraft: handoff.draft,
             ...(handoff.suggestedCategory !== undefined && {
               suggestedCategory: handoff.suggestedCategory,
@@ -529,6 +533,7 @@ function resolveTradeHandoff(
     portfolioId,
   );
   return {
+    ...(trade.amount !== undefined && { amountGbp: trade.amount }),
     draft: {
       ...(trade.amount !== undefined && { amount: trade.amount }),
       ...(portfolioId !== undefined && { portfolioId }),

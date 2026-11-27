@@ -1772,4 +1772,68 @@ describe("PortfolioScreen", () => {
     ).not.toBeInTheDocument();
     expect(routerReplace).toHaveBeenCalledTimes(1);
   });
+
+  it("passes gbpRates and handoffAmountGbp into PortfolioTransactionDialog when a Cogitator trade lands on a non-GBP account", () => {
+    const usdOwned: OwnedPortfolio = {
+      ...ownedMulti,
+      snapshot: {
+        ...ownedMulti.snapshot,
+        cashAccounts: [
+          ...ownedMulti.snapshot.cashAccounts,
+          {
+            balance: 1000,
+            balanceGbp: 800,
+            currency: "USD",
+            id: "cash-usd",
+            isRetired: false,
+            name: "Dollar Cash",
+            transactionCount: 1,
+          },
+        ],
+        gbpRates: Object.fromEntries([
+          ["GBP", 1],
+          ["USD", 0.8],
+        ]),
+        securitiesAccounts: [
+          ...ownedMulti.snapshot.securitiesAccounts,
+          {
+            holdingsCount: 0,
+            id: "port-usd",
+            isRetired: false,
+            marketValue: 0,
+            name: "Dollar Brokerage",
+            referenceAccountId: "cash-usd",
+          },
+        ],
+      },
+    };
+
+    render(
+      <PortfolioScreen
+        initialTrade={{
+          amount: 400,
+          portfolioId: "port-usd",
+          securityId: "sec-alpha",
+          type: "purchase",
+        }}
+        isInScenario={false}
+        owned={usdOwned}
+        today="2026-09-25"
+      />,
+      { wrapper: Toaster },
+    );
+
+    const dialog = screen.getByRole("dialog", {
+      name: "Purchase · Alpha World Equity",
+    });
+    expect(within(dialog).getByRole("note")).toHaveTextContent(
+      "Cogitator trade is £400",
+    );
+    expect(within(dialog).getByRole("note")).toHaveTextContent(
+      "about US$500.00 at the last known rate",
+    );
+    expect(
+      within(dialog).getByRole("textbox", { name: "Total paid" }),
+    ).toHaveValue("");
+  });
 });

@@ -1705,4 +1705,136 @@ describe("PortfolioTransactionDialog", () => {
       "Converted automatically between GBP and GBX (pence).",
     );
   });
+
+  it("guards non-GBP Cogitator handoffs, adapts copy after manual entry, and keeps the shares hint", () => {
+    render(
+      <PortfolioTransactionDialog
+        baseCurrency="GBP"
+        cashAccounts={cashAccounts}
+        gbpRates={Object.fromEntries([
+          ["GBP", 1],
+          ["USD", 0.8],
+        ])}
+        handoffAmountGbp={400}
+        holdings={holdings}
+        initialDraft={{
+          amount: 400,
+          portfolioId: "port-gia",
+          securityId: "sec-world",
+          type: "purchase",
+        }}
+        onDismiss={vi.fn<() => void>()}
+        onSaved={vi.fn<() => void>()}
+        securitiesAccounts={securitiesAccounts}
+        today="2026-09-25"
+        version={1}
+      />,
+      { wrapper: Toaster },
+    );
+
+    const amountInput = screen.getByRole("textbox", { name: "Total paid" });
+    const sharesInput = screen.getByRole("textbox", { name: "Shares" });
+    expect(amountInput).toHaveValue("");
+    expect(sharesInput).toHaveAccessibleDescription("Enter executed shares");
+    expect(screen.getByRole("note")).toHaveTextContent(
+      "Cogitator trade is £400",
+    );
+    expect(screen.getByRole("note")).toHaveTextContent(
+      "This account settles in USD, so the amount was left blank. Enter the executed USD total (about US$500.00 at the last known rate).",
+    );
+
+    // Entering an executed USD figure updates the caution copy and preserves the edited amount across account switches.
+    commit(amountInput, "505");
+    expect(screen.getByRole("note")).toHaveTextContent(
+      "This account settles in USD. Confirm the executed USD total (about US$500.00 at the last known rate).",
+    );
+    fireEvent.change(screen.getByRole("combobox", { name: "Cash account" }), {
+      target: { value: "cash-isa" },
+    });
+    expect(screen.getByRole("textbox", { name: "Total paid" })).toHaveValue(
+      "£505.00",
+    );
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+
+    // Switching back to USD keeps the edited figure; switching transaction type clears the handoff guard and shares hint.
+    fireEvent.change(screen.getByRole("combobox", { name: "Cash account" }), {
+      target: { value: "cash-usd" },
+    });
+    expect(screen.getByRole("textbox", { name: "Total paid" })).toHaveValue(
+      "US$505.00",
+    );
+    fireEvent.change(screen.getByRole("combobox", { name: "Type" }), {
+      target: { value: "sale" },
+    });
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    expect(sharesInput).not.toHaveAccessibleDescription(
+      "Enter executed shares",
+    );
+  });
+
+  it("announces dynamic handoff clearing and restoration and formats fractional GBP without rounding", () => {
+    render(
+      <PortfolioTransactionDialog
+        baseCurrency="GBP"
+        cashAccounts={cashAccounts}
+        handoffAmountGbp={800.5}
+        holdings={holdings}
+        initialDraft={{
+          amount: 800.5,
+          portfolioId: "port-isa",
+          securityId: "sec-world",
+          type: "purchase",
+        }}
+        onDismiss={vi.fn<() => void>()}
+        onSaved={vi.fn<() => void>()}
+        securitiesAccounts={securitiesAccounts}
+        today="2026-09-25"
+        version={1}
+      />,
+      { wrapper: Toaster },
+    );
+
+    const status = screen.getByRole("status");
+    expect(screen.getByRole("textbox", { name: "Total paid" })).toHaveValue(
+      "£800.50",
+    );
+    expect(status).toHaveTextContent("");
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+
+    // Switching to USD clears the untouched GBP handoff amount, announces it politely, and formats fractional GBP cleanly without an estimate when no rate is known.
+    fireEvent.change(screen.getByRole("combobox", { name: "Cash account" }), {
+      target: { value: "cash-usd" },
+    });
+    expect(screen.getByRole("textbox", { name: "Total paid" })).toHaveValue("");
+    expect(status).toHaveTextContent(
+      "Amount cleared because this account settles in USD",
+    );
+    expect(screen.getByRole("note")).toHaveTextContent(
+      "Cogitator trade is £800.50",
+    );
+    expect(screen.getByRole("note")).toHaveTextContent(
+      "This account settles in USD, so the amount was left blank. Enter the executed USD total.",
+    );
+
+    // Switching back to GBP while untouched restores the GBP handoff amount and announces the restoration.
+    fireEvent.change(screen.getByRole("combobox", { name: "Cash account" }), {
+      target: { value: "cash-isa" },
+    });
+    const restoredAmountInput = screen.getByRole("textbox", {
+      name: "Total paid",
+    });
+    expect(restoredAmountInput).toHaveValue("£800.50");
+    expect(status).toHaveTextContent(
+      "Amount restored to £800.50 for GBP account",
+    );
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+
+    // Clearing the amount marks it edited and clears the status message.
+    commit(restoredAmountInput, "");
+    expect(status).toHaveTextContent("");
+    fireEvent.change(screen.getByRole("combobox", { name: "Cash account" }), {
+      target: { value: "cash-usd" },
+    });
+    expect(status).toHaveTextContent("");
+  });
 });

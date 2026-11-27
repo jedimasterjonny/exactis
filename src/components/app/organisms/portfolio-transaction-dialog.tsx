@@ -16,6 +16,7 @@ import type { Option, OptionGroup } from "@/lib/options";
 import { addPortfolioTransaction } from "@/actions/portfolio";
 import { FieldRow } from "@/components/app/atoms/field-row";
 import { Note } from "@/components/app/atoms/note";
+import { Caution } from "@/components/app/molecules/caution";
 import { DateField } from "@/components/app/molecules/date-field";
 import {
   CurrencyField,
@@ -34,7 +35,7 @@ import {
   withSyncNote,
 } from "@/data/portfolio";
 import { useSender } from "@/hooks/use-sender";
-import { formatCurrency, formatPrice } from "@/lib/money";
+import { formatCurrency, formatGbp, formatPrice } from "@/lib/money";
 import { formatDay } from "@/lib/months";
 
 export type PortfolioTransactionDraft = Partial<TransactionFormValues>;
@@ -58,6 +59,7 @@ interface PortfolioTransactionDialogProps {
   readonly baseCurrency: string;
   readonly cashAccounts: readonly CashAccount[];
   readonly gbpRates?: Readonly<Record<string, number>>;
+  readonly handoffAmountGbp?: number;
   readonly holdings: readonly Holding[];
   readonly initialDraft?: PortfolioTransactionDraft;
   readonly onDismiss: () => void;
@@ -115,6 +117,7 @@ export function PortfolioTransactionDialog({
   baseCurrency,
   cashAccounts,
   gbpRates,
+  handoffAmountGbp,
   holdings,
   initialDraft,
   onDismiss,
@@ -166,6 +169,11 @@ export function PortfolioTransactionDialog({
     initialCurrency,
     initialFxCurrency,
   );
+  const initialAmount = initialAmountOf(
+    handoffAmountGbp,
+    initialCurrency,
+    initialDraft?.amount,
+  );
 
   const [type, setType] = useState<TransactionType>(initialType);
   const [date, setDate] = useState(initialDraft?.date ?? today);
@@ -182,9 +190,13 @@ export function PortfolioTransactionDialog({
   const [shares, setShares] = useState<null | number>(
     initialDraft?.shares ?? null,
   );
-  const [amount, setAmount] = useState<null | number>(
-    initialDraft?.amount ?? null,
-  );
+  const [amount, setAmount] = useState<null | number>(initialAmount);
+  const [activeHandoffAmountGbp, setActiveHandoffAmountGbp] = useState<
+    number | undefined
+  >(handoffAmountGbp);
+  const [hasEditedAmount, setHasEditedAmount] = useState(false);
+  const [lastCurrency, setLastCurrency] = useState(initialCurrency);
+  const [handoffAnnouncement, setHandoffAnnouncement] = useState("");
   const [fees, setFees] = useState<null | number>(initialDraft?.fees ?? null);
   const [taxes, setTaxes] = useState<null | number>(
     initialDraft?.taxes ?? null,
@@ -222,6 +234,16 @@ export function PortfolioTransactionDialog({
     deliveryCurrency,
     fromCashCurrency: fromCash?.currency,
   });
+
+  if (lastCurrency !== effectiveCurrency) {
+    setLastCurrency(effectiveCurrency);
+    if (activeHandoffAmountGbp !== undefined && !hasEditedAmount) {
+      setAmount(effectiveCurrency === "GBP" ? activeHandoffAmountGbp : null);
+      setHandoffAnnouncement(
+        handoffAnnouncementOf(activeHandoffAmountGbp, effectiveCurrency),
+      );
+    }
+  }
 
   const fxCurrency = fxCurrencyOf({
     accounts: spec.accounts,
@@ -308,6 +330,12 @@ export function PortfolioTransactionDialog({
   const subjectName =
     (hasSecurity ? chosenSecurity?.name : fromCash?.name) ?? "";
 
+  function changeAmount(next: null | number): void {
+    setHasEditedAmount(true);
+    setHandoffAnnouncement("");
+    setAmount(next);
+  }
+
   function changeFxAmount(next: null | number): void {
     setFxDriver("amount");
     setFxTypedAmount(next);
@@ -318,6 +346,12 @@ export function PortfolioTransactionDialog({
     setFxDriver("rate");
     setFxTypedRate(next);
     setFxTypedAmount(null);
+  }
+
+  function clearAmount(): void {
+    setHasEditedAmount(true);
+    setHandoffAnnouncement("");
+    setAmount(null);
   }
 
   function clearFx(): void {
@@ -341,6 +375,9 @@ export function PortfolioTransactionDialog({
 
   function selectType(nextType: TransactionType): void {
     setType(nextType);
+    setActiveHandoffAmountGbp(undefined);
+    setHasEditedAmount(true);
+    setHandoffAnnouncement("");
     setAmount(null);
     setFees(null);
     setTaxes(null);
@@ -460,7 +497,12 @@ export function PortfolioTransactionDialog({
             value={resolvedSecurity.id}
           />
           <SharesField
-            hint={sharesHintOf(initialDraft, amount, shares)}
+            hint={sharesHintOf({
+              activeHandoffAmountGbp,
+              amount,
+              initialDraft,
+              shares,
+            })}
             label="Shares"
             max={maxPortfolioScaled}
             min={0}
@@ -474,6 +516,21 @@ export function PortfolioTransactionDialog({
         </FieldRow>
       )}
 
+      {activeHandoffAmountGbp !== undefined && (
+        <p className="sr-only" role="status">
+          {handoffAnnouncement}
+        </p>
+      )}
+
+      {activeHandoffAmountGbp !== undefined && effectiveCurrency !== "GBP" && (
+        <HandoffCurrencyCaution
+          amountGbp={activeHandoffAmountGbp}
+          currency={effectiveCurrency}
+          gbpRates={gbpRates}
+          isAmountBlank={amount === null}
+        />
+      )}
+
       <AmountAndFxFields
         amount={amount}
         amountError={amountError}
@@ -485,10 +542,8 @@ export function PortfolioTransactionDialog({
         grossSettlementPence={grossSettlementPence}
         hasManualFx={hasManualFx}
         isAutoSterlingPence={isAutoSterlingPence}
-        onAmountChange={setAmount}
-        onAmountCleared={() => {
-          setAmount(null);
-        }}
+        onAmountChange={changeAmount}
+        onAmountCleared={clearAmount}
         onFeesChange={setFees}
         onFxAmountChange={changeFxAmount}
         onFxCleared={clearFx}
@@ -1257,6 +1312,12 @@ function evaluateTransactionForm({
   };
 }
 
+function formatHandoffGbp(amountGbp: number): string {
+  return Number.isInteger(amountGbp)
+    ? formatGbp(amountGbp)
+    : formatCurrency(amountGbp, "GBP");
+}
+
 function fxCurrencyOf({
   accounts,
   effectiveCurrency,
@@ -1332,6 +1393,45 @@ function grossSettlementPenceOf({
   return hasCosts ? amountPence + feesPence + taxesPence : amountPence;
 }
 
+function handoffAnnouncementOf(amountGbp: number, currency: string): string {
+  if (currency === "GBP") {
+    return `Amount restored to ${formatHandoffGbp(amountGbp)} for GBP account`;
+  }
+  return `Amount cleared because this account settles in ${currency}`;
+}
+
+// Warns when a GBP Cogitator trade lands on a non-GBP cash account so
+// the user enters the executed foreign settlement amount intentionally.
+function HandoffCurrencyCaution({
+  amountGbp,
+  currency,
+  gbpRates,
+  isAmountBlank,
+}: {
+  readonly amountGbp: number;
+  readonly currency: string;
+  readonly gbpRates: Readonly<Record<string, number>> | undefined;
+  readonly isAmountBlank: boolean;
+}): JSX.Element {
+  const gbpPerForeign = gbpRates?.[currency];
+  const estimatedForeign =
+    gbpPerForeign !== undefined && gbpPerForeign > 0
+      ? amountGbp / gbpPerForeign
+      : undefined;
+  const estimate =
+    estimatedForeign === undefined
+      ? ""
+      : ` (about ${formatCurrency(estimatedForeign, currency)} at the last known rate)`;
+  const prompt = isAmountBlank
+    ? `This account settles in ${currency}, so the amount was left blank. Enter the executed ${currency} total${estimate}.`
+    : `This account settles in ${currency}. Confirm the executed ${currency} total${estimate}.`;
+  return (
+    <Caution title={`Cogitator trade is ${formatHandoffGbp(amountGbp)}`}>
+      {prompt}
+    </Caution>
+  );
+}
+
 function hasValidAccounts(
   layout: AccountsLayout,
   {
@@ -1373,6 +1473,17 @@ function hasValidAccounts(
         portfolioId !== otherPortfolioId
       );
   }
+}
+
+function initialAmountOf(
+  handoffAmountGbp: number | undefined,
+  initialCurrency: string,
+  draftAmount: number | undefined,
+): null | number {
+  if (handoffAmountGbp !== undefined) {
+    return initialCurrency === "GBP" ? handoffAmountGbp : null;
+  }
+  return draftAmount ?? null;
 }
 
 function initialSelectionOf({
@@ -1599,16 +1710,24 @@ function shareSecurityOptionsOf(
     : [];
 }
 
-function sharesHintOf(
-  initialDraft: PortfolioTransactionDraft | undefined,
-  amount: null | number,
-  shares: null | number,
-): string | undefined {
-  return initialDraft?.amount !== undefined &&
-    amount !== null &&
-    shares === null
-    ? "Enter executed shares"
-    : undefined;
+function sharesHintOf({
+  activeHandoffAmountGbp,
+  amount,
+  initialDraft,
+  shares,
+}: {
+  readonly activeHandoffAmountGbp: number | undefined;
+  readonly amount: null | number;
+  readonly initialDraft: PortfolioTransactionDraft | undefined;
+  readonly shares: null | number;
+}): string | undefined {
+  if (shares !== null) {
+    return undefined;
+  }
+  const hasHandoffAmount =
+    activeHandoffAmountGbp !== undefined ||
+    (initialDraft?.amount !== undefined && amount !== null);
+  return hasHandoffAmount ? "Enter executed shares" : undefined;
 }
 
 function transferDestinationHint(
