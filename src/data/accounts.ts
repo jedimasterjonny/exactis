@@ -24,7 +24,10 @@ import type { Month } from "@/data/schedule";
 // and what the salaries feeding it sacrifice, is kept up out of the
 // savings when the month cannot pay it, unless the pension is marked
 // droppable, when it is dropped instead; any other account, and a
-// pension kept paid, carries no mark at all. An account carries the
+// pension kept paid, carries no mark at all. A saving may carry the
+// name of the Portfolio Performance securities account it links to for
+// bespoke CMA growth; any other account, and an unlinked saving,
+// carries none. An account carries the
 // day its balance was last set, an ISO date, once a save has dated it;
 // one kept before the day was carries none.
 export interface Account {
@@ -40,6 +43,7 @@ export interface Account {
   readonly move?: Move;
   readonly name: string;
   readonly owner?: number;
+  readonly portfolio?: string;
   readonly secures?: number;
   readonly setOn?: string;
 }
@@ -63,7 +67,9 @@ export type AccountKind = (typeof accountKinds)[number];
 // choice whether or not that is fixed, a balloon of nothing is a loan
 // with none, which is every account but a PCP's, an owner of null
 // is an account nobody owns, which is every account but an ISA and a
-// pension, and an account not droppable is marked false. So a value
+// pension, a portfolio of null is an account linked to no Portfolio
+// Performance securities account, and an account not droppable is
+// marked false. So a value
 // can be edited field by field and stored column by column, and becomes
 // an account by the rules below.
 export interface AccountValues {
@@ -78,6 +84,7 @@ export interface AccountValues {
   readonly kind: AccountKind;
   readonly name: string;
   readonly owner: null | number;
+  readonly portfolio: null | string;
   readonly rate: number;
 }
 
@@ -278,7 +285,8 @@ export function takesSpare(account: { readonly kind: AccountKind }): boolean {
 }
 
 // A contribution of nothing is an absence on the account, as a balloon
-// of nothing is, and so is an owner of null, a cap of nothing is the
+// of nothing is, and so are an owner of null and a portfolio of null, a
+// cap of nothing is the
 // account's own allowance, and a growth choice becomes the account's
 // growth with the rate only where it applies. The purchase is beside
 // the values rather than among them, since only the house dialog asks
@@ -306,13 +314,15 @@ export function toAccount(
     ...(values.move !== undefined && { move: values.move }),
     name: values.name,
     ...(values.owner !== null && { owner: values.owner }),
+    ...(values.portfolio !== null && { portfolio: values.portfolio }),
   };
 }
 
 // The reverse: an absent contribution is a fixed sum of nothing a year,
 // a spare one carries no sum, a fixed one no cap, a plan rate no rate,
-// an absent balloon is one of nothing, an absent owner is null, and an
-// absent mark is an account not droppable.
+// an absent balloon is one of nothing, an absent owner is null, an
+// absent portfolio link is null, and an absent mark is an account not
+// droppable.
 export function toValues(account: Account): AccountValues {
   const { contribution } = account;
   return {
@@ -327,6 +337,7 @@ export function toValues(account: Account): AccountValues {
     kind: account.kind,
     name: account.name,
     owner: account.owner ?? null,
+    portfolio: account.portfolio ?? null,
     rate: account.growth.kind === "fixed" ? account.growth.rate : 0,
   };
 }

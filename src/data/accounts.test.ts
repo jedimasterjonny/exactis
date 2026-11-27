@@ -52,6 +52,7 @@ describe("accounts", () => {
       kind: "debt",
       name: "Mortgage",
       owner: null,
+      portfolio: null,
       rate: 0.0485,
     } as const;
 
@@ -75,6 +76,7 @@ describe("accounts", () => {
         kind: "tax-free",
         name: "Lifetime ISA",
         owner: 1,
+        portfolio: null,
         rate: 0.03,
       },
       6,
@@ -100,6 +102,7 @@ describe("accounts", () => {
       kind: "tax-free",
       name: "Lifetime ISA",
       owner: 1,
+      portfolio: null,
       rate: 0,
     });
   });
@@ -151,6 +154,7 @@ describe("accounts", () => {
       kind: "tax-free",
       name: "Lifetime ISA",
       owner: 1,
+      portfolio: null,
       rate: 0,
     } as const;
 
@@ -229,6 +233,23 @@ describe("isDroppable", () => {
     expect(toValues(pension).isDroppable).toBe(false);
     expect(toAccount({ ...values, isDroppable: false }, 1)).not.toHaveProperty(
       "isDroppable",
+    );
+  });
+});
+
+describe("portfolio", () => {
+  it("reads a portfolio link off an account and back, and drops null", () => {
+    const [, isa] = accounts;
+    const values = { ...toValues(isa), portfolio: "Brokerage ISA" };
+
+    expect(toAccount(values, 2)).toStrictEqual({
+      ...isa,
+      portfolio: "Brokerage ISA",
+    });
+    expect(toValues(toAccount(values, 2))).toStrictEqual(values);
+    expect(toValues(isa).portfolio).toBeNull();
+    expect(toAccount({ ...values, portfolio: null }, 2)).not.toHaveProperty(
+      "portfolio",
     );
   });
 });

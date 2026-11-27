@@ -408,6 +408,76 @@ describe("movedSince", () => {
     expect([moved.changes, moved.rates]).toStrictEqual([["schedule"], []]);
   });
 
+  // A linked plan-rate account whose per-account category mix shifts on
+  // re-import triggers a "targets" rates step even when global target
+  // shares are unchanged; proportional scaling of holdings does not, and
+  // newly linking an account in now does not trigger a spurious targets
+  // step.
+  it("tracks normalized per-account holdings for linked plan-rate accounts in before", () => {
+    const withHoldings = (uk: number, bonds: number): Kept["targets"] => ({
+      ...targets,
+      categories: targets.categories.map((category) => {
+        if (category.name === "UK equity") {
+          return {
+            ...category,
+            accounts: [{ name: "ISA Portfolio", value: uk }],
+          };
+        }
+        if (category.name === "Global bonds, hedged") {
+          return {
+            ...category,
+            accounts: [{ name: "ISA Portfolio", value: bonds }],
+          };
+        }
+        return category;
+      }),
+    });
+    const linkedBefore = closing({
+      accounts: changed(
+        changed(kept.accounts, 2, { portfolio: "ISA Portfolio" }),
+        6,
+        { portfolio: "Empty Portfolio" },
+      ),
+      rateSet: "cma",
+      targets: withHoldings(80_000, 20_000),
+    });
+
+    // Proportional doubling keeps normalized shares identical: no rates step.
+    const scaled = movedSince(
+      linkedBefore,
+      closed(linkedBefore, { targets: withHoldings(160_000, 40_000) }),
+    );
+    expect(scaled.rates).toStrictEqual([]);
+
+    // Shifting mix from 80/20 to 20/80 moves bespoke rate: triggers targets step.
+    const shifted = movedSince(
+      linkedBefore,
+      closed(linkedBefore, { targets: withHoldings(20_000, 80_000) }),
+    );
+    expect(shifted.rates).toStrictEqual(["targets"]);
+    expect(shifted.steps.map(({ groups }) => groups)).toStrictEqual([
+      ["rates"],
+    ]);
+
+    // Newly linking in now does not trigger a targets step when global
+    // target shares are unchanged; only changes ("accounts") triggers.
+    const unlinkedBefore = closing({
+      rateSet: "cma",
+      targets: withHoldings(80_000, 20_000),
+    });
+    const newlyLinked = movedSince(
+      unlinkedBefore,
+      closed(unlinkedBefore, {
+        accounts: changed(closed(unlinkedBefore).accounts, 2, {
+          portfolio: "ISA Portfolio",
+        }),
+        targets: withHoldings(20_000, 80_000),
+      }),
+    );
+    expect(newlyLinked.rates).toStrictEqual([]);
+    expect(newlyLinked.changes).toStrictEqual(["accounts"]);
+  });
+
   // An invented line of £500 a month from 2026, a child and a plan
   // running to 95 are the household's own changes, named in the order
   // the screens hold them.

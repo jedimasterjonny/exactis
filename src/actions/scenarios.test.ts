@@ -317,6 +317,7 @@ describe("createScenario", () => {
           kind: "cash",
           name: "Premium bonds",
           owner: null,
+          portfolio: null,
           rate: 0.04,
           shares: [],
         },

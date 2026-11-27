@@ -64,6 +64,7 @@ const values = {
   kind: "tax-free",
   name: " Lifetime ISA ",
   owner: 1,
+  portfolio: null,
   rate: 0.03,
   shares: [],
 } as const;
@@ -577,10 +578,49 @@ describe("the account actions", () => {
       expect(await versions()).toBe(1);
     });
 
+    it("saves, edits, and clears a trimmed portfolio link on a saving, refuses one on a debt, and rejects a concurrent portfolio change", async () => {
+      expect(
+        await saveAccount(
+          null,
+          { ...values, portfolio: " Brokerage ISA " },
+          null,
+        ),
+      ).toMatchObject(saved({ portfolio: "Brokerage ISA" }));
+      await expect(
+        saveAccount(null, { ...owing, portfolio: "Brokerage ISA" }, null),
+      ).resolves.toStrictEqual(
+        refused("Only a saving links to a portfolio account"),
+      );
+
+      // Link an existing saving, catch a stale concurrent edit against
+      // the pre-link snapshot, then clear the link back to null.
+      const beforeLink = await accountOn(2);
+      const linked = await saveAccount(
+        2,
+        { ...values, portfolio: " Stocks ISA " },
+        beforeLink,
+      );
+      expect(linked).toMatchObject(saved({ id: 2, portfolio: "Stocks ISA" }));
+      await expect(
+        saveAccount(2, { ...values, portfolio: "Other ISA" }, beforeLink),
+      ).resolves.toStrictEqual(
+        refused(
+          "The account changed since this was opened, so nothing was saved; close it and open it again",
+        ),
+      );
+      const cleared = await saveAccount(
+        2,
+        { ...values, portfolio: null },
+        await accountOn(2),
+      );
+      expect(cleared).toStrictEqual(saved({ ...lifetime, id: 2 }));
+    });
+
     it("refuses what the form could not have sent, and an id no account has", async () => {
       const pension = { ...values, kind: "tax-deferred" } as const;
       for (const draft of [
         { ...values, name: "  " },
+        { ...values, portfolio: "  " },
         { ...values, contribution: -1 },
         { ...values, balance: 0.5 },
         { ...values, cap: -1 },

@@ -215,6 +215,7 @@ export function toPension(opening: Opening): AccountValues {
     kind: "tax-deferred",
     name: opening.name,
     owner: opening.owner,
+    portfolio: null,
     rate: 0,
   };
 }

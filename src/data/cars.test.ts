@@ -131,6 +131,7 @@ describe("toRecords", () => {
         kind: "car",
         name: "Golf",
         owner: null,
+        portfolio: null,
         rate: -0.15,
       },
       loans: [],
@@ -161,6 +162,7 @@ describe("toRecords", () => {
           kind: "debt",
           name: "Golf PCP",
           owner: null,
+          portfolio: null,
           rate: 0.079,
         },
         line: {

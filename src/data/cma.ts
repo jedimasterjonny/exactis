@@ -1,13 +1,27 @@
 import type { Curve } from "@/data/inflation";
-import type { Spread } from "@/data/plan";
-import type { Across, Allocation, Rates } from "@/data/rates";
+import type { AccountRate, AccountSpread, Plan, Spread } from "@/data/plan";
+import type { Across, Allocation, Anchor, Rates, RateSet } from "@/data/rates";
 import type { Month } from "@/data/schedule";
 import type { Target, Targets } from "@/data/targets";
 
 import { inflationOf, inflationSpread } from "@/data/inflation";
-import { loggedSpread } from "@/data/plan";
-import { planRate } from "@/data/rates";
+import { ageIn, loggedSpread } from "@/data/plan";
+import { bondsAt, planRate } from "@/data/rates";
+import { rules } from "@/data/rules";
 import { monthName } from "@/lib/months";
+
+// What a Portfolio Performance securities account's own holdings derive
+// for a linked saving on the plan rate: either its bespoke nominal
+// return, optional CMA-derived log-spread, and current stocks share, or
+// a fallback to the global plan rate with the reason why.
+export type AccountGrowth =
+  | {
+      readonly kind: "bespoke";
+      readonly rate: AccountRate;
+      readonly spread?: AccountSpread;
+      readonly stocks: number;
+    }
+  | { readonly kind: "fallback"; readonly reason: string };
 
 // An asset class as BlackRock's capital market assumptions price it in
 // sterling: its name, the class of the plan its return blends into,
@@ -129,6 +143,18 @@ export interface Vintages {
   readonly previous: Cma | null;
 }
 
+// One split's evaluation for a linked portfolio account: either its
+// nominal return, optional log-spread and stocks share, or why it falls
+// back to the global plan rate.
+type EvaluatedSplit =
+  | { readonly kind: "fallback"; readonly reason: string }
+  | {
+      readonly kind: "ok";
+      readonly rate: number;
+      readonly spread?: number;
+      readonly stocks: number;
+    };
+
 // A category as it blends into its sleeve: the category, the class it
 // is mapped onto, and its weight in the sleeve, its share of the whole
 // over the sleeve's; or, in a sleeve that stands in at a class of its
@@ -167,6 +193,122 @@ export const openingDeductions: Deductions = { dividends: 0.02, fees: 0.002 };
 
 // Names as a sentence lists them, "A, B and C".
 const listed = new Intl.ListFormat("en-GB", { type: "conjunction" });
+
+// What a linked saving grows at from its Portfolio Performance
+// securities account's own holdings under the CMA method, or why it
+// falls back to the global plan rate. Along a glide path, the account
+// keeps its own within-sleeve mix while its stocks/bonds split follows
+// the global glide path year by year.
+export function accountGrowthOf(
+  {
+    cma,
+    curve,
+    deductions,
+    glide,
+    mappings,
+    rateSet,
+    targets,
+  }: {
+    readonly cma: null | Vintages;
+    readonly curve: Curve | null;
+    readonly deductions: Deductions;
+    readonly glide: readonly Anchor[];
+    readonly mappings: readonly Mapping[];
+    readonly rateSet: RateSet;
+    readonly targets: null | Targets;
+  },
+  plan: Pick<Plan, "born" | "from" | "years">,
+  portfolio: string,
+): AccountGrowth {
+  if (rateSet !== "cma") {
+    return { kind: "fallback", reason: "Custom rates are live" };
+  }
+  if (targets === null) {
+    return { kind: "fallback", reason: "No target allocation is synced" };
+  }
+  const accountTargets = accountTargetsOf(targets, portfolio);
+  if (accountTargets === null) {
+    return {
+      kind: "fallback",
+      reason: "No categorised holdings synced from Portfolio",
+    };
+  }
+  if (cma === null) {
+    return { kind: "fallback", reason: "No CMA is pulled" };
+  }
+  const hasRisks =
+    cma.latest.correlation !== undefined &&
+    cma.latest.assets.some(({ risk }) => risk !== undefined);
+  const accountSources = {
+    cma,
+    curve,
+    deductions,
+    mappings,
+    targets: accountTargets,
+  };
+  if (glide.length === 0) {
+    const evaluated = evaluateAtSplit(accountSources, null, hasRisks);
+    return evaluated.kind === "fallback"
+      ? evaluated
+      : {
+          kind: "bespoke",
+          rate: { rate: evaluated.rate },
+          ...(evaluated.spread !== undefined && {
+            spread: { rate: evaluated.spread },
+          }),
+          stocks: evaluated.stocks,
+        };
+  }
+  return glidedAccountGrowth(accountSources, { glide, hasRisks, plan });
+}
+
+// A synthetic target allocation weighted by one Portfolio Performance
+// securities account's own holdings across the categories, normalised
+// so positive shares sum to exact 1 in deterministic id order while
+// preserving category order, or null where there is no target
+// allocation, the account name is blank, or the account holds no
+// positive categorised value.
+export function accountTargetsOf(
+  targets: null | Targets,
+  portfolio: string,
+): null | Targets {
+  const target = portfolio.trim();
+  if (targets === null || target === "") {
+    return null;
+  }
+  const held = targets.categories.map((category) => ({
+    category,
+    value: (category.accounts ?? []).reduce(
+      (sum, entry) =>
+        entry.name.trim() === target ? sum + Math.max(0, entry.value) : sum,
+      0,
+    ),
+  }));
+  const total = held.reduce((sum, { value }) => sum + value, 0);
+  if (total <= 0) {
+    return null;
+  }
+  const positive = held
+    .filter(({ value }) => value > 0)
+    .toSorted((one, other) => one.category.id.localeCompare(other.category.id));
+  const shares = new Map<string, number>();
+  let running = 0;
+  for (const [index, { category, value }] of positive.entries()) {
+    const share =
+      index === positive.length - 1
+        ? Math.min(1, Math.max(0, 1 - running))
+        : value / total;
+    running += share;
+    shares.set(category.id, share);
+  }
+  return {
+    ...targets,
+    categories: targets.categories.map((category) => ({
+      ...category,
+      share: shares.get(category.id) ?? 0,
+    })),
+  };
+}
 
 // The return a vintage expects of each sleeve, blended by the target
 // allocation: each category with a share of the whole weighted by its
@@ -596,6 +738,99 @@ function bondsStandIn(named: ReadonlyMap<string, Asset>): Blend | undefined {
     parts: [{ asset, weight: 1 }],
     rate,
     share: 0,
+  };
+}
+
+// Evaluates one split for a linked portfolio account, guarding against
+// total loss or missing volatility in a risked vintage.
+function evaluateAtSplit(
+  sources: {
+    readonly cma: Vintages;
+    readonly curve: Curve | null;
+    readonly deductions: Deductions;
+    readonly mappings: readonly Mapping[];
+    readonly targets: Targets;
+  },
+  bonds: null | number,
+  hasRisks: boolean,
+): EvaluatedSplit {
+  const split = bonds === null ? null : { stocks: 1 - bonds };
+  const derived = derivedSet(sources, split);
+  if ("short" in derived) {
+    return {
+      kind: "fallback",
+      reason: derived.short.replace(
+        /^The glide path holds (.+) the target allocation holds none of, so nothing says what they return$/,
+        "Holds no $1 for the glide path",
+      ),
+    };
+  }
+  const rate = planRate(derived.rates, derived.allocation, derived.rebalancing);
+  if (rate <= -1) {
+    return { kind: "fallback", reason: rules.beyondLoss };
+  }
+  const spread = spreadOf(sources, derived);
+  if ("short" in spread) {
+    return hasRisks
+      ? { kind: "fallback", reason: spread.short }
+      : { kind: "ok", rate, stocks: derived.allocation.stocks };
+  }
+  return {
+    kind: "ok",
+    rate,
+    spread: spread.rate,
+    stocks: derived.allocation.stocks,
+  };
+}
+
+// Evaluates a linked portfolio account year by year along a glide path,
+// memoising each distinct bond share along the curve.
+function glidedAccountGrowth(
+  sources: Parameters<typeof evaluateAtSplit>[0],
+  {
+    glide,
+    hasRisks,
+    plan,
+  }: {
+    readonly glide: readonly Anchor[];
+    readonly hasRisks: boolean;
+    readonly plan: Pick<Plan, "born" | "from" | "years">;
+  },
+): AccountGrowth {
+  const known = new Map<null | number, EvaluatedSplit>();
+  const atYear = (year: number): EvaluatedSplit => {
+    const bonds = bondsAt(glide, ageIn(year, plan));
+    const cached = known.get(bonds);
+    if (cached !== undefined) {
+      return cached;
+    }
+    const evaluated = evaluateAtSplit(sources, bonds, hasRisks);
+    known.set(bonds, evaluated);
+    return evaluated;
+  };
+  const now = atYear(plan.from);
+  if (now.kind === "fallback") {
+    return now;
+  }
+  const byYear: number[] = [];
+  const spreadByYear: number[] = [];
+  for (let offset = 0; offset < plan.years; offset += 1) {
+    const year = atYear(plan.from + offset);
+    if (year.kind === "fallback") {
+      return year;
+    }
+    byYear.push(year.rate);
+    if (year.spread !== undefined) {
+      spreadByYear.push(year.spread);
+    }
+  }
+  return {
+    kind: "bespoke",
+    rate: { byYear, rate: now.rate },
+    ...(now.spread !== undefined && {
+      spread: { byYear: spreadByYear, rate: now.spread },
+    }),
+    stocks: now.stocks,
   };
 }
 

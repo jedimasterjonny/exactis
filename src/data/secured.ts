@@ -108,6 +108,7 @@ export function securedRecords(
     ...(asset.move !== undefined && { move: asset.move }),
     name: asset.name,
     owner: null,
+    portfolio: null,
     rate: asset.rate,
   };
   return {
@@ -125,6 +126,7 @@ export function securedRecords(
         kind: "debt",
         name: loan.name,
         owner: null,
+        portfolio: null,
         rate: loan.rate,
       },
       line: {

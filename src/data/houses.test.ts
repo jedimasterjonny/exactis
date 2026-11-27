@@ -360,6 +360,7 @@ describe("toRecords", () => {
         kind: "house",
         name: "Home",
         owner: null,
+        portfolio: null,
         rate: 0.021,
       },
       loans: [],
@@ -405,6 +406,7 @@ describe("toRecords", () => {
           kind: "debt",
           name: "Home mortgage",
           owner: null,
+          portfolio: null,
           rate: 0.0485,
         },
         line: {

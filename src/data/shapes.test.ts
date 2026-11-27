@@ -71,13 +71,14 @@ describe("shapes", () => {
     expect(upcast({ ...kept, shape: 2 })).toStrictEqual(kept);
   });
 
-  // The third shape keeps no reading on a point, so the fourth reads it
-  // as it is; the step is there so that a build of the third refuses
-  // the fourth, which is the shape kept now.
-  it("carries a household kept in the third shape to the fourth as it is, the shape kept now", () => {
+  // The third shape keeps no reading on a point and the fourth no
+  // portfolio link on an account, so each step carries them as they
+  // are; the steps exist so earlier builds refuse newer shapes.
+  it("carries a household kept in the third and fourth shapes to the fifth as it is, the shape kept now", () => {
     expect(upcast({ ...kept, shape: 3 })).toStrictEqual(kept);
-    expect(currentShape).toBe(4);
-    expect(() => upcast({ ...kept, shape: 5 })).toThrow(
+    expect(upcast({ ...kept, shape: 4 })).toStrictEqual(kept);
+    expect(currentShape).toBe(5);
+    expect(() => upcast({ ...kept, shape: 6 })).toThrow(
       "This household was saved by a newer app than this one",
     );
   });

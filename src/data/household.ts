@@ -3,6 +3,7 @@ import * as z from "zod";
 import type { Account, Move } from "@/data/accounts";
 import type { Child } from "@/data/children";
 import type {
+  AccountGrowth,
   Asset,
   Cma,
   Deductions,
@@ -17,7 +18,14 @@ import type { IncomeLine } from "@/data/income";
 import type { Curve } from "@/data/inflation";
 import type { Milestone } from "@/data/milestones";
 import type { Owner } from "@/data/owners";
-import type { Drawdown, Plan, PlanAges, Spread } from "@/data/plan";
+import type {
+  AccountRate,
+  AccountSpread,
+  Drawdown,
+  Plan,
+  PlanAges,
+  Spread,
+} from "@/data/plan";
 import type { KeptPoint } from "@/data/progress";
 import type { Allocation, Anchor, Rates, RateSet } from "@/data/rates";
 import type { Month, Tie } from "@/data/schedule";
@@ -32,7 +40,13 @@ import {
   takesSpare,
   toValues,
 } from "@/data/accounts";
-import { derivedSet, openingDeductions, sleeves, spreadOf } from "@/data/cma";
+import {
+  accountGrowthOf,
+  derivedSet,
+  openingDeductions,
+  sleeves,
+  spreadOf,
+} from "@/data/cma";
 import { incomeKinds } from "@/data/income";
 import { ageOf, moving, retiresBy, retiresOn, timed } from "@/data/milestones";
 import { openingOwner } from "@/data/owners";
@@ -213,9 +227,11 @@ const move = z.object({
 // a fixed sum within its allowance on its own, a rate no lower than
 // losing everything, a link to an asset only on the loan secured on
 // it, a purchase on a house and on nothing else, a limit of something
-// on a house or a car alone, a move on a house alone, and the mark of
-// an account droppable only on a pension. A contribution, a
-// balloon, a limit, a move, an owner, a link, the mark and the day its
+// on a house or a car alone, a move on a house alone, the mark of
+// an account droppable only on a pension, and a portfolio link only on
+// a saving. A contribution, a
+// balloon, a limit, a move, an owner, a portfolio link, a link, the
+// mark and the day its
 // balance was set are absent rather than nothing, as the model has
 // them.
 export const account = z
@@ -250,6 +266,7 @@ export const account = z
     move: move.exactOptional(),
     name: named,
     owner: recordId.exactOptional(),
+    portfolio: named.exactOptional(),
     secures: recordId.exactOptional(),
     setOn: z.iso.date().exactOptional(),
   })
@@ -295,6 +312,10 @@ export const account = z
   .refine(
     (account) => account.isDroppable === undefined || isPension(account),
     rules.droppable,
+  )
+  .refine(
+    (account) => account.portfolio === undefined || takesSpare(account),
+    rules.portfolio,
   ) satisfies z.ZodType<Account>;
 
 // An expense line adds the debt it pays, if it pays one, and then pays
@@ -681,6 +702,15 @@ const glide = z
 // being written.
 const plan = z
   .object({
+    accountRates: z
+      .record(
+        recordId,
+        z.object({
+          byYear: z.array(z.number().min(-1, rules.beyondLoss)).exactOptional(),
+          rate: z.number().min(-1, rules.beyondLoss),
+        }),
+      )
+      .exactOptional(),
     born: z.number().int(),
     byYear: z.array(z.number().min(-1, rules.beyondLoss)).exactOptional(),
     children: z.array(child).exactOptional(),
@@ -753,6 +783,15 @@ export const household = z
     spread: z.union([
       z.object({ short: z.string() }),
       z.object({
+        accountSpreads: z
+          .record(
+            recordId,
+            z.object({
+              byYear: z.array(z.number().nonnegative()).exactOptional(),
+              rate: z.number().nonnegative(),
+            }),
+          )
+          .exactOptional(),
         byYear: z.array(z.number().nonnegative()).exactOptional(),
         inflation: z.number().nonnegative(),
         rate: z.number().nonnegative(),
@@ -1162,6 +1201,41 @@ export function sourcesIn(value: unknown): null | Sources {
   return parsed.success ? parsed.data : null;
 }
 
+// Per-account bespoke growth rates and spreads derived from Portfolio
+// Performance holdings for savings linked to a portfolio on the plan
+// rate, memoised by portfolio name.
+function accountGrowthsOf(
+  kept: Kept,
+  plan: Plan,
+): {
+  readonly accountRates?: Readonly<Record<number, AccountRate>>;
+  readonly accountSpreads?: Readonly<Record<number, AccountSpread>>;
+} {
+  const byPortfolio = new Map<string, AccountGrowth>();
+  const rates: Record<number, AccountRate> = {};
+  const spreads: Record<number, AccountSpread> = {};
+  for (const listed of kept.accounts) {
+    if (listed.portfolio === undefined || listed.growth.kind !== "plan") {
+      continue;
+    }
+    let derived = byPortfolio.get(listed.portfolio);
+    if (derived === undefined) {
+      derived = accountGrowthOf(kept, plan, listed.portfolio);
+      byPortfolio.set(listed.portfolio, derived);
+    }
+    if (derived.kind === "bespoke") {
+      rates[listed.id] = derived.rate;
+      if (derived.spread !== undefined) {
+        spreads[listed.id] = derived.spread;
+      }
+    }
+  }
+  return {
+    ...(Object.keys(rates).length > 0 && { accountRates: rates }),
+    ...(Object.keys(spreads).length > 0 && { accountSpreads: spreads }),
+  };
+}
+
 // Whether a debt's own fixed sum pays it off at the rate it is charged,
 // down to the balloon a PCP leaves standing, as the engine reads it to
 // find the month the payments end in. Every other account, and a debt
@@ -1250,7 +1324,18 @@ function glidedOf(
 // where none are.
 function householdOf(kept: Kept): Household {
   const live = liveOf(kept);
-  const { plan, split, spread } = glidedOf(kept, planOf(kept, live), live);
+  const {
+    plan: glidedPlan,
+    split,
+    spread: glidedSpread,
+  } = glidedOf(kept, planOf(kept, live), live);
+  const { accountRates, accountSpreads } = accountGrowthsOf(kept, glidedPlan);
+  const plan: Plan =
+    accountRates === undefined ? glidedPlan : { ...glidedPlan, accountRates };
+  const spread: Shortfall | Spread =
+    "short" in glidedSpread || accountSpreads === undefined
+      ? glidedSpread
+      : { ...glidedSpread, accountSpreads };
   return {
     accounts: kept.accounts.map((account) =>
       moving(account, kept.milestones, plan),

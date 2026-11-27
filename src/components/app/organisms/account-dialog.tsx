@@ -55,6 +55,7 @@ const blank: Draft = {
   kind: "tax-deferred",
   name: "",
   owner: null,
+  portfolio: null,
   rate: 0,
   shares: [],
 };

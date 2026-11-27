@@ -134,7 +134,9 @@ const house = z
 // two cannot drift: the figures whole, a contribution, a cap and a
 // balloon never negative, a rate no lower than losing everything, since
 // below that a year's growth is not a number, the name as typed less
-// the space around it, which the form also trims, and the shares the
+// the space around it, which the form also trims, an optional
+// Portfolio Performance account name trimmed the same way or null, and
+// the shares the
 // salaries feeding the account sacrifice, each a fraction of the base
 // at most against a line by its id, one share a line, since the dialog
 // holds one and two would write the same line twice, and none against
@@ -142,7 +144,8 @@ const house = z
 // account as a whole is the household's to hold once it is written in:
 // a balance below nothing only on a debt, the spare money only into an
 // account that takes it, an owner on an ISA or a pension, one the
-// household lists, and on nothing else, a fixed sum within its
+// household lists, and on nothing else, a portfolio link only on a
+// saving, a fixed sum within its
 // allowance on its own, a debt paying its own fixed sum paying it off,
 // since the engine charges that sum to the month the loan maths says
 // the payments end in and a payment the interest swallows gives it no
@@ -161,6 +164,7 @@ const values = z
     kind: z.enum(accountKinds),
     name: named,
     owner: recordId.nullable(),
+    portfolio: named.nullable(),
     rate: z.number().min(-1),
     shares: z.array(
       z.object({ line: recordId, sacrifice: z.number().min(0).max(1) }),

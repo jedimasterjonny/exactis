@@ -534,6 +534,7 @@ describe("isWithinAllowance", () => {
     kind: "tax-free",
     name: "ISA",
     owner: 1,
+    portfolio: null,
     rate: 0,
   } as const;
 

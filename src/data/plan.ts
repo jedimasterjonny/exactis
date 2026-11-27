@@ -9,6 +9,20 @@ import { rules } from "@/data/rules";
 import { termOf } from "@/lib/loans";
 import { monthAfter, monthsBetween } from "@/lib/months";
 
+// One account's bespoke nominal return, and its per-year figures along
+// a glide path.
+export interface AccountRate {
+  readonly byYear?: readonly number[];
+  readonly rate: number;
+}
+
+// One account's bespoke log-spread, and its per-year figures along a
+// glide path.
+export interface AccountSpread {
+  readonly byYear?: readonly number[];
+  readonly rate: number;
+}
+
 // The order a month's shortfall is drawn in, which the plan chooses:
 // the savings before the pension, the pension before the ISA, the
 // pension first, or the pension to the top of each owner's basic rate
@@ -146,20 +160,6 @@ export interface Spread {
 interface AccountPath {
   readonly months?: readonly number[];
   readonly rate: readonly number[];
-}
-
-// One account's bespoke nominal return, and its per-year figures along
-// a glide path.
-interface AccountRate {
-  readonly byYear?: readonly number[];
-  readonly rate: number;
-}
-
-// One account's bespoke log-spread, and its per-year figures along a
-// glide path.
-interface AccountSpread {
-  readonly byYear?: readonly number[];
-  readonly rate: number;
 }
 
 // What a plan's prices are read off: the month it starts in, whose money
