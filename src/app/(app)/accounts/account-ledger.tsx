@@ -5,6 +5,7 @@ import type { JSX } from "react";
 import { CarFront, HousePlus, Plus } from "lucide-react";
 import { useOptimistic, useState } from "react";
 
+import type { PortfolioOptions } from "@/components/app/organisms/account-fields";
 import type { Account, AccountKind } from "@/data/accounts";
 import type { Child } from "@/data/children";
 import type { ExpenseLine } from "@/data/expenses";
@@ -42,6 +43,7 @@ interface AccountLedgerProps {
   readonly milestones: readonly MoveChoice[];
   readonly owners: readonly Owner[];
   readonly plan: Plan;
+  readonly portfolio: PortfolioOptions;
 }
 
 // What the account dialog is open on: a new account of the kind it
@@ -97,6 +99,7 @@ export function AccountLedger({
   milestones,
   owners,
   plan,
+  portfolio,
 }: AccountLedgerProps): JSX.Element {
   const [account, setAccount] = useState<AccountOpening | null>(null);
   const [house, setHouse] = useState<AssetOpening | null>(null);
@@ -134,6 +137,11 @@ export function AccountLedger({
   // The month the plan starts in as the loan maths counts from it, for
   // the two dialogs that let a loan's end be picked as a date.
   const starts: PlanMonth = { from: plan.from, month: plan.month };
+  const hasBespoke = savings.some(
+    (saving) => plan.accountRates?.[saving.id] !== undefined,
+  );
+  const planRateLabel = `${formatPercent(plan.rate)}${portfolio.hasGlide ? " now" : ""}`;
+  const sheetCaption = `${hasBespoke ? "Unlinked savings" : "Savings"} grow at the plan rate, ${planRateLabel}, unless set otherwise`;
 
   // Closes whichever dialog is open, there being only ever one, on a
   // dismiss, a save or a Delete alike.
@@ -225,15 +233,17 @@ export function AccountLedger({
             </Button>
           </>
         }
-        caption={`Savings grow at the plan rate, ${formatPercent(plan.rate)}, unless set otherwise`}
+        caption={sheetCaption}
         label={subsectionLabel(accountsAndAssets, 1)}
         title="Balance sheet"
       >
         <CardContent>
           <BalanceSheet
+            accountRates={plan.accountRates}
             assets={assets}
             debts={debts}
             expenses={expenses}
+            hasGlide={portfolio.hasGlide}
             onAddDebt={() => {
               setAccount("debt");
             }}
@@ -274,6 +284,7 @@ export function AccountLedger({
           onSaved={close}
           opens={{ month: plan.month, year: plan.from }}
           owners={owners}
+          portfolio={portfolio}
         />
       )}
       {doomed !== null && (

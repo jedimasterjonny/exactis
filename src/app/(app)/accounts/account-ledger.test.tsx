@@ -90,6 +90,12 @@ function renderLedger(
       milestones={moveChoices(markersOf(milestones, retiring), retiring, [])}
       owners={owners}
       plan={plan}
+      portfolio={{
+        accounts: [],
+        hasGlide: false,
+        planRate: plan.rate,
+        rates: {},
+      }}
       {...props}
     />,
     { wrapper: Toaster },
@@ -220,6 +226,27 @@ describe("AccountLedger", () => {
         "Sect. III.iii",
       ),
     ).toHaveClass("label");
+  });
+
+  // When any saving has a bespoke rate, the Balance sheet caption names
+  // "Unlinked savings", and appends "now" along a glide path.
+  it("qualifies the Balance sheet caption when bespoke rates or a glide path are live", () => {
+    renderLedger({
+      accounts: [{ ...isa, portfolio: "ISA Portfolio" }, pension],
+      plan: { ...plan, accountRates: { [isa.id]: { rate: 0.08 } } },
+      portfolio: {
+        accounts: ["ISA Portfolio"],
+        hasGlide: true,
+        planRate: plan.rate,
+        rates: { "ISA Portfolio": { kind: "bespoke", rate: 0.08, stocks: 1 } },
+      },
+    });
+
+    expect(
+      within(sheet()).getByText(
+        "Unlinked savings grow at the plan rate, 5.00% now, unless set otherwise",
+      ),
+    ).toBeInTheDocument();
   });
 
   // The sheet says when the mortgage's payments clear it from the line

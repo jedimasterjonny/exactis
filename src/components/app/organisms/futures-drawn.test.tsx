@@ -52,5 +52,22 @@ describe("FuturesDrawn", () => {
       "Low year, one in ten−9.33%0.47%",
       "High year, one in ten26.27%5.59%",
     ]);
+    expect(within(card).queryByRole("paragraph")).not.toBeInTheDocument();
+  });
+
+  it("notes bespoke Portfolio accounts when accountRates are present", () => {
+    render(
+      <FuturesDrawn
+        plan={{ ...plan, accountRates: { 2: { rate: 0.08 } } }}
+        spread={{
+          inflation: loggedSpread(0.03, 0.02),
+          rate: loggedSpread(0.07, 0.14),
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("paragraph")).toHaveTextContent(
+      "Accounts linked to Portfolio use their own holdings' return and spread along the same market draws.",
+    );
   });
 });

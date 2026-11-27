@@ -6,6 +6,8 @@ import type { AccountKind, AccountValues, Funding } from "@/data/accounts";
 import { owners, sam } from "@/data/owners.fixture";
 import { commit } from "@/test/dom";
 
+import type { PortfolioOptions } from "./account-fields";
+
 import { AccountFields } from "./account-fields";
 
 const isa: AccountValues = {
@@ -29,7 +31,11 @@ const isa: AccountValues = {
 function renderFields(
   initial: AccountValues,
   draft: AccountValues = initial,
-  { isFed = false, kindLock }: { isFed?: boolean; kindLock?: string } = {},
+  {
+    isFed = false,
+    kindLock,
+    portfolio,
+  }: { isFed?: boolean; kindLock?: string; portfolio?: PortfolioOptions } = {},
 ): {
   readonly onAmend: ReturnType<
     typeof vi.fn<(patch: Partial<AccountValues>) => void>
@@ -52,6 +58,7 @@ function renderFields(
       onFundingChange={onFundingChange}
       onKindChange={onKindChange}
       owners={[...owners, sam]}
+      portfolio={portfolio}
     >
       <p>What the salaries sacrifice</p>
     </AccountFields>,
@@ -354,5 +361,202 @@ describe("AccountFields", () => {
       screen.queryByRole("combobox", { name: "Contribution" }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Amount" })).toHaveValue("£500");
+  });
+
+  // Portfolio account selector renders for savings whenever live accounts
+  // exist or the account already carries a stale link, hides when
+  // unlinked with no live accounts or on non-savings, reports null/name
+  // changes, stays mounted under fixed growth, and previews bespoke and
+  // fallback rates via its hint.
+  it("offers the Portfolio account selector for savings and previews live bespoke and fallback hints", () => {
+    const portfolio: PortfolioOptions = {
+      accounts: [
+        "All Stocks",
+        "All Bonds",
+        "Balanced ISA",
+        "Half Point",
+        "Losing ISA",
+        "Flat ISA",
+        "Empty ISA",
+      ],
+      hasGlide: false,
+      planRate: 0.05,
+      rates: {
+        "All Bonds": { kind: "bespoke", rate: 0.04, stocks: 0 },
+        "All Stocks": { kind: "bespoke", rate: 0.08, stocks: 1 },
+        "Balanced ISA": { kind: "bespoke", rate: 0.065, stocks: 0.7 },
+        "Empty ISA": { kind: "fallback", reason: "Custom rates are live" },
+        "Flat ISA": { kind: "bespoke", rate: 0, stocks: 1 },
+        "Half Point": { kind: "bespoke", rate: 0.06, stocks: 0.505 },
+        "Losing ISA": { kind: "bespoke", rate: -0.02, stocks: 0.5 },
+        "Old ISA": { kind: "fallback", reason: "Not found in Portfolio" },
+      },
+    };
+
+    const onAmend = vi.fn<(patch: Partial<AccountValues>) => void>();
+    const { unmount: unmountInitial } = render(
+      <AccountFields
+        draft={isa}
+        initial={isa}
+        onAmend={onAmend}
+        onFundingChange={vi.fn<(funding: Funding) => void>()}
+        onKindChange={vi.fn<(kind: AccountKind) => void>()}
+        owners={owners}
+        portfolio={portfolio}
+      />,
+    );
+    const select = screen.getByRole("combobox", { name: "Portfolio account" });
+    expect(select).toHaveValue("");
+    expect(select).toHaveAccessibleDescription("Uses the plan rate, 5.00%");
+
+    fireEvent.change(select, { target: { value: "Balanced ISA" } });
+    fireEvent.change(select, { target: { value: "" } });
+    expect(onAmend.mock.calls.map(([patch]) => patch)).toStrictEqual([
+      { portfolio: "Balanced ISA" },
+      { portfolio: null },
+    ]);
+    unmountInitial();
+
+    const cases: readonly [AccountValues, PortfolioOptions, string][] = [
+      [
+        { ...isa, growth: "fixed", portfolio: null },
+        portfolio,
+        "Only applies on the plan rate",
+      ],
+      [
+        { ...isa, growth: "fixed", portfolio: "Balanced ISA" },
+        portfolio,
+        "Fixed rate overrides Portfolio growth",
+      ],
+      [
+        { ...isa, portfolio: "All Stocks" },
+        portfolio,
+        "Grows 8.00% a year · 100% stocks",
+      ],
+      [
+        { ...isa, portfolio: "All Bonds" },
+        portfolio,
+        "Grows 4.00% a year · 100% bonds",
+      ],
+      [
+        { ...isa, portfolio: "Balanced ISA" },
+        portfolio,
+        "Grows 6.50% a year · 70% stocks, 30% bonds",
+      ],
+      [
+        { ...isa, portfolio: "Half Point" },
+        portfolio,
+        "Grows 6.00% a year · 51% stocks, 49% bonds",
+      ],
+      [
+        { ...isa, portfolio: "Losing ISA" },
+        portfolio,
+        "Loses 2.00% a year · 50% stocks, 50% bonds",
+      ],
+      [
+        { ...isa, portfolio: "Flat ISA" },
+        portfolio,
+        "Holds its value · 100% stocks",
+      ],
+      [
+        { ...isa, portfolio: "Flat ISA" },
+        { ...portfolio, hasGlide: true },
+        "Holds its value now · following the glide path",
+      ],
+      [
+        { ...isa, portfolio: "Empty ISA" },
+        portfolio,
+        "Uses the plan rate, 5.00%. Custom rates are live.",
+      ],
+      [
+        { ...isa, portfolio: "toString" },
+        portfolio,
+        "Uses the plan rate, 5.00%",
+      ],
+      [
+        { ...isa, portfolio: "Balanced ISA" },
+        { ...portfolio, hasGlide: true },
+        "Grows 6.50% a year now · following the glide path",
+      ],
+      [
+        { ...isa, portfolio: "Losing ISA" },
+        { ...portfolio, hasGlide: true },
+        "Loses 2.00% a year now · following the glide path",
+      ],
+      [
+        { ...isa, portfolio: null },
+        { ...portfolio, hasGlide: true },
+        "Uses the plan rate, 5.00% now",
+      ],
+    ];
+
+    for (const [draft, options, expectedHint] of cases) {
+      const { unmount } = render(
+        <AccountFields
+          draft={draft}
+          initial={draft}
+          onAmend={vi.fn<(patch: Partial<AccountValues>) => void>()}
+          onFundingChange={vi.fn<(funding: Funding) => void>()}
+          onKindChange={vi.fn<(kind: AccountKind) => void>()}
+          owners={owners}
+          portfolio={options}
+        />,
+      );
+      expect(
+        screen.getByRole("combobox", { name: "Portfolio account" }),
+      ).toHaveAccessibleDescription(expectedHint);
+      unmount();
+    }
+
+    // Stale link stays selectable even when portfolio.accounts is empty.
+    const { unmount: unmountStale } = render(
+      <AccountFields
+        draft={{ ...isa, portfolio: "Old ISA" }}
+        initial={{ ...isa, portfolio: "Old ISA" }}
+        onAmend={vi.fn<(patch: Partial<AccountValues>) => void>()}
+        onFundingChange={vi.fn<(funding: Funding) => void>()}
+        onKindChange={vi.fn<(kind: AccountKind) => void>()}
+        owners={owners}
+        portfolio={{ ...portfolio, accounts: [] }}
+      />,
+    );
+    const staleSelect = screen.getByRole("combobox", {
+      name: "Portfolio account",
+    });
+    expect(staleSelect).toHaveValue("Old ISA");
+    expect(
+      within(staleSelect)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toStrictEqual(["Not linked", "Old ISA (not in Portfolio)"]);
+    expect(staleSelect).toHaveAccessibleDescription(
+      "Uses the plan rate, 5.00%. Not found in Portfolio.",
+    );
+    unmountStale();
+
+    // Hides when no live accounts exist on an unlinked saving, and hides
+    // on non-savings even when live accounts exist.
+    const hiddenCases: readonly [AccountValues, PortfolioOptions][] = [
+      [isa, { ...portfolio, accounts: [] }],
+      [{ ...isa, kind: "debt", owner: null }, portfolio],
+      [{ ...isa, kind: "real-asset", owner: null }, portfolio],
+    ];
+    for (const [draft, options] of hiddenCases) {
+      const { unmount } = render(
+        <AccountFields
+          draft={draft}
+          initial={draft}
+          onAmend={vi.fn<(patch: Partial<AccountValues>) => void>()}
+          onFundingChange={vi.fn<(funding: Funding) => void>()}
+          onKindChange={vi.fn<(kind: AccountKind) => void>()}
+          owners={owners}
+          portfolio={options}
+        />,
+      );
+      expect(
+        screen.queryByRole("combobox", { name: "Portfolio account" }),
+      ).not.toBeInTheDocument();
+      unmount();
+    }
   });
 });

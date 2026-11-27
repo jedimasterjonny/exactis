@@ -594,7 +594,7 @@ function horizonOf(months: number): string {
 // What the invested balances are, with how many of them were left out.
 function investedOf(left: number): string {
   const invested =
-    "Invested balances are the accounts growing at the plan rate that were checked at both closes, as their statements give them.";
+    "Invested balances are the accounts on the plan or Portfolio rate that were checked at both closes, as their statements give them.";
   if (left === 0) {
     return invested;
   }

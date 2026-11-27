@@ -731,4 +731,114 @@ describe("AccountDialog", () => {
       within(openDialog()).queryByRole("button", { name: "Delete" }),
     ).not.toBeInTheDocument();
   });
+
+  // Portfolio account links stay synced when switching between savings
+  // kinds and across growth toggles, clear on a non-saving kind,
+  // restore the initial link when returning to a saving, and unlink to
+  // null cleanly.
+  it("keeps a portfolio link across saving types and growth toggles, drops it on non-savings, and restores or unlinks cleanly", async () => {
+    const onSaved = vi.fn<(account: Account) => void>();
+    vi.mocked(saveAccount).mockResolvedValue(
+      saved({ ...isa, portfolio: "Brokerage ISA" }),
+    );
+    const portfolioOptions = {
+      accounts: ["Brokerage ISA", "Workplace SIPP"],
+      hasGlide: false,
+      planRate: 0.05,
+      rates: {
+        "Brokerage ISA": { kind: "bespoke" as const, rate: 0.075, stocks: 1 },
+        "Workplace SIPP": {
+          kind: "bespoke" as const,
+          rate: 0.065,
+          stocks: 0.8,
+        },
+      },
+    };
+    const view = renderDialog({
+      account: { ...pension, portfolio: "Workplace SIPP" },
+      onSaved,
+      portfolio: portfolioOptions,
+    });
+    const dialog = openDialog();
+
+    expect(choice(dialog, "Portfolio account")).toHaveAccessibleDescription(
+      "Grows 6.50% a year · 80% stocks, 20% bonds",
+    );
+
+    fireEvent.change(choice(dialog, "Portfolio account"), {
+      target: { value: "Brokerage ISA" },
+    });
+    expect(choice(dialog, "Portfolio account")).toHaveAccessibleDescription(
+      "Grows 7.50% a year · 100% stocks",
+    );
+
+    // Switching saving -> saving keeps the selected Portfolio account and hint.
+    fireEvent.change(choice(dialog, "Type"), { target: { value: "tax-free" } });
+    expect(choice(dialog, "Portfolio account")).toHaveValue("Brokerage ISA");
+    expect(choice(dialog, "Portfolio account")).toHaveAccessibleDescription(
+      "Grows 7.50% a year · 100% stocks",
+    );
+
+    // Toggling plan -> fixed -> plan keeps the selector mounted and updates hints.
+    fireEvent.change(choice(dialog, "Growth"), { target: { value: "fixed" } });
+    expect(choice(dialog, "Portfolio account")).toHaveValue("Brokerage ISA");
+    expect(choice(dialog, "Portfolio account")).toHaveAccessibleDescription(
+      "Fixed rate overrides Portfolio growth",
+    );
+    fireEvent.change(choice(dialog, "Growth"), { target: { value: "plan" } });
+    expect(choice(dialog, "Portfolio account")).toHaveValue("Brokerage ISA");
+    expect(choice(dialog, "Portfolio account")).toHaveAccessibleDescription(
+      "Grows 7.50% a year · 100% stocks",
+    );
+
+    // Switching to debt hides the selector; returning to cash restores initial link.
+    fireEvent.change(choice(dialog, "Type"), { target: { value: "debt" } });
+    expect(
+      within(dialog).queryByRole("combobox", { name: "Portfolio account" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(choice(dialog, "Type"), { target: { value: "cash" } });
+    expect(choice(dialog, "Portfolio account")).toHaveValue("Workplace SIPP");
+    expect(choice(dialog, "Portfolio account")).toHaveAccessibleDescription(
+      "Grows 6.50% a year · 80% stocks, 20% bonds",
+    );
+
+    // Unlinking saves portfolio: null on a saving.
+    fireEvent.change(choice(dialog, "Portfolio account"), {
+      target: { value: "" },
+    });
+    expect(choice(dialog, "Portfolio account")).toHaveAccessibleDescription(
+      "Uses the plan rate, 5.00%",
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(vi.mocked(saveAccount).mock.calls[0]?.[1]).toMatchObject({
+      kind: "cash",
+      portfolio: null,
+    });
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledOnce();
+    });
+    view.unmount();
+
+    // Switching a linked saving directly to debt saves portfolio: null.
+    renderDialog({
+      account: { ...pension, portfolio: "Workplace SIPP" },
+      onSaved,
+      portfolio: portfolioOptions,
+    });
+    const secondDialog = openDialog();
+    fireEvent.change(choice(secondDialog, "Type"), {
+      target: { value: "debt" },
+    });
+    fireEvent.click(within(secondDialog).getByRole("button", { name: "Save" }));
+
+    expect(vi.mocked(saveAccount).mock.calls[1]?.[1]).toMatchObject({
+      kind: "debt",
+      portfolio: null,
+    });
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledTimes(2);
+    });
+  });
 });
