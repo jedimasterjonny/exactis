@@ -13,6 +13,7 @@ import {
   taxonomyOf,
 } from "@/lib/portfolio-file.fixture";
 import {
+  bytesAt,
   int32At,
   int64At,
   joined,
@@ -3733,7 +3734,7 @@ describe("appendTransaction", () => {
     ]);
   });
 
-  it("refuses mismatched currencies, cross-currency cash transfers, synthetic/missing ids, self-transfers, and invalid costs or shares", () => {
+  it("refuses mismatched currencies, missing cross-currency FX amounts, synthetic/missing ids, self-transfers, and invalid costs or shares", () => {
     const file = portfolioFile([
       [1, 66],
       [
@@ -3817,11 +3818,7 @@ describe("appendTransaction", () => {
         otherAccountId: "cash-usd",
         type: "cash-transfer",
       }),
-    ).toThrow(
-      new Refusal(
-        "Cash transfers between different currencies are not supported yet",
-      ),
-    );
+    ).toThrow(new Refusal("Enter the foreign amount in USD"));
 
     expect(() =>
       appendTransaction(file, {
@@ -5636,5 +5633,495 @@ describe("GROSS_VALUE decoding and cross-currency bookkeeping", () => {
     ]);
     // 1 share * $100 * 0.8 = £80
     expect(targets.categories[0]?.value).toBe(80);
+  });
+
+  it("writes GROSS_VALUE FX units with canonical PDecimalValue wire bytes across trades, deliveries, dividends, transfers, and GBP to GBX", () => {
+    const base = portfolioFile([
+      [1, 66],
+      // Security missing field 1 id is skipped by securityCurrenciesOf
+      [2, [[3, "No Id Security"]]],
+      [
+        2,
+        [
+          [1, "sec-gbp"],
+          [3, "UK Equity"],
+          [4, "GBP"],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-us"],
+          [3, "US Equity"],
+          [4, "USD"],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-gbx"],
+          [3, "UK Pence ETF"],
+          [4, "GBX"],
+        ],
+      ],
+      [
+        2,
+        [
+          [1, "sec-nocur"],
+          [3, "Currency-less Security"],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-gbp"],
+          [2, "Cash GBP"],
+          [3, "GBP"],
+        ],
+      ],
+      [
+        3,
+        [
+          [1, "cash-usd"],
+          [2, "Cash USD"],
+          [3, "USD"],
+        ],
+      ],
+      [
+        4,
+        [
+          [1, "port-1"],
+          [2, "Dealing"],
+          [5, "cash-gbp"],
+        ],
+      ],
+      [12, "GBP"],
+    ]);
+
+    let nextId = 0;
+    const opts = {
+      now: new Date("2026-09-25T12:00:00Z"),
+      uuid: (): string => `fx-${String(++nextId)}`,
+    };
+
+    // 1. Cross-currency purchase (GBP cash, USD security) with fees/taxes: gross £787.40 = $1,000 -> 0.7874
+    let file = appendTransaction(
+      base,
+      {
+        accountId: "cash-gbp",
+        amount: 800,
+        currency: "GBP",
+        date: "2026-09-20",
+        fees: 10,
+        fxAmount: 1000,
+        portfolioId: "port-1",
+        securityId: "sec-us",
+        shares: 10,
+        taxes: 2.6,
+        type: "purchase",
+      },
+      opts,
+    ).content;
+
+    // 2. Cross-currency sale (GBP cash, USD security): net £1,270 + £8 fee + £2 tax = gross £1,280 = $1,000 -> 1.28 (MSB 0x80 guard)
+    file = appendTransaction(
+      file,
+      {
+        accountId: "cash-gbp",
+        amount: 1270,
+        currency: "GBP",
+        date: "2026-09-21",
+        fees: 8,
+        fxAmount: 1000,
+        portfolioId: "port-1",
+        securityId: "sec-us",
+        shares: 5,
+        taxes: 2,
+        type: "sale",
+      },
+      opts,
+    ).content;
+
+    // 3. Cross-currency dividend: net £18 + £2 tax = gross £20 = $10 -> 2 (scale 0 omitted on wire)
+    file = appendTransaction(
+      file,
+      {
+        accountId: "cash-gbp",
+        amount: 18,
+        currency: "GBP",
+        date: "2026-09-22",
+        fees: 0,
+        fxAmount: 10,
+        securityId: "sec-us",
+        shares: 0,
+        taxes: 2,
+        type: "dividend",
+      },
+      opts,
+    ).content;
+
+    // 4. Automatic GBP -> GBX purchase: total £105, fee £5 -> gross £100 = 10,000p @ 0.01
+    file = appendTransaction(
+      file,
+      {
+        accountId: "cash-gbp",
+        amount: 105,
+        currency: "GBP",
+        date: "2026-09-23",
+        fees: 5,
+        portfolioId: "port-1",
+        securityId: "sec-gbx",
+        shares: 100,
+        taxes: 0,
+        type: "purchase",
+      },
+      opts,
+    ).content;
+
+    // 5. Cross-currency cash transfer GBP -> USD (£400 -> $500 -> rate 0.8)
+    file = appendTransaction(
+      file,
+      {
+        accountId: "cash-gbp",
+        amount: 400,
+        currency: "GBP",
+        date: "2026-09-24",
+        fees: 0,
+        fxAmount: 500,
+        otherAccountId: "cash-usd",
+        shares: 0,
+        taxes: 0,
+        type: "cash-transfer",
+      },
+      opts,
+    ).content;
+
+    // 6. Currency-less security purchase emits no GROSS_VALUE unit
+    file = appendTransaction(
+      file,
+      {
+        accountId: "cash-gbp",
+        amount: 50,
+        currency: "GBP",
+        date: "2026-09-25",
+        fees: 0,
+        portfolioId: "port-1",
+        securityId: "sec-nocur",
+        shares: 1,
+        taxes: 0,
+        type: "purchase",
+      },
+      opts,
+    ).content;
+
+    // 7. Cross-currency inbound-delivery (GBP settlement, USD security): £105 - £5 fee = £100 = $125 -> 0.8
+    file = appendTransaction(
+      file,
+      {
+        amount: 105,
+        currency: "GBP",
+        date: "2026-09-26",
+        fees: 5,
+        fxAmount: 125,
+        portfolioId: "port-1",
+        securityId: "sec-us",
+        shares: 2,
+        taxes: 0,
+        type: "inbound-delivery",
+      },
+      opts,
+    ).content;
+
+    // 8. Cross-currency outbound-delivery (GBP settlement, USD security): £78 + £2 fee = £80 = $100 -> 0.8
+    file = appendTransaction(
+      file,
+      {
+        amount: 78,
+        currency: "GBP",
+        date: "2026-09-27",
+        fees: 2,
+        fxAmount: 100,
+        portfolioId: "port-1",
+        securityId: "sec-us",
+        shares: 1,
+        taxes: 0,
+        type: "outbound-delivery",
+      },
+      opts,
+    ).content;
+
+    // 9. Inverse cross-currency cash transfer USD -> GBP ($250 -> £200 -> rate 0.8)
+    file = appendTransaction(
+      file,
+      {
+        accountId: "cash-usd",
+        amount: 250,
+        currency: "USD",
+        date: "2026-09-28",
+        fees: 0,
+        fxAmount: 200,
+        otherAccountId: "cash-gbp",
+        shares: 0,
+        taxes: 0,
+        type: "cash-transfer",
+      },
+      opts,
+    ).content;
+
+    // Verify raw wire PTransactionUnit & PDecimalValue fields directly.
+    const rawTxs = new Map(
+      messagesAt(messageOf(rawClientOf(file)), 5).map((tx) => [
+        textAt(tx, 1),
+        tx,
+      ]),
+    );
+    const grossUnitOf = (txId: string): ReturnType<typeof messageOf> => {
+      const tx = rawTxs.get(txId);
+      const unit =
+        tx === undefined
+          ? undefined
+          : messagesAt(tx, 15).find((entry) => int32At(entry, 1) === 0);
+      expect(unit).toBeDefined();
+      return unit ?? messageOf(new Uint8Array());
+    };
+
+    // 0.7874 -> scale 4, precision 4, value 7874 (0x1ec2) with GROSS_VALUE field 1 omitted.
+    const purchaseGross = grossUnitOf("fx-1");
+    expect(purchaseGross.has(1)).toBe(false);
+    expect(int64At(purchaseGross, 2)).toBe(78_740);
+    expect(textAt(purchaseGross, 3)).toBe("GBP");
+    expect(int64At(purchaseGross, 4)).toBe(100_000);
+    expect(textAt(purchaseGross, 5)).toBe("USD");
+    const purchaseRate = messagesAt(purchaseGross, 6)[0];
+    expect(purchaseRate).toBeDefined();
+    expect(int32At(purchaseRate ?? purchaseGross, 1)).toBe(4);
+    expect(int32At(purchaseRate ?? purchaseGross, 2)).toBe(4);
+    expect([
+      ...(bytesAt(purchaseRate ?? purchaseGross, 3) ?? []),
+    ]).toStrictEqual([0x1e, 0xc2]);
+
+    // 1.28 -> scale 2, precision 3, value 128 (0x80) prefixed with 0x00 for positive two's complement.
+    const saleRate = messagesAt(grossUnitOf("fx-3"), 6)[0];
+    expect(saleRate).toBeDefined();
+    expect(int32At(saleRate ?? purchaseGross, 1)).toBe(2);
+    expect(int32At(saleRate ?? purchaseGross, 2)).toBe(3);
+    expect([...(bytesAt(saleRate ?? purchaseGross, 3) ?? [])]).toStrictEqual([
+      0x00, 0x80,
+    ]);
+
+    // 2 -> scale 0 omitted on wire, precision 1, value [0x02].
+    const dividendRate = messagesAt(grossUnitOf("fx-5"), 6)[0];
+    expect(dividendRate).toBeDefined();
+    expect(dividendRate?.has(1)).toBe(false);
+    expect(int32At(dividendRate ?? purchaseGross, 2)).toBe(1);
+    expect([
+      ...(bytesAt(dividendRate ?? purchaseGross, 3) ?? []),
+    ]).toStrictEqual([0x02]);
+
+    const snapshot = readPortfolioSnapshot(file, "fx-write.portfolio");
+    const byDate = new Map(snapshot.transactions.map((tx) => [tx.date, tx]));
+
+    expect(byDate.get("2026-09-20")?.grossValue).toStrictEqual({
+      amount: 787.4,
+      currency: "GBP",
+      exchangeRate: 0.7874,
+      fxAmount: 1000,
+      fxCurrency: "USD",
+    });
+    expect(byDate.get("2026-09-21")?.grossValue).toStrictEqual({
+      amount: 1280,
+      currency: "GBP",
+      exchangeRate: 1.28,
+      fxAmount: 1000,
+      fxCurrency: "USD",
+    });
+    expect(byDate.get("2026-09-22")?.grossValue).toStrictEqual({
+      amount: 20,
+      currency: "GBP",
+      exchangeRate: 2,
+      fxAmount: 10,
+      fxCurrency: "USD",
+    });
+    expect(byDate.get("2026-09-23")?.grossValue).toStrictEqual({
+      amount: 100,
+      currency: "GBP",
+      exchangeRate: 0.01,
+      fxAmount: 10_000,
+      fxCurrency: "GBX",
+    });
+    expect(byDate.get("2026-09-24")?.grossValue).toStrictEqual({
+      amount: 400,
+      currency: "GBP",
+      exchangeRate: 0.8,
+      fxAmount: 500,
+      fxCurrency: "USD",
+    });
+    expect(byDate.get("2026-09-25")?.grossValue).toBeUndefined();
+    expect(byDate.get("2026-09-26")?.grossValue).toStrictEqual({
+      amount: 100,
+      currency: "GBP",
+      exchangeRate: 0.8,
+      fxAmount: 125,
+      fxCurrency: "USD",
+    });
+    expect(byDate.get("2026-09-27")?.grossValue).toStrictEqual({
+      amount: 80,
+      currency: "GBP",
+      exchangeRate: 0.8,
+      fxAmount: 100,
+      fxCurrency: "USD",
+    });
+    expect(byDate.get("2026-09-28")?.grossValue).toStrictEqual({
+      amount: 250,
+      currency: "USD",
+      exchangeRate: 1.25,
+      fxAmount: 200,
+      fxCurrency: "GBP",
+    });
+    expect(
+      snapshot.cashAccounts.find((account) => account.id === "cash-usd")
+        ?.balance,
+    ).toBe(250);
+    expect(snapshot.gbpRates).toStrictEqual(
+      Object.fromEntries([
+        ["GBP", 1],
+        ["GBX", 0.01],
+        ["USD", 0.8],
+      ]),
+    );
+
+    // Refusal paths for cross-currency validation and overflow bounds.
+    expect(() =>
+      appendTransaction(base, {
+        accountId: "cash-gbp",
+        amount: 100,
+        currency: "GBP",
+        date: "2026-09-25",
+        fees: 0,
+        fxAmount: 100,
+        shares: 0,
+        taxes: 0,
+        type: "deposit",
+      }),
+    ).toThrow(
+      new Refusal("Foreign amount only applies to cross-currency transactions"),
+    );
+
+    expect(() =>
+      appendTransaction(base, {
+        accountId: "cash-gbp",
+        amount: 100,
+        currency: "GBP",
+        date: "2026-09-25",
+        fees: 0,
+        fxAmount: 100,
+        portfolioId: "port-1",
+        securityId: "sec-gbp",
+        shares: 1,
+        taxes: 0,
+        type: "purchase",
+      }),
+    ).toThrow(
+      new Refusal("Foreign amount only applies to cross-currency transactions"),
+    );
+
+    expect(() =>
+      appendTransaction(base, {
+        accountId: "cash-gbp",
+        amount: 100,
+        currency: "GBP",
+        date: "2026-09-25",
+        fees: 0,
+        fxAmount: 10_000,
+        portfolioId: "port-1",
+        securityId: "sec-gbx",
+        shares: 1,
+        taxes: 0,
+        type: "purchase",
+      }),
+    ).toThrow(
+      new Refusal("GBP to GBX conversions are calculated automatically"),
+    );
+
+    expect(() =>
+      appendTransaction(base, {
+        accountId: "cash-gbp",
+        amount: 1_000_000_000_000,
+        currency: "GBP",
+        date: "2026-09-25",
+        fees: 0,
+        portfolioId: "port-1",
+        securityId: "sec-gbx",
+        shares: 1,
+        taxes: 0,
+        type: "purchase",
+      }),
+    ).toThrow(new Refusal("Gross amount is out of range"));
+
+    expect(() =>
+      appendTransaction(base, {
+        accountId: "cash-gbp",
+        amount: 100,
+        currency: "GBP",
+        date: "2026-09-25",
+        fees: 60,
+        fxAmount: 10,
+        portfolioId: "port-1",
+        securityId: "sec-us",
+        shares: 1,
+        taxes: 40,
+        type: "purchase",
+      }),
+    ).toThrow(
+      new Refusal(
+        "Fees and taxes must be less than the transaction amount for cross-currency trades",
+      ),
+    );
+
+    expect(() =>
+      appendTransaction(base, {
+        accountId: "cash-gbp",
+        amount: 1_000_000_000_000,
+        currency: "GBP",
+        date: "2026-09-25",
+        fees: 100,
+        fxAmount: 100,
+        portfolioId: "port-1",
+        securityId: "sec-us",
+        shares: 1,
+        taxes: 0,
+        type: "sale",
+      }),
+    ).toThrow(new Refusal("Gross amount is out of range"));
+
+    expect(() =>
+      appendTransaction(base, {
+        accountId: "cash-gbp",
+        amount: 0.01,
+        currency: "GBP",
+        date: "2026-09-25",
+        fees: 0,
+        fxAmount: 1_000_000_000,
+        otherAccountId: "cash-usd",
+        shares: 0,
+        taxes: 0,
+        type: "cash-transfer",
+      }),
+    ).toThrow(new Refusal("Exchange rate is out of range"));
+
+    expect(() =>
+      appendTransaction(base, {
+        accountId: "cash-gbp",
+        amount: 1_000_000_000_000,
+        currency: "GBP",
+        date: "2026-09-25",
+        fees: 0,
+        fxAmount: 0.01,
+        otherAccountId: "cash-usd",
+        shares: 0,
+        taxes: 0,
+        type: "cash-transfer",
+      }),
+    ).toThrow(new Refusal("Exchange rate is out of range"));
   });
 });
