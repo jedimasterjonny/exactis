@@ -822,6 +822,24 @@ export function isIsoCalendarDate(value: string): boolean {
   );
 }
 
+// The ordered [next, previous] surviving row keys around `target` for
+// deterministic focus restoration after deleting or hiding a row.
+export function neighboursOf(
+  orderedKeys: readonly string[],
+  target: string,
+): readonly string[] {
+  const index = orderedKeys.indexOf(target);
+  if (index === -1) {
+    return [];
+  }
+  const next = orderedKeys[index + 1];
+  const prev = orderedKeys[index - 1];
+  return [
+    ...(next === undefined ? [] : [next]),
+    ...(prev === undefined ? [] : [prev]),
+  ];
+}
+
 // A bookkeeping sum rounded to the penny, with minus nothing normalised
 // to zero.
 export function roundPence(value: number): number {

@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import type { HoldingRow } from "@/data/portfolio";
 
@@ -162,5 +162,54 @@ describe("HoldingsTable", () => {
       "data-variant",
       "outline",
     );
+  });
+
+  it("renders Actions column with RowActions and deleteLock, opens edit from folded rows, and invokes delete for zero-transaction rows", () => {
+    const onEdit = vi.fn<(holding: HoldingRow["holding"]) => void>();
+    const onDelete = vi.fn<(holding: HoldingRow["holding"]) => void>();
+    render(
+      <HoldingsTable
+        onDelete={onDelete}
+        onEdit={onEdit}
+        rows={[valuedRow, zeroRow]}
+      />,
+    );
+
+    expect(
+      screen.getAllByRole("columnheader").map((head) => head.textContent),
+    ).toStrictEqual([
+      "Security",
+      "Shares",
+      "Price",
+      "Value",
+      "Share",
+      "Actions",
+    ]);
+
+    // Folded row opener triggers onEdit.
+    fireEvent.click(
+      screen.getByRole("button", { name: "Global Equity Index" }),
+    );
+    expect(onEdit).toHaveBeenCalledWith(valuedRow.holding);
+
+    // Unfolded Edit pencil triggers onEdit, and transactionCount > 0 shows RowLock instead of Delete.
+    fireEvent.click(
+      screen.getByRole("button", { name: "Edit Global Equity Index" }),
+    );
+    expect(onEdit).toHaveBeenCalledTimes(2);
+    expect(
+      screen.queryByRole("button", { name: "Delete Global Equity Index" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("img", {
+        name: "Used by 2 transactions — retire it instead",
+      }),
+    ).toBeInTheDocument();
+
+    // Zero-transaction security offers Delete button.
+    fireEvent.click(
+      screen.getByRole("button", { name: "Delete Dormant Gilts" }),
+    );
+    expect(onDelete).toHaveBeenCalledExactlyOnceWith(zeroRow.holding);
   });
 });

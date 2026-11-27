@@ -14,7 +14,7 @@ import { HoldingsTable } from "@/components/app/organisms/holdings-table";
 import { SectionCard } from "@/components/app/organisms/section-card";
 import { Button } from "@/components/kit/button";
 import { CardContent, CardFooter } from "@/components/kit/card";
-import { holdingsViewOf } from "@/data/portfolio";
+import { holdingsViewOf, neighboursOf } from "@/data/portfolio";
 import { formatCurrency } from "@/lib/money";
 
 interface PortfolioHoldingsProps {
@@ -25,6 +25,14 @@ interface PortfolioHoldingsProps {
   readonly label: string;
   readonly onAccountChange: (accountId: string) => void;
   readonly onAddSecurity: () => void;
+  readonly onDeleteSecurity?: (
+    holding: Holding,
+    fallbackFocusIds: readonly string[],
+  ) => void;
+  readonly onEditSecurity?: (
+    holding: Holding,
+    fallbackFocusIds: readonly string[],
+  ) => void;
   readonly onShowingZeroSharesChange: (isShowing: boolean) => void;
   readonly onUpdateQuotes: () => void;
   readonly readOnlyId?: string | undefined;
@@ -46,6 +54,8 @@ export function PortfolioHoldings({
   label,
   onAccountChange,
   onAddSecurity,
+  onDeleteSecurity,
+  onEditSecurity,
   onShowingZeroSharesChange,
   onUpdateQuotes,
   readOnlyId,
@@ -71,6 +81,7 @@ export function PortfolioHoldings({
     holdings,
     { accountId: effectiveAccountId, isShowingZeroShares },
   );
+  const visibleRowIds = rows.map((row) => `holding:${row.holding.id}`);
   const hasControls = activeAccounts.length > 0 || hasZeroShare;
   const isShowingSubtotal = selectedAccount !== undefined && rows.length > 0;
   const hasFooter = isShowingSubtotal || hasForeignPrices;
@@ -134,7 +145,29 @@ export function PortfolioHoldings({
       title="Holdings"
     >
       {rows.length > 0 ? (
-        <HoldingsTable rows={rows} />
+        <HoldingsTable
+          onDelete={
+            isReadOnly || onDeleteSecurity === undefined
+              ? undefined
+              : (holding): void => {
+                  onDeleteSecurity(
+                    holding,
+                    neighboursOf(visibleRowIds, `holding:${holding.id}`),
+                  );
+                }
+          }
+          onEdit={
+            isReadOnly || onEditSecurity === undefined
+              ? undefined
+              : (holding): void => {
+                  onEditSecurity(
+                    holding,
+                    neighboursOf(visibleRowIds, `holding:${holding.id}`),
+                  );
+                }
+          }
+          rows={rows}
+        />
       ) : (
         <CardContent>
           <HoldingsEmpty

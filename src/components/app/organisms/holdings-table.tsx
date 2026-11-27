@@ -2,8 +2,9 @@ import type { JSX } from "react";
 
 import { cn } from "cn";
 
-import type { HoldingRow } from "@/data/portfolio";
+import type { Holding, HoldingRow } from "@/data/portfolio";
 
+import { RowActions } from "@/components/app/molecules/row-actions";
 import { FoldedCell } from "@/components/app/organisms/folded-cell";
 import { Badge } from "@/components/kit/badge";
 import {
@@ -14,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/kit/table";
+import { counted } from "@/lib/count";
 import {
   formatCurrency,
   formatPercent,
@@ -23,6 +25,8 @@ import {
 import { formatDay } from "@/lib/months";
 
 interface HoldingsTableProps {
+  readonly onDelete?: ((holding: Holding) => void) | undefined;
+  readonly onEdit?: ((holding: Holding) => void) | undefined;
   readonly rows: readonly HoldingRow[];
 }
 
@@ -32,8 +36,16 @@ interface HoldingsTableProps {
 // scroll. Caution badges stay strictly on exceptions (Unpriced, No FX
 // rate), retired securities carry an outline Retired badge, and ISIN,
 // ticker, Asset Allocation category, multi-account count and notes sit
-// calmly in the muted subline.
-export function HoldingsTable({ rows }: HoldingsTableProps): JSX.Element {
+// calmly in the muted subline. When interactive handlers are supplied,
+// unfolded rows end with RowActions (locking delete while transactions
+// reference the security) and folded rows open the Edit dialog on press.
+export function HoldingsTable({
+  onDelete,
+  onEdit,
+  rows,
+}: HoldingsTableProps): JSX.Element {
+  const hasActions = onEdit !== undefined || onDelete !== undefined;
+
   return (
     <Table>
       <TableHeader className="folded:hidden">
@@ -43,6 +55,11 @@ export function HoldingsTable({ rows }: HoldingsTableProps): JSX.Element {
           <TableHead className="text-right">Price</TableHead>
           <TableHead className="text-right">Value</TableHead>
           <TableHead className="text-right">Share</TableHead>
+          {hasActions && (
+            <TableHead className="w-px folded:hidden">
+              <span className="sr-only">Actions</span>
+            </TableHead>
+          )}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -68,11 +85,18 @@ export function HoldingsTable({ rows }: HoldingsTableProps): JSX.Element {
               : `${shareCount} @ ${priceText} · ${shareText}`;
 
           return (
-            <TableRow key={holding.id}>
+            <TableRow data-row-id={`holding:${holding.id}`} key={holding.id}>
               <FoldedCell
                 figure={valueText}
                 isFigureMuted={isMutedValue}
                 name={holding.name}
+                onOpen={
+                  onEdit === undefined
+                    ? undefined
+                    : (): void => {
+                        onEdit(holding);
+                      }
+                }
               >
                 <span>{summaryLine}</span>
                 {metaLine !== "" && <span>{metaLine}</span>}
@@ -134,6 +158,21 @@ export function HoldingsTable({ rows }: HoldingsTableProps): JSX.Element {
               >
                 {shareText}
               </TableCell>
+              {hasActions && (
+                <TableCell className="w-px py-1 folded:hidden">
+                  <RowActions
+                    deleteLock={
+                      holding.transactionCount > 0
+                        ? `Used by ${counted(holding.transactionCount, "transaction")} — retire it instead`
+                        : undefined
+                    }
+                    name={holding.name}
+                    onDelete={onDelete}
+                    onEdit={onEdit}
+                    row={holding}
+                  />
+                </TableCell>
+              )}
             </TableRow>
           );
         })}

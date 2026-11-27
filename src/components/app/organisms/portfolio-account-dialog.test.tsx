@@ -1,17 +1,20 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { CashAccount, NewPortfolioAccount } from "@/data/portfolio";
+import type { CashAccount, SecuritiesAccount } from "@/data/portfolio";
 import type { Answer } from "@/lib/answer";
 import type { SavedPortfolioMutation } from "@/store/portfolio";
 
-import { addPortfolioAccount } from "@/actions/portfolio";
+import { addPortfolioAccount, editPortfolioAccount } from "@/actions/portfolio";
 import { Toaster } from "@/components/kit/toast";
 import { refused, saved } from "@/lib/answer";
 
 import { PortfolioAccountDialog } from "./portfolio-account-dialog";
 
-vi.mock("@/actions/portfolio", () => ({ addPortfolioAccount: vi.fn() }));
+vi.mock("@/actions/portfolio", () => ({
+  addPortfolioAccount: vi.fn(),
+  editPortfolioAccount: vi.fn(),
+}));
 
 const isaCash: CashAccount = {
   balance: 1250,
@@ -47,7 +50,13 @@ describe("PortfolioAccountDialog", () => {
         }),
     );
 
-    const onSaved = vi.fn<(draft: NewPortfolioAccount) => void>();
+    const onSaved =
+      vi.fn<
+        (outcome: {
+          readonly isRetired: boolean;
+          readonly version: number;
+        }) => void
+      >();
     render(
       <PortfolioAccountDialog
         cashAccounts={[isaCash, dollarCash]}
@@ -111,10 +120,8 @@ describe("PortfolioAccountDialog", () => {
       referenceAccountId: "cash-usd",
     });
     expect(onSaved).toHaveBeenCalledExactlyOnceWith({
-      kind: "securities",
-      name: "Northstar GIA",
-      note: "Taxable dealing",
-      referenceAccountId: "cash-usd",
+      isRetired: false,
+      version: 4,
     });
   });
 
@@ -129,7 +136,13 @@ describe("PortfolioAccountDialog", () => {
         saved({ id: "port-new", savedOn: "2026-09-25", version: 5 }),
       );
 
-    const onSaved = vi.fn<(draft: NewPortfolioAccount) => void>();
+    const onSaved =
+      vi.fn<
+        (outcome: {
+          readonly isRetired: boolean;
+          readonly version: number;
+        }) => void
+      >();
     const { rerender } = render(
       <PortfolioAccountDialog
         cashAccounts={[isaCash, dollarCash]}
@@ -181,8 +194,8 @@ describe("PortfolioAccountDialog", () => {
 
     await waitFor(() => {
       expect(onSaved).toHaveBeenCalledExactlyOnceWith({
-        kind: "securities",
-        name: "Direct Shares",
+        isRetired: false,
+        version: 5,
       });
     });
     expect(addPortfolioAccount).toHaveBeenLastCalledWith(4, {
@@ -195,7 +208,13 @@ describe("PortfolioAccountDialog", () => {
     vi.mocked(addPortfolioAccount).mockResolvedValue(
       saved({ id: "cash-new", savedOn: "2026-09-25", version: 2 }),
     );
-    const onSaved = vi.fn<(draft: NewPortfolioAccount) => void>();
+    const onSaved =
+      vi.fn<
+        (outcome: {
+          readonly isRetired: boolean;
+          readonly version: number;
+        }) => void
+      >();
     const { unmount } = render(
       <PortfolioAccountDialog
         cashAccounts={[isaCash]}
@@ -228,9 +247,8 @@ describe("PortfolioAccountDialog", () => {
       );
     });
     expect(onSaved).toHaveBeenCalledExactlyOnceWith({
-      currency: "USD",
-      kind: "cash",
-      name: "US Settlement",
+      isRetired: false,
+      version: 2,
     });
 
     unmount();
@@ -265,7 +283,13 @@ describe("PortfolioAccountDialog", () => {
         version: 4,
       }),
     );
-    const onSaved = vi.fn<(draft: NewPortfolioAccount) => void>();
+    const onSaved =
+      vi.fn<
+        (outcome: {
+          readonly isRetired: boolean;
+          readonly version: number;
+        }) => void
+      >();
     render(
       <PortfolioAccountDialog
         cashAccounts={[isaCash]}
@@ -291,8 +315,227 @@ describe("PortfolioAccountDialog", () => {
       );
     });
     expect(onSaved).toHaveBeenCalledExactlyOnceWith({
-      kind: "securities",
-      name: "Harbour SIPP",
+      isRetired: false,
+      version: 4,
     });
+  });
+
+  it("edits cash and securities accounts with locked kind/currency, retired reference retention, delete locks, and tailored retire/restore toasts", async () => {
+    vi.mocked(editPortfolioAccount)
+      .mockResolvedValueOnce(
+        saved({ id: "cash-chf", savedOn: "2026-09-25", version: 2 }),
+      )
+      .mockResolvedValueOnce(
+        saved({ id: "cash-chf", savedOn: "2026-09-25", version: 3 }),
+      )
+      .mockResolvedValueOnce(
+        saved({ id: "port-1", savedOn: "2026-09-25", version: 4 }),
+      );
+
+    const chfCash: CashAccount = {
+      balance: 0,
+      balanceGbp: 0,
+      currency: "CHF",
+      id: "cash-chf",
+      isRetired: false,
+      name: "Swiss Cash",
+      note: "Holding pot",
+      transactionCount: 0,
+    };
+    const retiredCash: CashAccount = {
+      balance: 0,
+      balanceGbp: 0,
+      currency: "GBP",
+      id: "cash-retired",
+      isRetired: true,
+      name: "Old Cash",
+      transactionCount: 2,
+    };
+    const linkedSecurities: SecuritiesAccount = {
+      holdingsCount: 0,
+      id: "port-1",
+      isRetired: false,
+      marketValue: 0,
+      name: "Northstar ISA",
+      referenceAccountId: "cash-retired",
+      transactionCount: 0,
+    };
+    const usedSecurities: SecuritiesAccount = {
+      holdingsCount: 1,
+      id: "port-used",
+      isRetired: true,
+      marketValue: 100,
+      name: "Closed ISA",
+      referenceAccountId: "cash-chf",
+      transactionCount: 3,
+    };
+
+    const onDelete = vi.fn<() => void>();
+    const onSaved =
+      vi.fn<
+        (outcome: {
+          readonly isRetired: boolean;
+          readonly version: number;
+        }) => void
+      >();
+
+    // 1. Editable cash account locked by a referencing securities account (even retired) shows actionable note and no Delete.
+    const { rerender } = render(
+      <PortfolioAccountDialog
+        cashAccounts={[chfCash, retiredCash]}
+        defaultCurrency="GBP"
+        editing={{ account: chfCash, kind: "cash" }}
+        kind="cash"
+        onDelete={onDelete}
+        onDismiss={vi.fn<() => void>()}
+        onSaved={onSaved}
+        securitiesAccounts={[usedSecurities]}
+        version={1}
+      />,
+      { wrapper: Toaster },
+    );
+
+    expect(
+      screen.getByRole("combobox", { name: "Account type" }),
+    ).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Currency" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Currency" })).toHaveValue(
+      "CHF",
+    );
+    expect(
+      screen.queryByRole("button", { name: "Delete" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen
+        .getAllByRole("paragraph")
+        .map((paragraph) => paragraph.textContent),
+    ).toContain(
+      "Referenced by Closed ISA — unlink first to delete, or retire it instead",
+    );
+
+    // Retire cash account -> "Account retired" toast.
+    fireEvent.click(screen.getByRole("switch", { name: "Retired" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Account retired" }),
+      ).toHaveAccessibleDescription("Swiss Cash marked as retired");
+    });
+    expect(editPortfolioAccount).toHaveBeenCalledWith(1, {
+      id: "cash-chf",
+      isRetired: true,
+      kind: "cash",
+      name: "Swiss Cash",
+      note: "Holding pot",
+    });
+
+    // 2. Unlinked zero-tx retired cash account offers Delete and shows "Account restored" when unretired.
+    rerender(
+      <PortfolioAccountDialog
+        cashAccounts={[{ ...chfCash, isRetired: true }]}
+        defaultCurrency="GBP"
+        editing={{ account: { ...chfCash, isRetired: true }, kind: "cash" }}
+        key="unlinked-cash"
+        kind="cash"
+        onDelete={onDelete}
+        onDismiss={vi.fn<() => void>()}
+        onSaved={onSaved}
+        securitiesAccounts={[]}
+        version={2}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    expect(onDelete).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("switch", { name: "Retired" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Account restored" }),
+      ).toHaveAccessibleDescription("Swiss Cash restored to active accounts");
+    });
+
+    // 3. Cash account locked by both transactions and referencing securities account names both.
+    rerender(
+      <PortfolioAccountDialog
+        cashAccounts={[retiredCash]}
+        defaultCurrency="GBP"
+        editing={{ account: retiredCash, kind: "cash" }}
+        key="both-locked"
+        kind="cash"
+        onDelete={onDelete}
+        onDismiss={vi.fn<() => void>()}
+        onSaved={onSaved}
+        securitiesAccounts={[linkedSecurities]}
+        version={3}
+      />,
+    );
+    expect(
+      screen
+        .getAllByRole("paragraph")
+        .map((paragraph) => paragraph.textContent),
+    ).toContain(
+      "Used by 2 transactions and referenced by Northstar ISA — unlink first to delete, or retire it instead",
+    );
+
+    // 4. Securities account edit retains retired reference cash option, updates cleanly, and shows lock note when txCount > 0.
+    rerender(
+      <PortfolioAccountDialog
+        cashAccounts={[chfCash, retiredCash]}
+        defaultCurrency="GBP"
+        editing={{ account: linkedSecurities, kind: "securities" }}
+        key="edit-sec"
+        kind="securities"
+        onDelete={onDelete}
+        onDismiss={vi.fn<() => void>()}
+        onSaved={onSaved}
+        securitiesAccounts={[linkedSecurities]}
+        version={3}
+      />,
+    );
+    expect(
+      screen.getByRole("option", { name: "Old Cash (GBP, retired)" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Account saved" }),
+      ).toHaveAccessibleDescription("Northstar ISA updated");
+    });
+    expect(editPortfolioAccount).toHaveBeenLastCalledWith(3, {
+      id: "port-1",
+      isRetired: false,
+      kind: "securities",
+      name: "Northstar ISA",
+      referenceAccountId: "cash-retired",
+    });
+
+    const unlinkedUsedSecurities: SecuritiesAccount = {
+      holdingsCount: 1,
+      id: "port-used",
+      isRetired: true,
+      marketValue: 100,
+      name: "Closed ISA",
+      transactionCount: 3,
+    };
+    rerender(
+      <PortfolioAccountDialog
+        cashAccounts={[chfCash]}
+        defaultCurrency="GBP"
+        editing={{ account: unlinkedUsedSecurities, kind: "securities" }}
+        key="used-sec"
+        kind="securities"
+        onDelete={onDelete}
+        onDismiss={vi.fn<() => void>()}
+        onSaved={onSaved}
+        securitiesAccounts={[unlinkedUsedSecurities]}
+        version={4}
+      />,
+    );
+    expect(
+      screen
+        .getAllByRole("paragraph")
+        .map((paragraph) => paragraph.textContent),
+    ).toContain("Used by 3 transactions — retire it instead");
   });
 });

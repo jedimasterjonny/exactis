@@ -1,23 +1,35 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { NewPortfolioSecurity } from "@/data/portfolio";
+import type { Holding } from "@/data/portfolio";
 
-import { addPortfolioSecurity } from "@/actions/portfolio";
+import {
+  addPortfolioSecurity,
+  editPortfolioSecurity,
+} from "@/actions/portfolio";
 import { Toaster } from "@/components/kit/toast";
 import { refused, saved } from "@/lib/answer";
 import { commit } from "@/test/dom";
 
 import { PortfolioSecurityDialog } from "./portfolio-security-dialog";
 
-vi.mock("@/actions/portfolio", () => ({ addPortfolioSecurity: vi.fn() }));
+vi.mock("@/actions/portfolio", () => ({
+  addPortfolioSecurity: vi.fn(),
+  editPortfolioSecurity: vi.fn(),
+}));
 
 describe("PortfolioSecurityDialog", () => {
   it("saves trimmed security metadata and GBX pence quote dated to today", async () => {
     vi.mocked(addPortfolioSecurity).mockResolvedValue(
       saved({ id: "sec-new", savedOn: "2026-09-25", version: 2 }),
     );
-    const onSaved = vi.fn<(draft: NewPortfolioSecurity) => void>();
+    const onSaved =
+      vi.fn<
+        (outcome: {
+          readonly isRetired: boolean;
+          readonly version: number;
+        }) => void
+      >();
     render(
       <PortfolioSecurityDialog
         categories={[
@@ -105,7 +117,13 @@ describe("PortfolioSecurityDialog", () => {
       .mockResolvedValueOnce(
         saved({ id: "sec-new", savedOn: "2026-09-25", version: 3 }),
       );
-    const onSaved = vi.fn<(draft: NewPortfolioSecurity) => void>();
+    const onSaved =
+      vi.fn<
+        (outcome: {
+          readonly isRetired: boolean;
+          readonly version: number;
+        }) => void
+      >();
     const onDismiss = vi.fn<() => void>();
     const { rerender } = render(
       <PortfolioSecurityDialog
@@ -162,9 +180,8 @@ describe("PortfolioSecurityDialog", () => {
 
     await waitFor(() => {
       expect(onSaved).toHaveBeenCalledExactlyOnceWith({
-        currency: "GBP",
-        latestPrice: null,
-        name: "Global Bond Index",
+        isRetired: false,
+        version: 3,
       });
     });
     expect(addPortfolioSecurity).toHaveBeenLastCalledWith(2, {
@@ -181,7 +198,13 @@ describe("PortfolioSecurityDialog", () => {
     vi.mocked(addPortfolioSecurity).mockResolvedValue(
       saved({ id: "sec-zero", savedOn: "2026-09-25", version: 2 }),
     );
-    const onSaved = vi.fn<(draft: NewPortfolioSecurity) => void>();
+    const onSaved =
+      vi.fn<
+        (outcome: {
+          readonly isRetired: boolean;
+          readonly version: number;
+        }) => void
+      >();
     const { rerender } = render(
       <PortfolioSecurityDialog
         categories={[]}
@@ -205,9 +228,8 @@ describe("PortfolioSecurityDialog", () => {
 
     await waitFor(() => {
       expect(onSaved).toHaveBeenCalledExactlyOnceWith({
-        currency: "USD",
-        latestPrice: null,
-        name: "Zero Quote ETF",
+        isRetired: false,
+        version: 2,
       });
     });
 
@@ -236,7 +258,13 @@ describe("PortfolioSecurityDialog", () => {
         version: 2,
       }),
     );
-    const onSaved = vi.fn<(draft: NewPortfolioSecurity) => void>();
+    const onSaved =
+      vi.fn<
+        (outcome: {
+          readonly isRetired: boolean;
+          readonly version: number;
+        }) => void
+      >();
     render(
       <PortfolioSecurityDialog
         categories={[]}
@@ -261,9 +289,173 @@ describe("PortfolioSecurityDialog", () => {
       );
     });
     expect(onSaved).toHaveBeenCalledExactlyOnceWith({
-      currency: "GBP",
+      isRetired: false,
+      version: 2,
+    });
+  });
+
+  it("edits securities with locked currency and split category, offers Delete when unused, shows transaction lock note, and tailors retire/restore toasts", async () => {
+    vi.mocked(editPortfolioSecurity)
+      .mockResolvedValueOnce(
+        saved({ id: "sec-1", savedOn: "2026-09-25", version: 2 }),
+      )
+      .mockResolvedValueOnce(
+        saved({ id: "sec-1", savedOn: "2026-09-25", version: 3 }),
+      )
+      .mockResolvedValueOnce(
+        saved({ id: "sec-split", savedOn: "2026-09-25", version: 4 }),
+      );
+
+    const editableSec: Holding = {
+      category: "Global equity",
+      categoryId: "aa-equity",
+      currency: "JPY",
+      gbpRate: null,
+      id: "sec-1",
+      isin: "JP00TEST0001",
+      isRetired: false,
+      isSplitCategory: false,
+      latestPrice: 1000,
+      latestPriceDate: "2026-09-25",
+      name: "Tokyo Tracker",
+      note: "Core Asia",
+      shares: 0,
+      sharesByAccount: [],
+      ticker: "TOKY",
+      transactionCount: 0,
+    };
+    const splitSec: Holding = {
+      currency: "",
+      gbpRate: null,
+      id: "sec-split",
+      isRetired: false,
+      isSplitCategory: true,
       latestPrice: null,
-      name: "Sterling Index",
+      latestPriceDate: null,
+      name: "Multi Asset Trust",
+      shares: 2,
+      sharesByAccount: [{ portfolioId: "port-isa", shares: 2 }],
+      transactionCount: 2,
+    };
+
+    const onDelete = vi.fn<() => void>();
+    const onSaved =
+      vi.fn<
+        (outcome: {
+          readonly isRetired: boolean;
+          readonly version: number;
+        }) => void
+      >();
+
+    const { rerender } = render(
+      <PortfolioSecurityDialog
+        categories={[
+          { id: "aa-equity", name: "Global equity", securityIds: [] },
+          { id: "aa-bonds", name: "UK gilts", securityIds: [] },
+        ]}
+        onDelete={onDelete}
+        onDismiss={vi.fn<() => void>()}
+        onSaved={onSaved}
+        security={editableSec}
+        today="2026-09-25"
+        version={1}
+      />,
+      { wrapper: Toaster },
+    );
+
+    expect(screen.getByRole("combobox", { name: "Currency" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Currency" })).toHaveValue(
+      "JPY",
+    );
+    expect(
+      screen.queryByRole("textbox", { name: /Latest price/u }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    expect(onDelete).toHaveBeenCalledOnce();
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Asset class" }), {
+      target: { value: "aa-bonds" },
+    });
+    fireEvent.click(screen.getByRole("switch", { name: "Retired" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Security retired" }),
+      ).toHaveAccessibleDescription("Tokyo Tracker marked as retired");
+    });
+    expect(editPortfolioSecurity).toHaveBeenCalledWith(1, {
+      categoryId: "aa-bonds",
+      id: "sec-1",
+      isin: "JP00TEST0001",
+      isRetired: true,
+      name: "Tokyo Tracker",
+      note: "Core Asia",
+      ticker: "TOKY",
+    });
+
+    // Restoring retired security triggers "Security restored" toast.
+    rerender(
+      <PortfolioSecurityDialog
+        categories={[{ id: "aa-bonds", name: "UK gilts", securityIds: [] }]}
+        key="restore"
+        onDelete={onDelete}
+        onDismiss={vi.fn<() => void>()}
+        onSaved={onSaved}
+        security={{ ...editableSec, isRetired: true }}
+        today="2026-09-25"
+        version={2}
+      />,
+    );
+    fireEvent.click(screen.getByRole("switch", { name: "Retired" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Security restored" }),
+      ).toHaveAccessibleDescription(
+        "Tokyo Tracker restored to active securities",
+      );
+    });
+
+    // Split security locks Asset class, omits categoryId, shows blank currency as None, and shows transaction lock note.
+    rerender(
+      <PortfolioSecurityDialog
+        categories={[{ id: "aa-bonds", name: "UK gilts", securityIds: [] }]}
+        key="split"
+        onDelete={onDelete}
+        onDismiss={vi.fn<() => void>()}
+        onSaved={onSaved}
+        security={splitSec}
+        today="2026-09-25"
+        version={3}
+      />,
+    );
+    expect(
+      screen.getByRole("combobox", { name: "Asset class" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("option", { name: "Split allocation" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "None" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Delete" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen
+        .getAllByRole("paragraph")
+        .map((paragraph) => paragraph.textContent),
+    ).toContain("Used by 2 transactions — retire it instead");
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Security saved" }),
+      ).toHaveAccessibleDescription("Multi Asset Trust updated");
+    });
+    expect(editPortfolioSecurity).toHaveBeenLastCalledWith(3, {
+      id: "sec-split",
+      isRetired: false,
+      name: "Multi Asset Trust",
     });
   });
 });

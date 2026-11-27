@@ -3,7 +3,7 @@
 import type { JSX } from "react";
 
 import { cn } from "cn";
-import { Archive, Plus, Wallet } from "lucide-react";
+import { Archive, Pencil, Plus, Wallet } from "lucide-react";
 import { useId, useState } from "react";
 
 import type {
@@ -13,6 +13,7 @@ import type {
 } from "@/data/portfolio";
 
 import { Ledger } from "@/components/app/atoms/ledger";
+import { RowAction } from "@/components/app/atoms/row-action";
 import { EmptyState } from "@/components/app/molecules/empty-state";
 import { FoldedLines } from "@/components/app/molecules/folded-lines";
 import { LabelledSwitch } from "@/components/app/molecules/labelled-switch";
@@ -20,7 +21,7 @@ import { SectionCard } from "@/components/app/organisms/section-card";
 import { Badge } from "@/components/kit/badge";
 import { Button } from "@/components/kit/button";
 import { CardContent } from "@/components/kit/card";
-import { accountsLayoutOf } from "@/data/portfolio";
+import { accountsLayoutOf, neighboursOf } from "@/data/portfolio";
 import { counted } from "@/lib/count";
 import { formatCurrency } from "@/lib/money";
 
@@ -30,6 +31,14 @@ interface PortfolioAccountsProps {
   readonly label: string;
   readonly onAddCash: () => void;
   readonly onAddSecurities: () => void;
+  readonly onEditCash?: (
+    account: CashAccount,
+    fallbackFocusIds: readonly string[],
+  ) => void;
+  readonly onEditSecurities?: (
+    account: SecuritiesAccount,
+    fallbackFocusIds: readonly string[],
+  ) => void;
   readonly onOpenCash?: (accountId: string) => void;
   readonly onOpenSecurities?: (portfolioId: string) => void;
   readonly readOnlyId?: string | undefined;
@@ -42,13 +51,18 @@ interface PortfolioAccountsProps {
 // widths), followed by standalone cash accounts and a reconciling
 // sterling ledger. Shared reference cash accounts show their balance
 // once on the first securities account that names them and "—" on
-// subsequent rows so subtotals visibly add up.
+// subsequent rows so subtotals visibly add up. Each editable row keeps
+// py-3 inside a relative min-w-0 flex-1 wrapper around FoldedLines and
+// places its sibling RowAction pencil outside that wrapper so focus
+// rings and touch targets never overlap.
 export function PortfolioAccounts({
   cashAccounts,
   isReadOnly = false,
   label,
   onAddCash,
   onAddSecurities,
+  onEditCash,
+  onEditSecurities,
   onOpenCash,
   onOpenSecurities,
   readOnlyId,
@@ -73,6 +87,17 @@ export function PortfolioAccounts({
   const isEmptyFile =
     securitiesAccounts.length === 0 && cashAccounts.length === 0;
   const isAllHidden = pairs.length === 0 && standaloneCash.length === 0;
+  const visibleRowIds = [
+    ...pairs.flatMap(({ reference, securities }) => [
+      `securities:${securities.id}`,
+      ...(reference !== null && !reference.isShared
+        ? [`cash:${reference.account.id}`]
+        : []),
+    ]),
+    ...standaloneCash.map((account) => `cash:${account.id}`),
+  ];
+  const editCash = isReadOnly ? undefined : onEditCash;
+  const editSecurities = isReadOnly ? undefined : onEditSecurities;
 
   return (
     <SectionCard
@@ -155,36 +180,60 @@ export function PortfolioAccounts({
                 </div>
                 <ul className="divide-y">
                   {pairs.length === 0 && <None>No securities accounts</None>}
-                  {pairs.map(({ reference, securities }) => (
-                    <li
-                      className="grid unfolded:grid-cols-2 unfolded:gap-x-12"
-                      key={securities.id}
-                    >
-                      <div className="relative py-3">
-                        <FoldedLines
-                          figure={formatCurrency(securities.marketValue, "GBP")}
-                          name={securities.name}
-                          onOpen={
-                            !securities.isRetired &&
-                            onOpenSecurities !== undefined
-                              ? (): void => {
-                                  onOpenSecurities(securities.id);
-                                }
-                              : undefined
-                          }
+                  {pairs.map(({ reference, securities }) => {
+                    const rowId = `securities:${securities.id}`;
+                    return (
+                      <li
+                        className="grid unfolded:grid-cols-2 unfolded:gap-x-12"
+                        key={securities.id}
+                      >
+                        <div
+                          className="flex items-start gap-1"
+                          data-row-id={rowId}
                         >
-                          <span>{securitiesDetail(securities)}</span>
-                          <RetiredFlag isRetired={securities.isRetired} />
-                        </FoldedLines>
-                      </div>
-                      <div className="relative py-3 folded:pt-0 folded:pl-4">
-                        <ReferenceLines
+                          <div className="relative min-w-0 flex-1 py-3">
+                            <FoldedLines
+                              figure={formatCurrency(
+                                securities.marketValue,
+                                "GBP",
+                              )}
+                              name={securities.name}
+                              onOpen={
+                                !securities.isRetired &&
+                                onOpenSecurities !== undefined
+                                  ? (): void => {
+                                      onOpenSecurities(securities.id);
+                                    }
+                                  : undefined
+                              }
+                            >
+                              <span>{securitiesDetail(securities)}</span>
+                              <RetiredFlag isRetired={securities.isRetired} />
+                            </FoldedLines>
+                          </div>
+                          {editSecurities !== undefined && (
+                            <RowAction
+                              className="mt-2 shrink-0 pointer-coarse:mt-0.5"
+                              icon={Pencil}
+                              name={`Edit ${securities.name}`}
+                              onClick={() => {
+                                editSecurities(
+                                  securities,
+                                  neighboursOf(visibleRowIds, rowId),
+                                );
+                              }}
+                            />
+                          )}
+                        </div>
+                        <ReferenceCell
+                          onEditCash={editCash}
                           onOpenCash={onOpenCash}
                           reference={reference}
+                          visibleRowIds={visibleRowIds}
                         />
-                      </div>
-                    </li>
-                  ))}
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
               <div aria-labelledby={standaloneHeadingId} role="group">
@@ -196,27 +245,49 @@ export function PortfolioAccounts({
                 </Heading>
                 <ul className="divide-y">
                   {standaloneCash.length === 0 && <None>None</None>}
-                  {standaloneCash.map((account) => (
-                    <li className="relative py-3" key={account.id}>
-                      <FoldedLines
-                        figure={formatCurrency(
-                          account.balance,
-                          account.currency,
-                        )}
-                        name={account.name}
-                        onOpen={
-                          onOpenCash === undefined
-                            ? undefined
-                            : (): void => {
-                                onOpenCash(account.id);
-                              }
-                        }
+                  {standaloneCash.map((account) => {
+                    const rowId = `cash:${account.id}`;
+                    return (
+                      <li
+                        className="flex items-start gap-1"
+                        data-row-id={rowId}
+                        key={account.id}
                       >
-                        <span>{cashDetail(account)}</span>
-                        <RetiredFlag isRetired={account.isRetired} />
-                      </FoldedLines>
-                    </li>
-                  ))}
+                        <div className="relative min-w-0 flex-1 py-3">
+                          <FoldedLines
+                            figure={formatCurrency(
+                              account.balance,
+                              account.currency,
+                            )}
+                            name={account.name}
+                            onOpen={
+                              onOpenCash === undefined
+                                ? undefined
+                                : (): void => {
+                                    onOpenCash(account.id);
+                                  }
+                            }
+                          >
+                            <span>{cashDetail(account)}</span>
+                            <RetiredFlag isRetired={account.isRetired} />
+                          </FoldedLines>
+                        </div>
+                        {editCash !== undefined && (
+                          <RowAction
+                            className="mt-2 shrink-0 pointer-coarse:mt-0.5"
+                            icon={Pencil}
+                            name={`Edit ${account.name}`}
+                            onClick={() => {
+                              editCash(
+                                account,
+                                neighboursOf(visibleRowIds, rowId),
+                              );
+                            }}
+                          />
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
               <div className="border-t pt-4">
@@ -304,18 +375,29 @@ function None({ children }: { readonly children: string }): JSX.Element {
 }
 
 // The right-hand half of a paired securities row: its reference cash
-// account on first appearance, a muted "—" reference when shared with
-// an earlier row, or a plain note when unlinked.
-function ReferenceLines({
+// account on first appearance with sibling edit pencil, a muted "—"
+// reference with alignment spacer when shared with an earlier row, or a
+// plain note when unlinked.
+function ReferenceCell({
+  onEditCash,
   onOpenCash,
   reference,
+  visibleRowIds,
 }: {
-  readonly onOpenCash?: ((accountId: string) => void) | undefined;
+  readonly onEditCash:
+    | ((account: CashAccount, fallbackFocusIds: readonly string[]) => void)
+    | undefined;
+  readonly onOpenCash: ((accountId: string) => void) | undefined;
   readonly reference: AccountReference | null;
+  readonly visibleRowIds: readonly string[];
 }): JSX.Element {
   if (reference === null) {
     return (
-      <p className="text-sm text-muted-foreground">No reference cash account</p>
+      <div className="py-3 folded:pt-1 folded:pl-4">
+        <p className="text-sm text-muted-foreground">
+          No reference cash account
+        </p>
+      </div>
     );
   }
   const onOpen =
@@ -326,28 +408,50 @@ function ReferenceLines({
         };
   if (reference.isShared) {
     return (
-      <FoldedLines
-        figure="—"
-        isFigureMuted
-        name={reference.account.name}
-        onOpen={onOpen}
-      >
-        <span>Shared reference cash account</span>
-      </FoldedLines>
+      <div className="flex items-start gap-1 folded:pl-4">
+        <div className="relative min-w-0 flex-1 py-3 folded:pt-1">
+          <FoldedLines
+            figure="—"
+            isFigureMuted
+            name={reference.account.name}
+            onOpen={onOpen}
+          >
+            <span>Shared reference cash account</span>
+          </FoldedLines>
+        </div>
+        {onEditCash !== undefined && (
+          <span aria-hidden className="w-7 shrink-0 pointer-coarse:w-11" />
+        )}
+      </div>
     );
   }
+  const rowId = `cash:${reference.account.id}`;
   return (
-    <FoldedLines
-      figure={formatCurrency(
-        reference.account.balance,
-        reference.account.currency,
+    <div className="flex items-start gap-1 folded:pl-4" data-row-id={rowId}>
+      <div className="relative min-w-0 flex-1 py-3 folded:pt-1">
+        <FoldedLines
+          figure={formatCurrency(
+            reference.account.balance,
+            reference.account.currency,
+          )}
+          name={reference.account.name}
+          onOpen={onOpen}
+        >
+          <span>{cashDetail(reference.account)}</span>
+          <RetiredFlag isRetired={reference.account.isRetired} />
+        </FoldedLines>
+      </div>
+      {onEditCash !== undefined && (
+        <RowAction
+          className="mt-2 shrink-0 pointer-coarse:mt-0.5 folded:mt-0"
+          icon={Pencil}
+          name={`Edit ${reference.account.name}`}
+          onClick={() => {
+            onEditCash(reference.account, neighboursOf(visibleRowIds, rowId));
+          }}
+        />
       )}
-      name={reference.account.name}
-      onOpen={onOpen}
-    >
-      <span>{cashDetail(reference.account)}</span>
-      <RetiredFlag isRetired={reference.account.isRetired} />
-    </FoldedLines>
+    </div>
   );
 }
 
