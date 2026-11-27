@@ -6,14 +6,19 @@ import { useState } from "react";
 
 import type {
   CashAccount,
+  EditPortfolioTransaction,
   Holding,
   NewPortfolioTransaction,
+  PortfolioTransaction,
   SecuritiesAccount,
   TransactionType,
 } from "@/data/portfolio";
 import type { Option, OptionGroup } from "@/lib/options";
 
-import { addPortfolioTransaction } from "@/actions/portfolio";
+import {
+  addPortfolioTransaction,
+  editPortfolioTransaction,
+} from "@/actions/portfolio";
 import { FieldRow } from "@/components/app/atoms/field-row";
 import { Note } from "@/components/app/atoms/note";
 import { Caution } from "@/components/app/molecules/caution";
@@ -53,8 +58,6 @@ type AccountsLayout =
   | "securities-and-currency"
   | "securities-transfer";
 
-type DeliveryCurrency = (typeof deliveryCurrencies)[number];
-
 interface PortfolioTransactionDialogProps {
   readonly baseCurrency: string;
   readonly cashAccounts: readonly CashAccount[];
@@ -62,11 +65,13 @@ interface PortfolioTransactionDialogProps {
   readonly handoffAmountGbp?: number;
   readonly holdings: readonly Holding[];
   readonly initialDraft?: PortfolioTransactionDraft;
+  readonly onDelete?: (() => void) | undefined;
   readonly onDismiss: () => void;
-  readonly onSaved: (draft: NewPortfolioTransaction) => void;
+  readonly onSaved: (draft: NewPortfolioTransaction, version: number) => void;
   readonly securitiesAccounts: readonly SecuritiesAccount[];
   readonly suggestedCategory?: SuggestedCategory;
   readonly today: string;
+  readonly transaction?: PortfolioTransaction;
   readonly version: number;
 }
 
@@ -103,16 +108,13 @@ interface TypeSpec {
 
 const deliveryCurrencies = ["GBP", "USD", "EUR"] as const;
 
-const deliveryCurrencyOptions: readonly Option<DeliveryCurrency>[] =
-  deliveryCurrencies.map((code) => ({ label: code, value: code }));
-
-// The dialog for appending any of Portfolio Performance's fifteen
-// transaction types to the household's stored .portfolio file.
-// Switching type adapts accounts, shares, currency and cost fields
-// cleanly without carrying stale figures into the saved draft; stale
-// refreshes that remove a chosen account or security clear that
-// selection to "" with an explicit hint rather than silently falling
-// back to another account.
+// The dialog for adding or editing any of Portfolio Performance's fifteen
+// transaction types in the household's stored .portfolio file. In edit
+// mode the transaction type is locked, any currently-referenced retired
+// account or security stays selectable, non-standard delivery currencies
+// are preserved, and an existing cross-currency GROSS_VALUE seeds
+// fxTypedAmount with fxDriver="amount" so derived rates match
+// ExchangeRateField without blur-rounding drift.
 export function PortfolioTransactionDialog({
   baseCurrency,
   cashAccounts,
@@ -120,118 +122,101 @@ export function PortfolioTransactionDialog({
   handoffAmountGbp,
   holdings,
   initialDraft,
+  onDelete,
   onDismiss,
   onSaved,
   securitiesAccounts,
   suggestedCategory,
   today,
+  transaction,
   version,
 }: PortfolioTransactionDialogProps): JSX.Element {
-  const activeSecurities = securitiesAccounts.filter(
-    (account) => !account.isRetired,
+  const isEditing = transaction !== undefined;
+  const selectableSecurities = securitiesAccounts.filter(
+    (account) =>
+      !account.isRetired ||
+      account.id === transaction?.portfolioId ||
+      account.id === transaction?.otherPortfolioId,
   );
-  const activeCash = cashAccounts.filter((account) => !account.isRetired);
-  const sortedHoldings = holdings
-    .filter((holding) => !holding.isRetired)
+  const selectableCash = cashAccounts.filter(
+    (account) =>
+      !account.isRetired ||
+      account.id === transaction?.accountId ||
+      account.id === transaction?.otherAccountId,
+  );
+  const selectableHoldings = holdings
+    .filter(
+      (holding) => !holding.isRetired || holding.id === transaction?.securityId,
+    )
     .toSorted((one, other) => one.name.localeCompare(other.name));
 
-  const defaults = initialSelectionOf({
-    activeCash,
-    activeSecurities,
-    initialDraft,
-    sortedHoldings,
-  });
-  const initialType = initialDraft?.type ?? "purchase";
-  const initialDeliveryCurrency = deliveryCurrencyOf(
-    initialDraft?.currency ?? baseCurrency,
-  );
-  const initialSpec = typeSpecOf(initialType);
-  const initialCurrency = currencyForType(initialSpec.accounts, {
+  const initial = initialDialogStateOf({
     baseCurrency,
-    deliveryCurrency: initialDeliveryCurrency,
-    fromCashCurrency: activeCash.find(
-      (account) => account.id === defaults.accountId,
-    )?.currency,
-  });
-  const initialFxCurrency = fxCurrencyOf({
-    accounts: initialSpec.accounts,
-    effectiveCurrency: initialCurrency,
-    hasCosts: initialSpec.hasCosts,
-    securityCurrency: sortedHoldings.find(
-      (holding) => holding.id === defaults.securityId,
-    )?.currency,
-    toCashCurrency: activeCash.find(
-      (account) => account.id === defaults.otherAccountId,
-    )?.currency,
-  });
-  const initialFxPair = fxPairKeyOf(
-    initialType,
-    initialCurrency,
-    initialFxCurrency,
-  );
-  const initialAmount = initialAmountOf(
     handoffAmountGbp,
-    initialCurrency,
-    initialDraft?.amount,
-  );
+    initialDraft,
+    selectableCash,
+    selectableHoldings,
+    selectableSecurities,
+    today,
+    transaction,
+  });
 
-  const [type, setType] = useState<TransactionType>(initialType);
-  const [date, setDate] = useState(initialDraft?.date ?? today);
-  const [portfolioId, setPortfolioId] = useState(defaults.portfolioId);
+  const [type, setType] = useState<TransactionType>(initial.type);
+  const [date, setDate] = useState(initial.date);
+  const [portfolioId, setPortfolioId] = useState(initial.portfolioId);
   const [otherPortfolioId, setOtherPortfolioId] = useState(
-    defaults.otherPortfolioId,
+    initial.otherPortfolioId,
   );
-  const [accountId, setAccountId] = useState(defaults.accountId);
-  const [otherAccountId, setOtherAccountId] = useState(defaults.otherAccountId);
-  const [securityId, setSecurityId] = useState(defaults.securityId);
-  const [deliveryCurrency, setDeliveryCurrency] = useState<DeliveryCurrency>(
-    initialDeliveryCurrency,
+  const [accountId, setAccountId] = useState(initial.accountId);
+  const [otherAccountId, setOtherAccountId] = useState(initial.otherAccountId);
+  const [securityId, setSecurityId] = useState(initial.securityId);
+  const [deliveryCurrency, setDeliveryCurrency] = useState(
+    initial.deliveryCurrency,
   );
-  const [shares, setShares] = useState<null | number>(
-    initialDraft?.shares ?? null,
-  );
-  const [amount, setAmount] = useState<null | number>(initialAmount);
+  const [shares, setShares] = useState<null | number>(initial.shares);
+  const [amount, setAmount] = useState<null | number>(initial.amount);
   const [activeHandoffAmountGbp, setActiveHandoffAmountGbp] = useState<
     number | undefined
   >(handoffAmountGbp);
   const [hasEditedAmount, setHasEditedAmount] = useState(false);
-  const [lastCurrency, setLastCurrency] = useState(initialCurrency);
+  const [lastCurrency, setLastCurrency] = useState(initial.currency);
   const [handoffAnnouncement, setHandoffAnnouncement] = useState("");
-  const [fees, setFees] = useState<null | number>(initialDraft?.fees ?? null);
-  const [taxes, setTaxes] = useState<null | number>(
-    initialDraft?.taxes ?? null,
-  );
-  const [fxPair, setFxPair] = useState(initialFxPair);
+  const [fees, setFees] = useState<null | number>(initial.fees);
+  const [taxes, setTaxes] = useState<null | number>(initial.taxes);
+  const [fxPair, setFxPair] = useState(initial.fxPair);
   const [fxDriver, setFxDriver] = useState<"amount" | "rate">("amount");
-  const [fxTypedAmount, setFxTypedAmount] = useState<null | number>(null);
+  const [fxTypedAmount, setFxTypedAmount] = useState<null | number>(
+    initial.fxTypedAmount,
+  );
   const [fxTypedRate, setFxTypedRate] = useState<null | number>(null);
-  const [note, setNote] = useState(initialDraft?.note ?? "");
+  const [note, setNote] = useState(initial.note);
   const { isSending, send } = useSender();
 
-  const resolvedPortfolio = resolveSelection(portfolioId, activeSecurities);
+  const resolvedPortfolio = resolveSelection(portfolioId, selectableSecurities);
   const resolvedOtherPortfolio = resolveSelection(
     otherPortfolioId,
-    activeSecurities,
+    selectableSecurities,
   );
-  const resolvedAccount = resolveSelection(accountId, activeCash);
-  const resolvedOtherAccount = resolveSelection(otherAccountId, activeCash);
-  const resolvedSecurity = resolveSelection(securityId, sortedHoldings);
+  const resolvedAccount = resolveSelection(accountId, selectableCash);
+  const resolvedOtherAccount = resolveSelection(otherAccountId, selectableCash);
+  const resolvedSecurity = resolveSelection(securityId, selectableHoldings);
 
   const spec = typeSpecOf(type);
   const hasSecurity = spec.hasShares || spec.accounts === "cash-and-security";
-  const fromCash = activeCash.find(
+  const fromCash = selectableCash.find(
     (account) => account.id === resolvedAccount.id,
   );
-  const toCash = activeCash.find(
+  const toCash = selectableCash.find(
     (account) => account.id === resolvedOtherAccount.id,
   );
-  const chosenSecurity = sortedHoldings.find(
+  const chosenSecurity = selectableHoldings.find(
     (holding) => holding.id === resolvedSecurity.id,
   );
 
   const effectiveCurrency = currencyForType(spec.accounts, {
     baseCurrency,
     deliveryCurrency,
+    existingCurrency: transaction?.currency,
     fromCashCurrency: fromCash?.currency,
   });
 
@@ -265,17 +250,27 @@ export function PortfolioTransactionDialog({
   }
 
   const baseSecuritiesOptions = accountOptionsOf(
-    activeSecurities,
+    selectableSecurities,
     "No securities accounts",
   );
-  const baseCashOptions = cashAccountOptionsOf(activeCash);
-  const baseSecurityOptions = accountOptionsOf(sortedHoldings, "No securities");
+  const baseCashOptions = cashAccountOptionsOf(selectableCash);
+  const baseSecurityOptions = accountOptionsOf(
+    selectableHoldings,
+    "No securities",
+  );
+  const deliveryCurrencyOptions = deliveryCurrencyOptionsOf(
+    deliveryCurrency,
+    transaction?.currency,
+  );
   const securitySelectOptions = withEmptyPlaceholder(
     baseSecurityOptions,
     resolvedSecurity.id,
     "Select a security",
   );
-  const securityGroups = securityGroupsOf(sortedHoldings, suggestedCategory);
+  const securityGroups = securityGroupsOf(
+    selectableHoldings,
+    suggestedCategory,
+  );
   const shareSecurityOptions = shareSecurityOptionsOf(
     securityGroups,
     securitySelectOptions,
@@ -283,7 +278,7 @@ export function PortfolioTransactionDialog({
   );
   const shareSecurityHint = shareSecurityHintOf({
     hasCategoryMatches: securityGroups !== undefined,
-    holdingsCount: sortedHoldings.length,
+    holdingsCount: selectableHoldings.length,
     isMissing: resolvedSecurity.isMissing,
     selectedSecurityId: resolvedSecurity.id,
     suggestedCategory,
@@ -298,8 +293,8 @@ export function PortfolioTransactionDialog({
     taxesPence,
   } = evaluateTransactionForm({
     accountId: resolvedAccount.id,
-    activeCashCount: activeCash.length,
-    activeSecuritiesCount: activeSecurities.length,
+    activeCashCount: selectableCash.length,
+    activeSecuritiesCount: selectableSecurities.length,
     amount,
     date,
     fees,
@@ -322,8 +317,10 @@ export function PortfolioTransactionDialog({
   const typeLabel = transactionTypeLabels[type];
   const title = dialogTitleOf({
     chosenSecurity,
+    fromCash,
     hasSecurity,
     hasShares: spec.hasShares,
+    isEditing,
     suggestedCategory,
     typeLabel,
   });
@@ -362,12 +359,15 @@ export function PortfolioTransactionDialog({
 
   function selectTradePortfolio(nextPortfolioId: string): void {
     setPortfolioId(nextPortfolioId);
-    const referenceId = activeSecurities.find(
+    if (isEditing) {
+      return;
+    }
+    const referenceId = selectableSecurities.find(
       (account) => account.id === nextPortfolioId,
     )?.referenceAccountId;
     if (
       referenceId !== undefined &&
-      activeCash.some((account) => account.id === referenceId)
+      selectableCash.some((account) => account.id === referenceId)
     ) {
       setAccountId(referenceId);
     }
@@ -384,7 +384,7 @@ export function PortfolioTransactionDialog({
     setShares(null);
     if (nextType === "cash-transfer") {
       setOtherAccountId(
-        distinctOtherCashId(resolvedAccount.id, otherAccountId, activeCash),
+        distinctOtherCashId(resolvedAccount.id, otherAccountId, selectableCash),
       );
     }
     if (nextType === "security-transfer") {
@@ -392,7 +392,7 @@ export function PortfolioTransactionDialog({
         distinctOtherId(
           resolvedPortfolio.id,
           otherPortfolioId,
-          activeSecurities,
+          selectableSecurities,
         ),
       );
     }
@@ -418,10 +418,31 @@ export function PortfolioTransactionDialog({
       type,
     });
 
+    if (transaction !== undefined) {
+      const editDraft: EditPortfolioTransaction = {
+        ...draft,
+        id: transaction.id,
+      };
+      send(async () => editPortfolioTransaction(version, editDraft), {
+        failure: "Transaction not saved",
+        onAccepted: (result) => {
+          onSaved(draft, result.version);
+        },
+        success: (result) => ({
+          description: withSyncNote(
+            `${typeLabel} · ${subjectName} · ${formatDay(draft.date)}`,
+            result.syncWarning,
+          ),
+          title: "Transaction saved",
+        }),
+      });
+      return;
+    }
+
     send(async () => addPortfolioTransaction(version, draft), {
       failure: "Transaction not saved",
-      onAccepted: () => {
-        onSaved(draft);
+      onAccepted: (result) => {
+        onSaved(draft, result.version);
       },
       success: (result) => ({
         description: withSyncNote(
@@ -436,9 +457,10 @@ export function PortfolioTransactionDialog({
   return (
     <EditDialog
       canSave={canSave}
-      eyebrow="New transaction"
+      eyebrow={isEditing ? "Edit transaction" : "New transaction"}
       isSaving={isSending}
       isWide
+      onDelete={isEditing ? onDelete : undefined}
       onDismiss={onDismiss}
       onSave={save}
       title={title}
@@ -446,6 +468,8 @@ export function PortfolioTransactionDialog({
       <FieldRow layout="pair">
         <SelectField<TransactionType>
           groups={transactionTypeGroups}
+          hint={isEditing ? "Transaction type cannot be changed" : undefined}
+          isDisabled={isEditing}
           label="Type"
           onValueChange={selectType}
           value={type}
@@ -455,9 +479,10 @@ export function PortfolioTransactionDialog({
 
       <AccountFields
         accountId={resolvedAccount.id}
-        cashCount={activeCash.length}
+        cashCount={selectableCash.length}
         cashOptions={baseCashOptions}
         deliveryCurrency={deliveryCurrency}
+        deliveryCurrencyOptions={deliveryCurrencyOptions}
         isAccountMissing={resolvedAccount.isMissing}
         isOtherAccountMissing={resolvedOtherAccount.isMissing}
         isOtherPortfolioMissing={resolvedOtherPortfolio.isMissing}
@@ -478,9 +503,9 @@ export function PortfolioTransactionDialog({
           initialDraft,
           resolvedPortfolio.id,
         )}
-        securitiesCount={activeSecurities.length}
+        securitiesCount={selectableSecurities.length}
         securitiesOptions={baseSecuritiesOptions}
-        securityCount={sortedHoldings.length}
+        securityCount={selectableHoldings.length}
         securityId={resolvedSecurity.id}
         securityOptions={securitySelectOptions}
       />
@@ -490,7 +515,7 @@ export function PortfolioTransactionDialog({
           <SelectField
             {...(securityGroups !== undefined && { groups: securityGroups })}
             hint={shareSecurityHint}
-            isDisabled={sortedHoldings.length === 0}
+            isDisabled={selectableHoldings.length === 0}
             label="Security"
             onValueChange={setSecurityId}
             options={shareSecurityOptions}
@@ -573,6 +598,7 @@ function AccountFields({
   cashCount,
   cashOptions,
   deliveryCurrency,
+  deliveryCurrencyOptions,
   isAccountMissing,
   isOtherAccountMissing,
   isOtherPortfolioMissing,
@@ -599,7 +625,8 @@ function AccountFields({
   readonly accountId: string;
   readonly cashCount: number;
   readonly cashOptions: readonly Option<string>[];
-  readonly deliveryCurrency: DeliveryCurrency;
+  readonly deliveryCurrency: string;
+  readonly deliveryCurrencyOptions: readonly Option<string>[];
   readonly isAccountMissing: boolean;
   readonly isOtherAccountMissing: boolean;
   readonly isOtherPortfolioMissing: boolean;
@@ -607,7 +634,7 @@ function AccountFields({
   readonly isSecurityMissing: boolean;
   readonly layout: AccountsLayout;
   readonly onAccountChange: (id: string) => void;
-  readonly onDeliveryCurrencyChange: (currency: DeliveryCurrency) => void;
+  readonly onDeliveryCurrencyChange: (currency: string) => void;
   readonly onOtherAccountChange: (id: string) => void;
   readonly onOtherPortfolioChange: (id: string) => void;
   readonly onPortfolioChange: (id: string) => void;
@@ -754,7 +781,7 @@ function AccountFields({
             options={primaryPortfolioOptions}
             value={portfolioId}
           />
-          <SelectField<DeliveryCurrency>
+          <SelectField
             label="Currency"
             onValueChange={onDeliveryCurrencyChange}
             options={deliveryCurrencyOptions}
@@ -796,12 +823,19 @@ function AccountFields({
 }
 
 function accountOptionsOf(
-  accounts: readonly { readonly id: string; readonly name: string }[],
+  accounts: readonly {
+    readonly id: string;
+    readonly isRetired: boolean;
+    readonly name: string;
+  }[],
   emptyLabel: string,
 ): readonly Option<string>[] {
   return accounts.length === 0
     ? [{ label: emptyLabel, value: "" }]
-    : accounts.map((account) => ({ label: account.name, value: account.id }));
+    : accounts.map((account) => ({
+        label: account.isRetired ? `${account.name} (retired)` : account.name,
+        value: account.id,
+      }));
 }
 
 // Amount, fees, taxes, and cross-currency FX inputs for the active
@@ -1095,7 +1129,9 @@ function cashAccountOptionsOf(
   return accounts.length === 0
     ? [{ label: "No cash accounts", value: "" }]
     : accounts.map((account) => ({
-        label: `${account.name} (${account.currency})`,
+        label: account.isRetired
+          ? `${account.name} (${account.currency}, retired)`
+          : `${account.name} (${account.currency})`,
         value: account.id,
       }));
 }
@@ -1121,10 +1157,12 @@ function currencyForType(
   {
     baseCurrency,
     deliveryCurrency,
+    existingCurrency,
     fromCashCurrency,
   }: {
     readonly baseCurrency: string;
-    readonly deliveryCurrency: DeliveryCurrency;
+    readonly deliveryCurrency: string;
+    readonly existingCurrency: string | undefined;
     readonly fromCashCurrency: string | undefined;
   },
 ): string {
@@ -1132,30 +1170,52 @@ function currencyForType(
     return deliveryCurrency;
   }
   if (layout === "securities-transfer") {
-    return baseCurrency;
+    return existingCurrency ?? baseCurrency;
   }
   return fromCashCurrency ?? baseCurrency;
 }
 
-function deliveryCurrencyOf(code: string): DeliveryCurrency {
+function deliveryCurrencyOf(code: string): string {
   return deliveryCurrencies.find((currency) => currency === code) ?? "GBP";
+}
+
+function deliveryCurrencyOptionsOf(
+  current: string,
+  preserved: string | undefined,
+): readonly Option<string>[] {
+  const codes: string[] = [...deliveryCurrencies];
+  for (const extra of [preserved, current]) {
+    if (extra !== undefined && !codes.includes(extra)) {
+      codes.push(extra);
+    }
+  }
+  return codes.map((code) => ({ label: code, value: code }));
 }
 
 function dialogTitleOf({
   chosenSecurity,
+  fromCash,
   hasSecurity,
   hasShares,
+  isEditing,
   suggestedCategory,
   typeLabel,
 }: {
   readonly chosenSecurity: Holding | undefined;
+  readonly fromCash: CashAccount | undefined;
   readonly hasSecurity: boolean;
   readonly hasShares: boolean;
+  readonly isEditing: boolean;
   readonly suggestedCategory: SuggestedCategory | undefined;
   readonly typeLabel: string;
 }): string {
   if (hasSecurity && chosenSecurity !== undefined) {
     return `${typeLabel} · ${chosenSecurity.name}`;
+  }
+  if (isEditing) {
+    return fromCash === undefined
+      ? typeLabel
+      : `${typeLabel} · ${fromCash.name}`;
   }
   if (hasShares && suggestedCategory !== undefined) {
     return `${typeLabel} · ${suggestedCategory.name}`;
@@ -1486,6 +1546,123 @@ function initialAmountOf(
   return draftAmount ?? null;
 }
 
+function initialDialogStateOf({
+  baseCurrency,
+  handoffAmountGbp,
+  initialDraft,
+  selectableCash,
+  selectableHoldings,
+  selectableSecurities,
+  today,
+  transaction,
+}: {
+  readonly baseCurrency: string;
+  readonly handoffAmountGbp: number | undefined;
+  readonly initialDraft: PortfolioTransactionDraft | undefined;
+  readonly selectableCash: readonly CashAccount[];
+  readonly selectableHoldings: readonly Holding[];
+  readonly selectableSecurities: readonly SecuritiesAccount[];
+  readonly today: string;
+  readonly transaction: PortfolioTransaction | undefined;
+}): {
+  readonly accountId: string;
+  readonly amount: null | number;
+  readonly currency: string;
+  readonly date: string;
+  readonly deliveryCurrency: string;
+  readonly fees: null | number;
+  readonly fxPair: string;
+  readonly fxTypedAmount: null | number;
+  readonly note: string;
+  readonly otherAccountId: string;
+  readonly otherPortfolioId: string;
+  readonly portfolioId: string;
+  readonly securityId: string;
+  readonly shares: null | number;
+  readonly taxes: null | number;
+  readonly type: TransactionType;
+} {
+  const defaults =
+    transaction !== undefined
+      ? {
+          accountId: transaction.accountId ?? "",
+          otherAccountId: transaction.otherAccountId ?? "",
+          otherPortfolioId: transaction.otherPortfolioId ?? "",
+          portfolioId: transaction.portfolioId ?? "",
+          securityId: transaction.securityId ?? "",
+        }
+      : initialSelectionOf({
+          activeCash: selectableCash,
+          activeSecurities: selectableSecurities,
+          initialDraft,
+          sortedHoldings: selectableHoldings,
+        });
+  const type = transaction?.type ?? initialDraft?.type ?? "purchase";
+  const deliveryCurrency =
+    transaction !== undefined
+      ? transaction.currency
+      : deliveryCurrencyOf(initialDraft?.currency ?? baseCurrency);
+  const spec = typeSpecOf(type);
+  const currency = currencyForType(spec.accounts, {
+    baseCurrency,
+    deliveryCurrency,
+    existingCurrency: transaction?.currency,
+    fromCashCurrency: selectableCash.find(
+      (account) => account.id === defaults.accountId,
+    )?.currency,
+  });
+  const fxCurrency = fxCurrencyOf({
+    accounts: spec.accounts,
+    effectiveCurrency: currency,
+    hasCosts: spec.hasCosts,
+    securityCurrency: selectableHoldings.find(
+      (holding) => holding.id === defaults.securityId,
+    )?.currency,
+    toCashCurrency: selectableCash.find(
+      (account) => account.id === defaults.otherAccountId,
+    )?.currency,
+  });
+  const fxPair = fxPairKeyOf(type, currency, fxCurrency);
+  const fxTypedAmount =
+    transaction?.grossValue !== undefined &&
+    fxPair !== "" &&
+    transaction.grossValue.currency === currency &&
+    transaction.grossValue.fxCurrency === fxCurrency
+      ? transaction.grossValue.fxAmount
+      : null;
+
+  return {
+    accountId: defaults.accountId,
+    amount:
+      transaction !== undefined
+        ? positiveOrNull(transaction.amount)
+        : initialAmountOf(handoffAmountGbp, currency, initialDraft?.amount),
+    currency,
+    date: transaction?.date ?? initialDraft?.date ?? today,
+    deliveryCurrency,
+    fees:
+      transaction !== undefined
+        ? positiveOrNull(transaction.fees)
+        : (initialDraft?.fees ?? null),
+    fxPair,
+    fxTypedAmount,
+    note: transaction?.note ?? initialDraft?.note ?? "",
+    otherAccountId: defaults.otherAccountId,
+    otherPortfolioId: defaults.otherPortfolioId,
+    portfolioId: defaults.portfolioId,
+    securityId: defaults.securityId,
+    shares:
+      transaction !== undefined
+        ? positiveOrNull(transaction.shares)
+        : (initialDraft?.shares ?? null),
+    taxes:
+      transaction !== undefined
+        ? positiveOrNull(transaction.taxes)
+        : (initialDraft?.taxes ?? null),
+    type,
+  };
+}
+
 function initialSelectionOf({
   activeCash,
   activeSecurities,
@@ -1557,6 +1734,10 @@ function portfolioUnselectedHintOf(
   return initialDraft?.portfolioId === "" && selectedPortfolioId === ""
     ? "Choose the account for this trade"
     : undefined;
+}
+
+function positiveOrNull(value: number): null | number {
+  return value > 0 ? value : null;
 }
 
 function requiredSelectHint(

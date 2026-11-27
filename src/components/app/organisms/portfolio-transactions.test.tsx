@@ -626,4 +626,66 @@ describe("PortfolioTransactions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
     expect(onTypeChange).toHaveBeenCalledWith("");
   });
+
+  it("computes focus neighbours from the full filtered list before the 50-row slice and omits row actions when read-only", () => {
+    const onEditTransaction =
+      vi.fn<
+        (
+          transaction: PortfolioTransaction,
+          fallbackFocusIds: readonly string[],
+        ) => void
+      >();
+    const onDeleteTransaction =
+      vi.fn<
+        (
+          transaction: PortfolioTransaction,
+          fallbackFocusIds: readonly string[],
+        ) => void
+      >();
+    const transactions = manyTransactions(55).map((entry, index) =>
+      index === 49 ? { ...entry, date: "2026-09-19" } : entry,
+    );
+
+    const { rerender } = renderTransactions({
+      onDeleteTransaction,
+      onEditTransaction,
+      transactions,
+    });
+
+    // Click Edit on the first visible row -> next is tx-1.
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Edit Deposit · Closed Cash · 20 Sep 2026",
+      }),
+    );
+    expect(onEditTransaction).toHaveBeenCalledWith(transactions[0], [
+      "transaction:tx-1",
+    ]);
+
+    // Click Delete on the 50th visible row (index 49, page boundary) -> next MUST include tx-50 from page 2!
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Delete Deposit · Northstar ISA Cash · 19 Sep 2026",
+      }),
+    );
+    expect(onDeleteTransaction).toHaveBeenCalledWith(transactions[49], [
+      "transaction:tx-50",
+      "transaction:tx-48",
+    ]);
+
+    rerender(
+      transactionsElement({
+        isReadOnly: true,
+        onDeleteTransaction,
+        onEditTransaction,
+        transactions: sampleTransactions,
+      }),
+    );
+    expect(
+      screen.queryByRole("button", { name: /^Edit /u }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Delete /u }),
+    ).not.toBeInTheDocument();
+  });
 });
