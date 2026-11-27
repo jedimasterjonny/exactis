@@ -186,11 +186,10 @@ describe("Accounts", () => {
     );
   });
 
-  // Live candidates merge the stored portfolio feed and category account
-  // holdings (trimming names, dropping blanks, excluding retired empty
-  // targets.portfolios entries when a feed is stored, and excluding stale
-  // links); bespoke rates surface on the Balance sheet with the
-  // "Unlinked savings..." caption and flow into the dialog preview.
+  // Live candidates come from owned.feed.accounts (active securities +
+  // active standalone cash), excluding retired accounts and paired
+  // reference cash, detecting name collisions, and surfacing bespoke,
+  // cash, and unavailable previews in the dialog and Balance sheet.
   it("collects live portfolio candidates, renders bespoke Balance sheet growth, and derives dialog previews", async () => {
     const heldTargets = {
       ...targets,
@@ -200,6 +199,7 @@ describe("Accounts", () => {
             ? {
                 accounts: [
                   { name: " Alpha ISA ", value: 40_000 },
+                  { name: "Legacy Target", value: 5000 },
                   { name: "  ", value: 100 },
                 ],
                 classes,
@@ -215,16 +215,155 @@ describe("Accounts", () => {
     };
     const linkedPension: Account = { ...accounts[0], portfolio: "Alpha ISA" };
     const staleIsa: Account = { ...accounts[1], portfolio: "Retired ISA" };
+    const linkedCash: Account = { ...accounts[2], portfolio: "Emergency Cash" };
+    const pairedCashLink: Account = {
+      balance: 2000,
+      growth: { kind: "fixed", rate: 0.03 },
+      id: 30,
+      kind: "cash",
+      name: "Paired Link",
+      portfolio: "Alpha Cash",
+    };
+    const missingLink: Account = {
+      balance: 1000,
+      growth: { kind: "fixed", rate: 0.02 },
+      id: 31,
+      kind: "cash",
+      name: "Missing Link",
+      portfolio: "Gone Account",
+    };
+    const blankSec = {
+      foreignCurrencies: [],
+      hasUncurrenciedHoldings: false,
+      holdingsCount: 0,
+      isRetired: false,
+      lastTransactionDate: null,
+      marketValueGbp: 0,
+      noFxCurrencies: [],
+      oldestQuoteDate: null,
+      referenceCash: null,
+      unpricedCount: 0,
+    };
     await renderAccounts({
       feed: {
-        accounts: { cash: [], securities: [] },
-        handoff: {
-          securitiesAccounts: [
-            { id: "p-1", name: " Zeta SIPP " },
-            { id: "p-2", name: "Alpha ISA" },
+        accounts: {
+          cash: [
+            {
+              balance: 5000,
+              balanceGbp: 5000,
+              currency: "GBP",
+              id: "c-solo",
+              isRetired: false,
+              lastTransactionDate: "2026-09-10",
+              name: " Emergency Cash ",
+              referencedBy: [],
+            },
+            {
+              balance: 1000,
+              balanceGbp: 1000,
+              currency: "GBP",
+              id: "c-paired-1",
+              isRetired: false,
+              lastTransactionDate: "2026-09-10",
+              name: "Alpha Cash",
+              referencedBy: ["Alpha ISA"],
+            },
+            {
+              balance: 500,
+              balanceGbp: 500,
+              currency: "GBP",
+              id: "c-paired-2",
+              isRetired: false,
+              lastTransactionDate: "2026-09-10",
+              name: " Alpha Cash ",
+              referencedBy: ["Alpha ISA", "Zeta SIPP"],
+            },
+            {
+              balance: 500,
+              balanceGbp: 500,
+              currency: "GBP",
+              id: "c-legacy-target",
+              isRetired: false,
+              lastTransactionDate: null,
+              name: "Legacy Target",
+              referencedBy: [],
+            },
+            {
+              balance: 400,
+              balanceGbp: 400,
+              currency: "GBP",
+              id: "c-closed-empty",
+              isRetired: false,
+              lastTransactionDate: null,
+              name: "Closed Empty",
+              referencedBy: [],
+            },
+            {
+              balance: 250,
+              balanceGbp: 250,
+              currency: "GBP",
+              id: "c-overlap",
+              isRetired: false,
+              lastTransactionDate: null,
+              name: "Shared Name",
+              referencedBy: [],
+            },
+            {
+              balance: 100,
+              balanceGbp: 100,
+              currency: "GBP",
+              id: "c-dup-1",
+              isRetired: false,
+              lastTransactionDate: null,
+              name: "Dup Cash",
+              referencedBy: [],
+            },
+            {
+              balance: 200,
+              balanceGbp: 200,
+              currency: "GBP",
+              id: "c-dup-2",
+              isRetired: false,
+              lastTransactionDate: null,
+              name: "Dup Cash",
+              referencedBy: [],
+            },
+            {
+              balance: 0,
+              balanceGbp: 0,
+              currency: "GBP",
+              id: "c-retired",
+              isRetired: true,
+              lastTransactionDate: null,
+              name: "Old Cash",
+              referencedBy: [],
+            },
           ],
-          securitiesByCategory: {},
+          securities: [
+            { ...blankSec, id: "p-1", name: " Zeta SIPP " },
+            { ...blankSec, id: "p-2", name: "Alpha ISA" },
+            { ...blankSec, id: "p-3", name: "Shared Name" },
+            { ...blankSec, id: "p-4", name: "Dup Sec" },
+            { ...blankSec, id: "p-5", name: "Dup Sec" },
+            { ...blankSec, id: "p-blank", name: "   " },
+            { ...blankSec, id: "p-old", isRetired: true, name: "Retired ISA" },
+            {
+              ...blankSec,
+              holdingsCount: 1,
+              id: "p-legacy-ret",
+              isRetired: true,
+              name: "Legacy Target",
+            },
+            {
+              ...blankSec,
+              holdingsCount: 0,
+              id: "p-empty-ret",
+              isRetired: true,
+              name: "Closed Empty",
+            },
+          ],
         },
+        handoff: { securitiesAccounts: [], securitiesByCategory: {} },
         latestQuoteDate: "2026-09-15",
         latestTransactionDate: "2026-09-15",
         targets: {
@@ -232,7 +371,7 @@ describe("Accounts", () => {
           value: { categories: heldTargets.categories, portfolios },
         },
       },
-      held: [linkedPension, staleIsa],
+      held: [linkedPension, staleIsa, linkedCash, pairedCashLink, missingLink],
       household: {
         cma: { latest: cma, previous: null },
         curve,
@@ -248,8 +387,9 @@ describe("Accounts", () => {
       },
     });
 
-    // Balance sheet renders bespoke growth on the linked saving and
-    // qualifies the caption with "Unlinked savings" and "now".
+    // Balance sheet renders bespoke growth on the linked saving, inline
+    // Portfolio indicator on fixed-rate linked cash, and qualifies the
+    // caption with "Unlinked savings" and "now".
     expect(
       screen.getByText(
         "Unlinked savings grow at the plan rate, 5.00% now, unless set otherwise",
@@ -258,11 +398,13 @@ describe("Accounts", () => {
     expect(
       screen.getByText("grows 7.96% a year now · Alpha ISA in Portfolio"),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText("holds its value · Emergency Cash in Portfolio"),
+    ).toBeInTheDocument();
 
-    // Opening the pension excludes stale "Retired ISA" and retired empty
-    // "Retired Empty" from targets.portfolios (since a live feed exists),
-    // deduplicates trimmed "Alpha ISA", and previews both bespoke and
-    // fallback live candidates.
+    // Opening the pension shows grouped Securities & Cash optgroups,
+    // deduplicates collisions, excludes paired cash and retired accounts,
+    // and previews bespoke, fallback, cash, and collision reasons.
     fireEvent.click(screen.getByRole("button", { name: "Workplace pension" }));
     const pensionDialog = screen.getByRole("dialog", {
       name: "Workplace pension",
@@ -272,9 +414,26 @@ describe("Accounts", () => {
     });
     expect(
       within(selector)
+        .getAllByRole("group")
+        .map((group) => group.getAttribute("label")),
+    ).toStrictEqual(["Securities accounts", "Cash accounts"]);
+    expect(
+      within(
+        within(selector).getByRole("group", { name: "Securities accounts" }),
+      )
         .getAllByRole("option")
         .map((option) => option.textContent),
-    ).toStrictEqual(["Not linked", "Alpha ISA", "Zeta SIPP"]);
+    ).toStrictEqual(["Alpha ISA", "Dup Sec", "Shared Name", "Zeta SIPP"]);
+    expect(
+      within(within(selector).getByRole("group", { name: "Cash accounts" }))
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toStrictEqual([
+      "Closed Empty",
+      "Dup Cash",
+      "Emergency Cash",
+      "Legacy Target",
+    ]);
 
     expect(selector).toHaveAccessibleDescription(
       /Grows .* now · following the glide path/,
@@ -285,31 +444,104 @@ describe("Accounts", () => {
       /No categorised holdings synced from Portfolio/,
     );
 
+    for (const cashName of ["Emergency Cash", "Closed Empty"]) {
+      fireEvent.change(selector, { target: { value: cashName } });
+      expect(selector).toHaveAccessibleDescription(
+        "Uses the plan rate, 5.00% now · prefills month-end balance",
+      );
+    }
+
+    for (const colliding of ["Dup Sec", "Dup Cash", "Shared Name"]) {
+      fireEvent.change(selector, { target: { value: colliding } });
+      expect(selector).toHaveAccessibleDescription(
+        "Multiple Portfolio accounts share this name · uses the plan rate, 5.00% now",
+      );
+    }
+
+    // Colliding name with live holdings in kept.targets surfaces its bespoke rate instead of falsely claiming plan rate.
+    fireEvent.change(selector, { target: { value: "Legacy Target" } });
+    expect(selector).toHaveAccessibleDescription(
+      /Grows .* now · following the glide path · Multiple Portfolio accounts share this name \(month-end prefill off\)/,
+    );
+
     fireEvent.click(
       within(pensionDialog).getByRole("button", { name: "Cancel" }),
     );
 
-    // Opening the account with the stale link shows "Not found in Portfolio".
+    // Retired, paired-reference-cash, and missing links surface clear unavailable reasons and accurate option suffixes.
     fireEvent.click(
       screen.getByRole("button", { name: "Stocks & shares ISA" }),
     );
-    const isaDialog = screen.getByRole("dialog", {
-      name: "Stocks & shares ISA",
-    });
-    expect(
-      within(isaDialog).getByRole("combobox", { name: "Portfolio account" }),
-    ).toHaveAccessibleDescription(
-      "Uses the plan rate, 5.00% now. Not found in Portfolio.",
+    const retiredSelect = within(
+      screen.getByRole("dialog", { name: "Stocks & shares ISA" }),
+    ).getByRole("combobox", { name: "Portfolio account" });
+    expect(retiredSelect).toHaveAccessibleDescription(
+      "Retired in Portfolio · uses the plan rate, 5.00% now",
     );
+    expect(
+      within(retiredSelect).getByRole("option", {
+        name: "Retired ISA (retired)",
+      }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Paired Link" }));
+    const pairedSelect = within(
+      screen.getByRole("dialog", { name: "Paired Link" }),
+    ).getByRole("combobox", { name: "Portfolio account" });
+    expect(pairedSelect).toHaveAccessibleDescription(
+      "Paired as reference cash for Alpha ISA and Zeta SIPP · fixed rate applies",
+    );
+    expect(
+      within(pairedSelect).getByRole("option", {
+        name: "Alpha Cash (unavailable)",
+      }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Missing Link" }));
+    const missingSelect = within(
+      screen.getByRole("dialog", { name: "Missing Link" }),
+    ).getByRole("combobox", { name: "Portfolio account" });
+    expect(missingSelect).toHaveAccessibleDescription(
+      "Not found in Portfolio · fixed rate applies",
+    );
+    expect(
+      within(missingSelect).getByRole("option", {
+        name: "Gone Account (not in Portfolio)",
+      }),
+    ).toBeInTheDocument();
   });
 
   // When no live portfolio feed is stored, candidate names fall back to
-  // synced targets.portfolios alongside category account holdings.
+  // synced targets.portfolios alongside category account holdings,
+  // fixed-rate hints omit live prefill promises, and stale links
+  // surface "Not found in Portfolio".
   it("falls back to targets.portfolios when no portfolio feed is stored", async () => {
+    const legacyTargets = {
+      ...targets,
+      categories: targets.categories.map((category, index) =>
+        index === 0
+          ? {
+              classes: category.classes,
+              id: category.id,
+              isImplemented: category.isImplemented,
+              name: category.name,
+              share: category.share,
+              value: category.value,
+            }
+          : category,
+      ),
+      portfolios,
+    };
     await renderAccounts({
       feed: null,
-      held: [accounts[0]],
-      household: { targets: { ...targets, portfolios } },
+      held: [
+        accounts[0],
+        { ...accounts[1], portfolio: "Gone ISA" },
+        accounts[2],
+      ],
+      household: { targets: legacyTargets },
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Workplace pension" }));
@@ -326,5 +558,26 @@ describe("Accounts", () => {
       "Stocks & shares ISA",
       "Workplace pension",
     ]);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Current account" }));
+    expect(
+      within(screen.getByRole("dialog", { name: "Current account" })).getByRole(
+        "combobox",
+        { name: "Portfolio account" },
+      ),
+    ).toHaveAccessibleDescription("Only applies on the plan rate");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Stocks & shares ISA" }),
+    );
+    expect(
+      within(
+        screen.getByRole("dialog", { name: "Stocks & shares ISA" }),
+      ).getByRole("combobox", { name: "Portfolio account" }),
+    ).toHaveAccessibleDescription(
+      "Not found in Portfolio · uses the plan rate, 5.00%",
+    );
   });
 });

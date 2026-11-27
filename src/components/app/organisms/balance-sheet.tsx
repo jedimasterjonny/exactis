@@ -241,11 +241,13 @@ export function BalanceSheet({
 
 // What a saving's row says of it beneath its name, its group having
 // said its kind: whose it is, when it is anyone's, a rate of its own
-// where it does not grow at the plan's, and a pension marked droppable
+// where it does not grow at the plan's, a pension marked droppable
 // saying so in words, since every other pension is kept paid when the
-// month runs short; and, stacked beneath, its bespoke Portfolio growth
-// rate or fallback note when linked to a Portfolio Performance account
-// on the plan rate; or no line for one with none of them.
+// month runs short, and an inline Portfolio label on a fixed-rate
+// saving linked to a Portfolio Performance securities or standalone
+// cash account; stacked beneath, its bespoke Portfolio growth rate or
+// plan-rate fallback when linked on the plan rate; or no line for one
+// with none of them.
 function aboutOf(
   account: Account,
   {
@@ -262,6 +264,9 @@ function aboutOf(
     owners.find(({ id }) => id === account.owner)?.name,
     account.growth.kind === "fixed" ? growthOf(account) : undefined,
     account.isDroppable === true ? "dropped when short" : undefined,
+    account.growth.kind === "fixed" && account.portfolio !== undefined
+      ? portfolioLabelOf(account.name, account.portfolio)
+      : undefined,
   ].filter((part) => part !== undefined);
   const linked = portfolioLineOf(account, accountRates, hasGlide);
   if (said.length === 0 && linked === undefined) {
@@ -406,8 +411,13 @@ function Page({ children }: { readonly children: string }): JSX.Element {
   );
 }
 
+function portfolioLabelOf(name: string, portfolio: string): string {
+  return portfolio === name ? "Portfolio" : `${portfolio} in Portfolio`;
+}
+
 // The Portfolio growth line for a saving on the plan rate linked to a
-// Portfolio Performance securities account, or undefined otherwise.
+// Portfolio Performance securities or standalone cash account, or
+// undefined otherwise.
 function portfolioLineOf(
   account: Account,
   accountRates: Plan["accountRates"],
@@ -416,10 +426,7 @@ function portfolioLineOf(
   if (account.growth.kind !== "plan" || account.portfolio === undefined) {
     return undefined;
   }
-  const label =
-    account.portfolio === account.name
-      ? "Portfolio"
-      : `${account.portfolio} in Portfolio`;
+  const label = portfolioLabelOf(account.name, account.portfolio);
   const bespoke = accountRates?.[account.id];
   if (bespoke === undefined) {
     return `at the plan rate · ${label}`;

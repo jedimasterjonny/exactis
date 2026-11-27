@@ -783,7 +783,7 @@ describe("AccountDialog", () => {
     fireEvent.change(choice(dialog, "Growth"), { target: { value: "fixed" } });
     expect(choice(dialog, "Portfolio account")).toHaveValue("Brokerage ISA");
     expect(choice(dialog, "Portfolio account")).toHaveAccessibleDescription(
-      "Fixed rate overrides Portfolio growth",
+      "Fixed rate overrides Portfolio growth · prefills month-end balance",
     );
     fireEvent.change(choice(dialog, "Growth"), { target: { value: "plan" } });
     expect(choice(dialog, "Portfolio account")).toHaveValue("Brokerage ISA");

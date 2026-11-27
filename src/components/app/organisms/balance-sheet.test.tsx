@@ -211,7 +211,7 @@ describe("BalanceSheet", () => {
       "4Fallback GIA£10,000at the plan rate · Empty Account in Portfolio",
     ]);
     expect(rowsOf("Cash")).toStrictEqual([
-      "5Current account£16,900grows 3.00% a year",
+      "5Current account£16,900grows 3.00% a year · Ignored Cash in Portfolio",
     ]);
   });
 
@@ -473,6 +473,40 @@ describe("BalanceSheet", () => {
     expect(rowsOf("Property & vehicles")).toStrictEqual([
       "No house or car yet",
     ]);
+  });
+
+  it("appends an inline Portfolio label on fixed-rate linked accounts", () => {
+    const fixedSameName: Account = {
+      balance: 15_000,
+      growth: { kind: "fixed", rate: 0.04 },
+      id: 40,
+      kind: "cash",
+      name: "Emergency Fund",
+      portfolio: "Emergency Fund",
+    };
+    const fixedOtherName: Account = {
+      balance: 20_000,
+      growth: { kind: "fixed", rate: 0.045 },
+      id: 41,
+      kind: "tax-free",
+      name: "Cash ISA",
+      owner: 1,
+      portfolio: "Northstar Cash ISA",
+    };
+    renderSheet({
+      assets: [],
+      debts: [],
+      savings: [fixedSameName, fixedOtherName],
+    });
+
+    expect(
+      screen.getByText("grows 4.00% a year · Portfolio"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Me · grows 4.50% a year · Northstar Cash ISA in Portfolio",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("draws its empty state rather than a sheet of nothing", () => {

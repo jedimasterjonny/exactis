@@ -2,6 +2,7 @@ import type { JSX, ReactNode } from "react";
 
 import type { AccountKind, AccountValues, Funding } from "@/data/accounts";
 import type { Owner } from "@/data/owners";
+import type { Option, OptionGroup } from "@/lib/options";
 
 import { FieldRow } from "@/components/app/atoms/field-row";
 import { MoneyField, RateField } from "@/components/app/molecules/figure-field";
@@ -22,16 +23,26 @@ import { mostFixedOf } from "@/lib/tax";
 
 export interface PortfolioOptions {
   readonly accounts: readonly string[];
+  readonly cashAccounts?: readonly string[];
   readonly hasGlide: boolean;
+  readonly hasLivePortfolio?: boolean;
   readonly planRate: number;
   readonly rates: Readonly<Record<string, PortfolioRate>>;
 }
 
 // What the Accounts UI shows for a candidate Portfolio Performance
-// securities account: either its bespoke nominal return and current
-// stocks share, or why it falls back to the global plan rate.
+// account: its bespoke nominal return and current stocks share, a
+// standalone cash account, a securities fallback to the plan rate, or
+// why a broken/colliding/retired link cannot be used (carrying any
+// bespoke CMA rate the household still derives from kept targets).
 export type PortfolioRate =
+  | {
+      readonly bespoke?: { readonly rate: number; readonly stocks: number };
+      readonly kind: "unavailable";
+      readonly reason: string;
+    }
   | { readonly kind: "bespoke"; readonly rate: number; readonly stocks: number }
+  | { readonly kind: "cash" }
   | { readonly kind: "fallback"; readonly reason: string };
 
 interface AccountFieldsProps {
@@ -121,10 +132,22 @@ export function AccountFields({
   owners,
   portfolio,
 }: AccountFieldsProps): JSX.Element {
+  const cashAccounts = portfolio?.cashAccounts ?? [];
   const isShowingPortfolio =
     takesSpare(draft) &&
     portfolio !== undefined &&
-    (portfolio.accounts.length > 0 || initial.portfolio !== null);
+    (portfolio.accounts.length > 0 ||
+      cashAccounts.length > 0 ||
+      initial.portfolio !== null);
+  const portfolioChoices =
+    portfolio === undefined
+      ? undefined
+      : portfolioSelectChoices({
+          accounts: portfolio.accounts,
+          cashAccounts,
+          initial: initial.portfolio,
+          rates: portfolio.rates,
+        });
   return (
     <div className="grid gap-4">
       <FieldRow layout={isOwned(draft) ? "triple" : "named"}>
@@ -256,18 +279,16 @@ export function AccountFields({
         </div>
         {children}
       </FieldRow>
-      {isShowingPortfolio && (
+      {isShowingPortfolio && portfolioChoices !== undefined && (
         <SelectField
           defaultValue={initial.portfolio ?? ""}
+          groups={portfolioChoices.groups}
           hint={portfolioHint(draft, portfolio)}
           label="Portfolio account"
           onValueChange={(value) => {
             onAmend({ portfolio: value === "" ? null : value });
           }}
-          options={portfolioSelectOptions(
-            portfolio.accounts,
-            initial.portfolio,
-          )}
+          options={portfolioChoices.options}
         />
       )}
     </div>
@@ -291,6 +312,19 @@ function amountHint(kind: AccountKind, isFed: boolean): string | undefined {
   return isFed ? `${limit}, less the sacrifice` : limit;
 }
 
+function bespokeHintOf({
+  hasGlide,
+  rate,
+  stocks,
+}: {
+  readonly hasGlide: boolean;
+  readonly rate: number;
+  readonly stocks: number;
+}): string {
+  const mix = hasGlide ? "following the glide path" : splitLabelOf(stocks);
+  return `${bespokeMoveOf(rate, hasGlide)} · ${mix}`;
+}
+
 // How a bespoke Portfolio rate moves a year in the Account dialog preview.
 function bespokeMoveOf(rate: number, hasGlide: boolean): string {
   const nowSuffix = hasGlide ? " now" : "";
@@ -311,46 +345,109 @@ function capHint(kind: AccountKind): string | undefined {
     : `Nothing for the full ${formatGbp(allowance)} allowance`;
 }
 
-// Live growth preview beneath the Portfolio account selector.
+function fixedGrowthHintOf(
+  portfolio: null | string,
+  hasLivePortfolio: boolean,
+): string {
+  if (portfolio === null) {
+    return hasLivePortfolio
+      ? "Links to prefill the month-end balance; bespoke growth applies on the plan rate"
+      : "Only applies on the plan rate";
+  }
+  return hasLivePortfolio
+    ? "Fixed rate overrides Portfolio growth · prefills month-end balance"
+    : "Fixed rate overrides Portfolio growth";
+}
+
+// Live growth and month-end prefill preview beneath the Portfolio
+// account selector. Unavailable links surface their reason before the
+// fixed-rate branch so broken, retired, paired-cash, or colliding links
+// never promise month-end prefill.
 function portfolioHint(
   draft: Pick<AccountValues, "growth" | "portfolio">,
-  { hasGlide, planRate, rates }: PortfolioOptions,
+  { hasGlide, hasLivePortfolio = true, planRate, rates }: PortfolioOptions,
 ): string {
-  if (draft.growth === "fixed") {
-    return draft.portfolio === null
-      ? "Only applies on the plan rate"
-      : "Fixed rate overrides Portfolio growth";
-  }
   const nowSuffix = hasGlide ? " now" : "";
   const preview =
     draft.portfolio !== null && Object.hasOwn(rates, draft.portfolio)
       ? rates[draft.portfolio]
       : undefined;
+  if (preview?.kind === "unavailable") {
+    return unavailableHintOf(preview, {
+      growth: draft.growth,
+      hasGlide,
+      planRate,
+    });
+  }
+  if (preview?.kind === "cash") {
+    return draft.growth === "fixed"
+      ? "Fixed rate · prefills month-end balance"
+      : `Uses the plan rate, ${formatPercent(planRate)}${nowSuffix} · prefills month-end balance`;
+  }
+  if (draft.growth === "fixed") {
+    return fixedGrowthHintOf(draft.portfolio, hasLivePortfolio);
+  }
   if (preview === undefined) {
     return `Uses the plan rate, ${formatPercent(planRate)}${nowSuffix}`;
   }
   if (preview.kind === "fallback") {
     return `Uses the plan rate, ${formatPercent(planRate)}${nowSuffix}. ${preview.reason}.`;
   }
-  const mix = hasGlide
-    ? "following the glide path"
-    : splitLabelOf(preview.stocks);
-  return `${bespokeMoveOf(preview.rate, hasGlide)} · ${mix}`;
+  return bespokeHintOf({
+    hasGlide,
+    rate: preview.rate,
+    stocks: preview.stocks,
+  });
 }
 
-// The options offered by the Portfolio account selector: unlinked,
-// live/synced accounts, and any stale saved link on this account.
-function portfolioSelectOptions(
-  accounts: readonly string[],
-  initial: null | string,
-): readonly { readonly label: string; readonly value: string }[] {
-  return [
-    { label: "Not linked", value: "" },
-    ...accounts.map((name) => ({ label: name, value: name })),
-    ...(initial !== null && !accounts.includes(initial)
-      ? [{ label: `${initial} (not in Portfolio)`, value: initial }]
-      : []),
-  ];
+// The options and optgroups offered by the Portfolio account selector:
+// grouped into Securities accounts and Cash accounts only when both
+// kinds exist, otherwise a flat list, preserving any stale saved link.
+function portfolioSelectChoices({
+  accounts,
+  cashAccounts,
+  initial,
+  rates,
+}: {
+  readonly accounts: readonly string[];
+  readonly cashAccounts: readonly string[];
+  readonly initial: null | string;
+  readonly rates: Readonly<Record<string, PortfolioRate>>;
+}): {
+  readonly groups: readonly OptionGroup[];
+  readonly options: readonly Option<string>[];
+} {
+  const live = new Set([...accounts, ...cashAccounts]);
+  const staleOption: readonly Option<string>[] =
+    initial !== null && !live.has(initial)
+      ? [{ label: staleOptionLabel(initial, rates), value: initial }]
+      : [];
+  const securitiesOptions = accounts.map((name) => ({
+    label: name,
+    value: name,
+  }));
+  const cashOptions = cashAccounts.map((name) => ({
+    label: name,
+    value: name,
+  }));
+  if (securitiesOptions.length > 0 && cashOptions.length > 0) {
+    return {
+      groups: [
+        { label: "Securities accounts", options: securitiesOptions },
+        { label: "Cash accounts", options: cashOptions },
+      ],
+      options: [{ label: "Not linked", value: "" }, ...staleOption],
+    };
+  }
+  return {
+    groups: [],
+    options: [
+      { label: "Not linked", value: "" },
+      ...securitiesOptions,
+      ...cashOptions,
+      ...staleOption,
+    ],
+  };
 }
 
 // The equity/bond mix label for a bespoke Portfolio preview without a
@@ -365,4 +462,44 @@ function splitLabelOf(stocks: number): string {
   }
   const stocksPercent = Math.min(99, Math.max(1, Math.round(stocks * 100)));
   return `${formatWholePercent(stocksPercent / 100)} stocks, ${formatWholePercent((100 - stocksPercent) / 100)} bonds`;
+}
+
+// Labels a saved link absent from the live candidate list according to
+// why it is unavailable rather than mislabelling retired or paired cash
+// accounts as "not in Portfolio".
+function staleOptionLabel(
+  name: string,
+  rates: Readonly<Record<string, PortfolioRate>>,
+): string {
+  const rate = Object.hasOwn(rates, name) ? rates[name] : undefined;
+  if (
+    rate?.kind !== "unavailable" ||
+    rate.reason === "Not found in Portfolio"
+  ) {
+    return `${name} (not in Portfolio)`;
+  }
+  return rate.reason === "Retired in Portfolio"
+    ? `${name} (retired)`
+    : `${name} (unavailable)`;
+}
+
+function unavailableHintOf(
+  preview: Extract<PortfolioRate, { readonly kind: "unavailable" }>,
+  {
+    growth,
+    hasGlide,
+    planRate,
+  }: {
+    readonly growth: AccountValues["growth"];
+    readonly hasGlide: boolean;
+    readonly planRate: number;
+  },
+): string {
+  if (growth === "fixed") {
+    return `${preview.reason} · fixed rate applies`;
+  }
+  if (preview.bespoke !== undefined) {
+    return `${bespokeHintOf({ hasGlide, ...preview.bespoke })} · ${preview.reason} (month-end prefill off)`;
+  }
+  return `${preview.reason} · uses the plan rate, ${formatPercent(planRate)}${hasGlide ? " now" : ""}`;
 }
