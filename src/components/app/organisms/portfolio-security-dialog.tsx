@@ -2,7 +2,7 @@
 
 import type { JSX } from "react";
 
-import { Archive } from "lucide-react";
+import { Archive, ArrowLeftRight } from "lucide-react";
 import { useState } from "react";
 
 import type {
@@ -30,12 +30,15 @@ import { counted } from "@/lib/count";
 import { formatDay } from "@/lib/months";
 
 interface PortfolioSecurityDialogProps {
+  readonly canRecordOpening?: boolean;
   readonly categories: readonly PortfolioCategory[];
   readonly defaultCurrency?: string;
   readonly onDelete?: () => void;
   readonly onDismiss: () => void;
   readonly onSaved: (outcome: {
+    readonly id: string;
     readonly isRetired: boolean;
+    readonly shouldRecordOpening: boolean;
     readonly version: number;
   }) => void;
   readonly security?: Holding;
@@ -52,6 +55,7 @@ const currencies = ["GBP", "GBX", "USD", "EUR"] as const;
 // overwritten, a Retired switch is provided, and Delete is offered only
 // when the security has zero raw transactions.
 export function PortfolioSecurityDialog({
+  canRecordOpening = false,
   categories,
   defaultCurrency,
   onDelete,
@@ -72,16 +76,14 @@ export function PortfolioSecurityDialog({
   const [latestPrice, setLatestPrice] = useState<null | number>(null);
   const [note, setNote] = useState(security?.note ?? "");
   const [isRetired, setIsRetired] = useState(security?.isRetired ?? false);
+  const [isRecordingOpening, setIsRecordingOpening] = useState(false);
   const { isSending, send } = useSender();
+  const willRecordOpening =
+    !isEditing && canRecordOpening && isRecordingOpening;
 
   const currencyOptions = currencyOptionsOf(currency);
   const isSplitCategory = security?.isSplitCategory === true;
-  const categoryOptions: readonly Option<string>[] = isSplitCategory
-    ? [{ label: security.category ?? "Split allocation", value: "" }]
-    : [
-        { label: "Unassigned", value: "" },
-        ...categories.map((item) => ({ label: item.name, value: item.id })),
-      ];
+  const categoryOptions = categoryOptionsOf(categories, security);
   const effectiveCategoryId =
     !isSplitCategory && categories.some((item) => item.id === categoryId)
       ? categoryId
@@ -111,7 +113,12 @@ export function PortfolioSecurityDialog({
       send(async () => editPortfolioSecurity(version, draft), {
         failure: "Security not saved",
         onAccepted: (result) => {
-          onSaved({ isRetired, version: result.version });
+          onSaved({
+            id: security.id,
+            isRetired,
+            shouldRecordOpening: false,
+            version: result.version,
+          });
         },
         success: (result) =>
           editSuccessToast({
@@ -139,7 +146,12 @@ export function PortfolioSecurityDialog({
     send(async () => addPortfolioSecurity(version, draft), {
       failure: "Security not saved",
       onAccepted: (result) => {
-        onSaved({ isRetired: false, version: result.version });
+        onSaved({
+          id: result.id,
+          isRetired: false,
+          shouldRecordOpening: willRecordOpening,
+          version: result.version,
+        });
       },
       success: (result) => ({
         description: withSyncNote(
@@ -154,6 +166,7 @@ export function PortfolioSecurityDialog({
   return (
     <EditDialog
       canSave={name.trim() !== ""}
+      confirm={willRecordOpening ? "Save & add trade" : "Save"}
       eyebrow={isEditing ? "Edit security" : "New security"}
       isSaving={isSending}
       isWide
@@ -254,7 +267,17 @@ export function PortfolioSecurityDialog({
           Retired
         </LabelledSwitch>
       )}
-      {!isEditing && (
+      {!isEditing && canRecordOpening && (
+        <LabelledSwitch
+          className="justify-self-start"
+          icon={ArrowLeftRight}
+          isChecked={isRecordingOpening}
+          onCheckedChange={setIsRecordingOpening}
+        >
+          Record opening trade
+        </LabelledSwitch>
+      )}
+      {!isEditing && !canRecordOpening && (
         <Note>
           Creates the security in the catalogue. Record a purchase or inbound
           delivery to add shares.
@@ -265,6 +288,19 @@ export function PortfolioSecurityDialog({
       )}
     </EditDialog>
   );
+}
+
+function categoryOptionsOf(
+  categories: readonly PortfolioCategory[],
+  security: Holding | undefined,
+): readonly Option<string>[] {
+  if (security?.isSplitCategory === true) {
+    return [{ label: security.category ?? "Split allocation", value: "" }];
+  }
+  return [
+    { label: "Unassigned", value: "" },
+    ...categories.map((item) => ({ label: item.name, value: item.id })),
+  ];
 }
 
 function currencyOf(code: string | undefined): string {

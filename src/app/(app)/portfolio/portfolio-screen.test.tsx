@@ -8,7 +8,7 @@ import {
 import { useRouter } from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { PortfolioSnapshot } from "@/data/portfolio";
+import type { Holding, PortfolioSnapshot } from "@/data/portfolio";
 import type { OwnedPortfolio } from "@/store/portfolio";
 
 import {
@@ -2558,5 +2558,521 @@ describe("PortfolioScreen", () => {
     await waitFor(() => {
       expect(screen.getByRole("heading", { level: 1 })).toHaveFocus();
     });
+  });
+
+  it("hands off a newly added security into an opening purchase or inbound delivery, restores focus cleanly, and clears stale handoffs", async () => {
+    vi.mocked(addPortfolioSecurity)
+      .mockResolvedValueOnce(
+        saved({ id: "sec-plain", savedOn: "2026-09-25", version: 2 }),
+      )
+      .mockResolvedValueOnce(
+        saved({ id: "sec-filtered", savedOn: "2026-09-25", version: 3 }),
+      )
+      .mockResolvedValueOnce(
+        saved({ id: "sec-multi", savedOn: "2026-09-25", version: 5 }),
+      )
+      .mockResolvedValueOnce(
+        saved({ id: "sec-delivery", savedOn: "2026-09-25", version: 6 }),
+      )
+      .mockResolvedValueOnce(
+        saved({ id: "sec-tab-abort", savedOn: "2026-09-25", version: 7 }),
+      )
+      .mockResolvedValueOnce(
+        saved({ id: "sec-overlay-abort", savedOn: "2026-09-25", version: 8 }),
+      )
+      .mockResolvedValueOnce(
+        saved({ id: "sec-missing", savedOn: "2026-09-25", version: 9 }),
+      )
+      .mockResolvedValueOnce(
+        saved({ id: "sec-scenario", savedOn: "2026-09-25", version: 10 }),
+      );
+    vi.mocked(addPortfolioTransaction).mockResolvedValue(
+      saved({ id: "tx-opening", savedOn: "2026-09-25", version: 4 }),
+    );
+
+    const makeHolding = (id: string, name: string): Holding => ({
+      currency: "GBP",
+      gbpRate: 1,
+      id,
+      isRetired: false,
+      isSplitCategory: false,
+      latestPrice: 100,
+      latestPriceDate: "2026-09-25",
+      name,
+      shares: 0,
+      sharesByAccount: [],
+      transactionCount: 0,
+    });
+
+    const { rerender } = render(
+      <PortfolioScreen
+        initialTab="holdings"
+        isInScenario={false}
+        owned={ownedMulti}
+        today="2026-09-25"
+      />,
+      { wrapper: Toaster },
+    );
+
+    // 1. Switch OFF: closes security dialog, turns on zero-share rows, and focuses the new holding row once version arrives.
+    fireEvent.click(screen.getByRole("button", { name: "Add security" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Security name" }), {
+      target: { value: "Plain Index Fund" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Plain Index Fund" }),
+      ).not.toBeInTheDocument();
+    });
+    const ownedV2: OwnedPortfolio = {
+      ...ownedMulti,
+      snapshot: {
+        ...ownedMulti.snapshot,
+        holdings: [
+          ...ownedMulti.snapshot.holdings,
+          makeHolding("sec-plain", "Plain Index Fund"),
+        ],
+      },
+      version: 2,
+    };
+    rerender(
+      <PortfolioScreen
+        initialTab="holdings"
+        isInScenario={false}
+        owned={ownedV2}
+        today="2026-09-25"
+      />,
+    );
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Plain Index Fund" }),
+      ).toHaveFocus();
+    });
+    expect(
+      screen.queryByRole("dialog", { name: "Purchase · Plain Index Fund" }),
+    ).not.toBeInTheDocument();
+
+    // 2. Switch ON while filtered to Northstar ISA -> waits for version 3, opens prefilled purchase, saves, and restores focus after version 4 without URL rewrite.
+    fireEvent.change(screen.getByRole("combobox", { name: "Account" }), {
+      target: { value: "port-isa" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add security" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Security name" }), {
+      target: { value: "Filtered Equity ETF" },
+    });
+    fireEvent.click(
+      screen.getByRole("switch", { name: "Record opening trade" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save & add trade" }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Filtered Equity ETF" }),
+      ).not.toBeInTheDocument();
+    });
+    // Still at version 2 -> opening dialog has not opened prematurely.
+    expect(
+      screen.queryByRole("dialog", { name: "Purchase · Filtered Equity ETF" }),
+    ).not.toBeInTheDocument();
+
+    const ownedV3: OwnedPortfolio = {
+      ...ownedV2,
+      snapshot: {
+        ...ownedV2.snapshot,
+        holdings: [
+          ...ownedV2.snapshot.holdings,
+          makeHolding("sec-filtered", "Filtered Equity ETF"),
+        ],
+      },
+      version: 3,
+    };
+    rerender(
+      <PortfolioScreen
+        initialTab="holdings"
+        isInScenario={false}
+        owned={ownedV3}
+        today="2026-09-25"
+      />,
+    );
+    const openingPurchase = screen.getByRole("dialog", {
+      name: "Purchase · Filtered Equity ETF",
+    });
+    expect(
+      within(openingPurchase).getByRole("combobox", {
+        name: "Securities account",
+      }),
+    ).toHaveValue("port-isa");
+    expect(
+      within(openingPurchase).getByRole("combobox", { name: "Cash account" }),
+    ).toHaveValue("cash-isa");
+    expect(
+      within(openingPurchase).getByRole("combobox", { name: "Security" }),
+    ).toHaveValue("sec-filtered");
+
+    commit(
+      within(openingPurchase).getByRole("textbox", { name: "Shares" }),
+      "5",
+    );
+    commit(
+      within(openingPurchase).getByRole("textbox", { name: "Total paid" }),
+      "500",
+    );
+    fireEvent.click(
+      within(openingPurchase).getByRole("button", { name: "Save" }),
+    );
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", {
+          name: "Purchase · Filtered Equity ETF",
+        }),
+      ).not.toBeInTheDocument();
+    });
+    const ownedV4: OwnedPortfolio = { ...ownedV3, version: 4 };
+    rerender(
+      <PortfolioScreen
+        initialTab="holdings"
+        isInScenario={false}
+        owned={ownedV4}
+        today="2026-09-25"
+      />,
+    );
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Filtered Equity ETF" }),
+      ).toHaveFocus();
+    });
+    expect(routerReplace).not.toHaveBeenCalled();
+
+    // 3. Switch ON unfiltered across multiple accounts -> blank account + hint; dismiss focuses the new holding row at current version without URL rewrite.
+    fireEvent.click(screen.getByRole("button", { name: "Add security" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Security name" }), {
+      target: { value: "Multi Account Fund" },
+    });
+    fireEvent.click(
+      screen.getByRole("switch", { name: "Record opening trade" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save & add trade" }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Multi Account Fund" }),
+      ).not.toBeInTheDocument();
+    });
+    const ownedV5: OwnedPortfolio = {
+      ...ownedV4,
+      snapshot: {
+        ...ownedV4.snapshot,
+        holdings: [
+          ...ownedV4.snapshot.holdings,
+          makeHolding("sec-multi", "Multi Account Fund"),
+        ],
+      },
+      version: 5,
+    };
+    rerender(
+      <PortfolioScreen
+        initialTab="holdings"
+        isInScenario={false}
+        owned={ownedV5}
+        today="2026-09-25"
+      />,
+    );
+    const multiOpening = screen.getByRole("dialog", {
+      name: "Purchase · Multi Account Fund",
+    });
+    const multiAccountSelect = within(multiOpening).getByRole("combobox", {
+      name: "Securities account",
+    });
+    expect(multiAccountSelect).toHaveValue("");
+    expect(multiAccountSelect).toHaveAccessibleDescription(
+      "Choose the account for this trade",
+    );
+    fireEvent.click(
+      within(multiOpening).getByRole("button", { name: "Cancel" }),
+    );
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Multi Account Fund" }),
+      ).toHaveFocus();
+    });
+    expect(routerReplace).not.toHaveBeenCalled();
+
+    // 4. Zero active cash accounts -> falls back to inbound-delivery with unselected account hint.
+    const noCashV5: OwnedPortfolio = {
+      ...ownedV5,
+      snapshot: { ...ownedV5.snapshot, cashAccounts: [] },
+    };
+    rerender(
+      <PortfolioScreen
+        initialTab="holdings"
+        isInScenario={false}
+        owned={noCashV5}
+        today="2026-09-25"
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Add security" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Security name" }), {
+      target: { value: "Delivery Only Fund" },
+    });
+    fireEvent.click(
+      screen.getByRole("switch", { name: "Record opening trade" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save & add trade" }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Delivery Only Fund" }),
+      ).not.toBeInTheDocument();
+    });
+    const noCashV6: OwnedPortfolio = {
+      ...noCashV5,
+      snapshot: {
+        ...noCashV5.snapshot,
+        holdings: [
+          ...noCashV5.snapshot.holdings,
+          makeHolding("sec-delivery", "Delivery Only Fund"),
+        ],
+      },
+      version: 6,
+    };
+    rerender(
+      <PortfolioScreen
+        initialTab="holdings"
+        isInScenario={false}
+        owned={noCashV6}
+        today="2026-09-25"
+      />,
+    );
+    const deliveryDialog = screen.getByRole("dialog", {
+      name: "Inbound delivery · Delivery Only Fund",
+    });
+    expect(
+      within(deliveryDialog).getByRole("combobox", {
+        name: "Securities account",
+      }),
+    ).toHaveAccessibleDescription("Choose the account for this trade");
+    fireEvent.click(
+      within(deliveryDialog).getByRole("button", { name: "Cancel" }),
+    );
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", {
+          name: "Inbound delivery · Delivery Only Fund",
+        }),
+      ).not.toBeInTheDocument();
+    });
+
+    // 5a. Switching tab during refresh cancels pending opening handoff.
+    fireEvent.click(screen.getByRole("button", { name: "Add security" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Security name" }), {
+      target: { value: "Tab Abort Fund" },
+    });
+    fireEvent.click(
+      screen.getByRole("switch", { name: "Record opening trade" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save & add trade" }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Tab Abort Fund" }),
+      ).not.toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("tab", { name: "Accounts" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Holdings" }));
+    const ownedV7: OwnedPortfolio = {
+      ...noCashV6,
+      snapshot: {
+        ...noCashV6.snapshot,
+        holdings: [
+          ...noCashV6.snapshot.holdings,
+          makeHolding("sec-tab-abort", "Tab Abort Fund"),
+        ],
+      },
+      version: 7,
+    };
+    rerender(
+      <PortfolioScreen
+        initialTab="holdings"
+        isInScenario={false}
+        owned={ownedV7}
+        today="2026-09-25"
+      />,
+    );
+    expect(
+      screen.queryByRole("dialog", { name: /Tab Abort Fund/u }),
+    ).not.toBeInTheDocument();
+
+    // 5b. Opening another overlay during refresh cancels pending opening handoff.
+    fireEvent.click(screen.getByRole("button", { name: "Add security" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Security name" }), {
+      target: { value: "Overlay Abort Fund" },
+    });
+    fireEvent.click(
+      screen.getByRole("switch", { name: "Record opening trade" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save & add trade" }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Overlay Abort Fund" }),
+      ).not.toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Update quotes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    const ownedV8: OwnedPortfolio = {
+      ...ownedV7,
+      snapshot: {
+        ...ownedV7.snapshot,
+        holdings: [
+          ...ownedV7.snapshot.holdings,
+          makeHolding("sec-overlay-abort", "Overlay Abort Fund"),
+        ],
+      },
+      version: 8,
+    };
+    rerender(
+      <PortfolioScreen
+        initialTab="holdings"
+        isInScenario={false}
+        owned={ownedV8}
+        today="2026-09-25"
+      />,
+    );
+    expect(
+      screen.queryByRole("dialog", { name: /Overlay Abort Fund/u }),
+    ).not.toBeInTheDocument();
+
+    // 5c. Refreshed snapshot missing the security clears pending opening handoff cleanly.
+    fireEvent.click(screen.getByRole("button", { name: "Add security" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Security name" }), {
+      target: { value: "Missing Fund" },
+    });
+    fireEvent.click(
+      screen.getByRole("switch", { name: "Record opening trade" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save & add trade" }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Missing Fund" }),
+      ).not.toBeInTheDocument();
+    });
+    const ownedV9: OwnedPortfolio = { ...ownedV8, version: 9 };
+    rerender(
+      <PortfolioScreen
+        initialTab="holdings"
+        isInScenario={false}
+        owned={ownedV9}
+        today="2026-09-25"
+      />,
+    );
+    expect(
+      screen.queryByRole("dialog", { name: /Missing Fund/u }),
+    ).not.toBeInTheDocument();
+
+    // 5d. Entering a scenario during refresh clears pending opening handoff so leaving never ghost-opens it.
+    fireEvent.click(screen.getByRole("button", { name: "Add security" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Security name" }), {
+      target: { value: "Scenario Abort Fund" },
+    });
+    fireEvent.click(
+      screen.getByRole("switch", { name: "Record opening trade" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save & add trade" }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Scenario Abort Fund" }),
+      ).not.toBeInTheDocument();
+    });
+    rerender(
+      <PortfolioScreen
+        initialTab="holdings"
+        isInScenario
+        owned={ownedV9}
+        today="2026-09-25"
+      />,
+    );
+    const ownedV10: OwnedPortfolio = {
+      ...ownedV9,
+      snapshot: {
+        ...ownedV9.snapshot,
+        holdings: [
+          ...ownedV9.snapshot.holdings,
+          makeHolding("sec-scenario", "Scenario Abort Fund"),
+        ],
+      },
+      version: 10,
+    };
+    rerender(
+      <PortfolioScreen
+        initialTab="holdings"
+        isInScenario={false}
+        owned={ownedV10}
+        today="2026-09-25"
+      />,
+    );
+    expect(
+      screen.queryByRole("dialog", { name: /Scenario Abort Fund/u }),
+    ).not.toBeInTheDocument();
+
+    // 6. Single active securities account auto-selects it without a prompt hint.
+    vi.mocked(addPortfolioSecurity).mockResolvedValueOnce(
+      saved({ id: "sec-single", savedOn: "2026-09-25", version: 11 }),
+    );
+    const singleAccountV10: OwnedPortfolio = {
+      ...ownedMulti,
+      snapshot: {
+        ...ownedMulti.snapshot,
+        securitiesAccounts: ownedMulti.snapshot.securitiesAccounts.slice(0, 1),
+      },
+      version: 10,
+    };
+    rerender(
+      <PortfolioScreen
+        initialTab="holdings"
+        isInScenario={false}
+        owned={singleAccountV10}
+        today="2026-09-25"
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Add security" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Security name" }), {
+      target: { value: "Single Account Fund" },
+    });
+    fireEvent.click(
+      screen.getByRole("switch", { name: "Record opening trade" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save & add trade" }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Single Account Fund" }),
+      ).not.toBeInTheDocument();
+    });
+    rerender(
+      <PortfolioScreen
+        initialTab="holdings"
+        isInScenario={false}
+        owned={{
+          ...singleAccountV10,
+          snapshot: {
+            ...singleAccountV10.snapshot,
+            holdings: [
+              ...singleAccountV10.snapshot.holdings,
+              makeHolding("sec-single", "Single Account Fund"),
+            ],
+          },
+          version: 11,
+        }}
+        today="2026-09-25"
+      />,
+    );
+    const singleOpening = screen.getByRole("dialog", {
+      name: "Purchase · Single Account Fund",
+    });
+    expect(
+      within(singleOpening).getByRole("combobox", {
+        name: "Securities account",
+      }),
+    ).toHaveValue("port-isa");
+    expect(
+      within(singleOpening).getByRole("combobox", {
+        name: "Securities account",
+      }),
+    ).toHaveAccessibleDescription("");
   });
 });

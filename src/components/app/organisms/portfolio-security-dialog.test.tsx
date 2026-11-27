@@ -26,7 +26,9 @@ describe("PortfolioSecurityDialog", () => {
     const onSaved =
       vi.fn<
         (outcome: {
+          readonly id: string;
           readonly isRetired: boolean;
+          readonly shouldRecordOpening: boolean;
           readonly version: number;
         }) => void
       >();
@@ -120,7 +122,9 @@ describe("PortfolioSecurityDialog", () => {
     const onSaved =
       vi.fn<
         (outcome: {
+          readonly id: string;
           readonly isRetired: boolean;
+          readonly shouldRecordOpening: boolean;
           readonly version: number;
         }) => void
       >();
@@ -180,7 +184,9 @@ describe("PortfolioSecurityDialog", () => {
 
     await waitFor(() => {
       expect(onSaved).toHaveBeenCalledExactlyOnceWith({
+        id: "sec-new",
         isRetired: false,
+        shouldRecordOpening: false,
         version: 3,
       });
     });
@@ -201,7 +207,9 @@ describe("PortfolioSecurityDialog", () => {
     const onSaved =
       vi.fn<
         (outcome: {
+          readonly id: string;
           readonly isRetired: boolean;
+          readonly shouldRecordOpening: boolean;
           readonly version: number;
         }) => void
       >();
@@ -228,7 +236,9 @@ describe("PortfolioSecurityDialog", () => {
 
     await waitFor(() => {
       expect(onSaved).toHaveBeenCalledExactlyOnceWith({
+        id: "sec-zero",
         isRetired: false,
+        shouldRecordOpening: false,
         version: 2,
       });
     });
@@ -261,7 +271,9 @@ describe("PortfolioSecurityDialog", () => {
     const onSaved =
       vi.fn<
         (outcome: {
+          readonly id: string;
           readonly isRetired: boolean;
+          readonly shouldRecordOpening: boolean;
           readonly version: number;
         }) => void
       >();
@@ -289,9 +301,130 @@ describe("PortfolioSecurityDialog", () => {
       );
     });
     expect(onSaved).toHaveBeenCalledExactlyOnceWith({
+      id: "sec-warn",
       isRetired: false,
+      shouldRecordOpening: false,
       version: 2,
     });
+  });
+
+  it("offers Record opening trade when canRecordOpening is true and clears it if the capability drops or in edit mode", async () => {
+    vi.mocked(addPortfolioSecurity)
+      .mockResolvedValueOnce(
+        saved({ id: "sec-open-1", savedOn: "2026-09-25", version: 2 }),
+      )
+      .mockResolvedValueOnce(
+        saved({ id: "sec-open-2", savedOn: "2026-09-25", version: 3 }),
+      );
+    const onSaved =
+      vi.fn<
+        (outcome: {
+          readonly id: string;
+          readonly isRetired: boolean;
+          readonly shouldRecordOpening: boolean;
+          readonly version: number;
+        }) => void
+      >();
+
+    const { rerender } = render(
+      <PortfolioSecurityDialog
+        canRecordOpening
+        categories={[]}
+        onDismiss={vi.fn<() => void>()}
+        onSaved={onSaved}
+        today="2026-09-25"
+        version={1}
+      />,
+      { wrapper: Toaster },
+    );
+
+    expect(
+      screen.queryByText(/Creates the security in the catalogue/u),
+    ).not.toBeInTheDocument();
+    const openingSwitch = screen.getByRole("switch", {
+      name: "Record opening trade",
+    });
+    expect(openingSwitch).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Security name" }), {
+      target: { value: "Opening Equity Index" },
+    });
+    fireEvent.click(openingSwitch);
+    expect(openingSwitch).toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "Save & add trade" }));
+
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledExactlyOnceWith({
+        id: "sec-open-1",
+        isRetired: false,
+        shouldRecordOpening: true,
+        version: 2,
+      });
+    });
+
+    // If canRecordOpening drops true -> false while the dialog stays open, revert label and suppress handoff.
+    rerender(
+      <PortfolioSecurityDialog
+        canRecordOpening={false}
+        categories={[]}
+        onDismiss={vi.fn<() => void>()}
+        onSaved={onSaved}
+        today="2026-09-25"
+        version={2}
+      />,
+    );
+    expect(
+      screen.queryByRole("switch", { name: "Record opening trade" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen
+        .getAllByRole("paragraph")
+        .map((paragraph) => paragraph.textContent),
+    ).toContain(
+      "Creates the security in the catalogue. Record a purchase or inbound delivery to add shares.",
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenLastCalledWith({
+        id: "sec-open-2",
+        isRetired: false,
+        shouldRecordOpening: false,
+        version: 3,
+      });
+    });
+
+    // Edit mode never offers Record opening trade even when canRecordOpening is true.
+    rerender(
+      <PortfolioSecurityDialog
+        canRecordOpening
+        categories={[]}
+        key="edit-mode"
+        onDismiss={vi.fn<() => void>()}
+        onSaved={onSaved}
+        security={{
+          currency: "GBP",
+          gbpRate: 1,
+          id: "sec-existing",
+          isRetired: false,
+          isSplitCategory: false,
+          latestPrice: 100,
+          latestPriceDate: "2026-09-25",
+          name: "Existing Fund",
+          shares: 0,
+          sharesByAccount: [],
+          transactionCount: 0,
+        }}
+        today="2026-09-25"
+        version={3}
+      />,
+    );
+    expect(
+      screen.queryByRole("switch", { name: "Record opening trade" }),
+    ).not.toBeInTheDocument();
   });
 
   it("edits securities with locked currency and split category, offers Delete when unused, shows transaction lock note, and tailors retire/restore toasts", async () => {
@@ -342,7 +475,9 @@ describe("PortfolioSecurityDialog", () => {
     const onSaved =
       vi.fn<
         (outcome: {
+          readonly id: string;
           readonly isRetired: boolean;
+          readonly shouldRecordOpening: boolean;
           readonly version: number;
         }) => void
       >();

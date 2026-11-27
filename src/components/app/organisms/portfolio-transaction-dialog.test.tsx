@@ -2268,4 +2268,59 @@ describe("PortfolioTransactionDialog", () => {
       screen.getByRole("combobox", { name: "To cash account" }),
     ).toHaveValue("cash-retired");
   });
+
+  it("shows the unselected portfolio hint for inbound-delivery handoffs and prioritizes empty account hints", () => {
+    const { rerender } = render(
+      <PortfolioTransactionDialog
+        baseCurrency="GBP"
+        cashAccounts={[]}
+        holdings={holdings}
+        initialDraft={{
+          portfolioId: "",
+          securityId: "sec-world",
+          type: "inbound-delivery",
+        }}
+        key="delivery-unselected"
+        onDismiss={vi.fn<() => void>()}
+        onSaved={vi.fn<() => void>()}
+        securitiesAccounts={securitiesAccounts}
+        today="2026-09-25"
+        version={1}
+      />,
+      { wrapper: Toaster },
+    );
+
+    const portfolioSelect = screen.getByRole("combobox", {
+      name: "Securities account",
+    });
+    expect(portfolioSelect).toHaveValue("");
+    expect(portfolioSelect).toHaveAccessibleDescription(
+      "Choose the account for this trade",
+    );
+
+    fireEvent.change(portfolioSelect, { target: { value: "port-isa" } });
+    expect(portfolioSelect).toHaveAccessibleDescription("");
+
+    rerender(
+      <PortfolioTransactionDialog
+        baseCurrency="GBP"
+        cashAccounts={[]}
+        holdings={holdings}
+        initialDraft={{
+          portfolioId: "",
+          securityId: "sec-world",
+          type: "inbound-delivery",
+        }}
+        key="delivery-empty"
+        onDismiss={vi.fn<() => void>()}
+        onSaved={vi.fn<() => void>()}
+        securitiesAccounts={[]}
+        today="2026-09-25"
+        version={1}
+      />,
+    );
+    expect(
+      screen.getByRole("combobox", { name: "Securities account" }),
+    ).toHaveAccessibleDescription("Add a securities account first");
+  });
 });
