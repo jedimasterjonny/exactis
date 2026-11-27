@@ -774,7 +774,7 @@ function AccountFields({
       return (
         <FieldRow layout="pair">
           <SelectField
-            hint={securitiesHint}
+            hint={securitiesHint ?? portfolioUnselectedHint}
             isDisabled={securitiesCount === 0}
             label="Securities account"
             onValueChange={onPortfolioChange}

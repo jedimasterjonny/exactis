@@ -72,6 +72,12 @@ interface DeleteTarget {
   readonly title: string;
 }
 
+interface OpeningSecurityHandoff {
+  readonly afterVersion: number;
+  readonly portfolioId?: string;
+  readonly securityId: string;
+}
+
 interface OwnedPortfolioTabsProps {
   readonly activeTab: PortfolioTab;
   readonly initialTrade?: PortfolioTradeHandoff;
@@ -268,6 +274,17 @@ export function PortfolioScreen({
   );
 }
 
+function canOpenSecurityTrade(
+  securityId: string,
+  activeSecurities: readonly SecuritiesAccount[],
+  holdings: readonly Holding[],
+): boolean {
+  return (
+    activeSecurities.length > 0 &&
+    holdings.some((holding) => holding.id === securityId && !holding.isRetired)
+  );
+}
+
 function deleteCopyOf(target: DeleteTarget): {
   readonly confirmBody: string;
   readonly failure: string;
@@ -331,6 +348,48 @@ function isElementVisible(element: HTMLElement): boolean {
   return true;
 }
 
+function isOpeningHandoffStale(
+  handoff: null | OpeningSecurityHandoff,
+  context: {
+    readonly activeSecurities: readonly SecuritiesAccount[];
+    readonly activeTab: PortfolioTab;
+    readonly holdings: readonly Holding[];
+    readonly isOtherOverlayOpen: boolean;
+    readonly version: number;
+  },
+): boolean {
+  if (handoff === null) {
+    return false;
+  }
+  if (context.activeTab !== "Holdings" || context.isOtherOverlayOpen) {
+    return true;
+  }
+  return (
+    context.version >= handoff.afterVersion &&
+    !canOpenSecurityTrade(
+      handoff.securityId,
+      context.activeSecurities,
+      context.holdings,
+    )
+  );
+}
+
+function openingTradeDraftOf(
+  target: OpeningSecurityHandoff,
+  activeSecurities: readonly SecuritiesAccount[],
+  activeCash: readonly CashAccount[],
+): PortfolioTransactionDraft {
+  const portfolioId = resolveTradePortfolioId(
+    target.portfolioId,
+    activeSecurities,
+  );
+  return {
+    ...(portfolioId !== undefined && { portfolioId }),
+    securityId: target.securityId,
+    type: activeCash.length > 0 ? "purchase" : "inbound-delivery",
+  };
+}
+
 // Tabs, filters, switches, and write-back dialogs for the owned
 // portfolio file. Keyed on replaceCount and fileName so single-entry
 // mutations preserve filters and keep dialogs open across stale
@@ -371,6 +430,8 @@ function OwnedPortfolioTabs({
       : null,
   );
   const [isUpdatingQuotes, setIsUpdatingQuotes] = useState(false);
+  const [openingSecurityHandoff, setOpeningSecurityHandoff] =
+    useState<null | OpeningSecurityHandoff>(null);
   const [isScenarioOpen, setIsScenarioOpen] = useState(isInScenario);
   const isHandoffOpen = handoff !== null;
   const wasHandoffOpenRef = useRef(isHandoffOpen);
@@ -386,7 +447,13 @@ function OwnedPortfolioTabs({
     wasHandoffOpenRef.current = isHandoffOpen;
   }, [isHandoffOpen, router]);
 
-  const isOverlayOpen =
+  const activeSecurities = snapshot.securitiesAccounts.filter(
+    (account) => !account.isRetired,
+  );
+  const activeCash = snapshot.cashAccounts.filter(
+    (account) => !account.isRetired,
+  );
+  const isOtherOverlayOpen =
     addingAccount !== null ||
     deleting !== null ||
     editingAccount !== null ||
@@ -396,6 +463,24 @@ function OwnedPortfolioTabs({
     isAddingSecurity ||
     isAddingTransaction ||
     isUpdatingQuotes;
+  const isOpeningHandoffInvalid = isOpeningHandoffStale(
+    openingSecurityHandoff,
+    {
+      activeSecurities,
+      activeTab,
+      holdings: snapshot.holdings,
+      isOtherOverlayOpen,
+      version,
+    },
+  );
+  if (isOpeningHandoffInvalid) {
+    setOpeningSecurityHandoff(null);
+  }
+  const isOpeningSecurityReady =
+    openingSecurityHandoff !== null &&
+    !isOpeningHandoffInvalid &&
+    version >= openingSecurityHandoff.afterVersion;
+  const isOverlayOpen = isOtherOverlayOpen || isOpeningSecurityReady;
 
   useEffect(() => {
     const pending = pendingFocusRef.current;
@@ -435,6 +520,7 @@ function OwnedPortfolioTabs({
       setIsAddingSecurity(false);
       setIsAddingTransaction(false);
       setIsUpdatingQuotes(false);
+      setOpeningSecurityHandoff(null);
     }
   }
 
@@ -502,10 +588,32 @@ function OwnedPortfolioTabs({
     setEditingAccount(null);
   }
 
-  function handleSecurityAdded(): void {
+  function handleSecurityAdded(outcome: {
+    readonly id: string;
+    readonly isRetired: boolean;
+    readonly shouldRecordOpening: boolean;
+    readonly version: number;
+  }): void {
+    const requestedPortfolioId =
+      holdingsAccountId === "" ? undefined : holdingsAccountId;
     setHoldingsAccountId("");
     setIsShowingZeroShares(true);
     setIsAddingSecurity(false);
+    if (outcome.shouldRecordOpening) {
+      setOpeningSecurityHandoff({
+        afterVersion: outcome.version,
+        ...(requestedPortfolioId !== undefined && {
+          portfolioId: requestedPortfolioId,
+        }),
+        securityId: outcome.id,
+      });
+    } else {
+      pendingFocusRef.current = {
+        afterVersion: outcome.version,
+        tab: activeTab,
+        targets: [`holding:${outcome.id}`],
+      };
+    }
   }
 
   function handleSecurityEdited(
@@ -755,6 +863,7 @@ function OwnedPortfolioTabs({
       )}
       {!isInScenario && isAddingSecurity && (
         <PortfolioSecurityDialog
+          canRecordOpening={activeSecurities.length > 0}
           categories={snapshot.categories}
           defaultCurrency={snapshot.baseCurrency}
           onDismiss={() => {
@@ -816,6 +925,40 @@ function OwnedPortfolioTabs({
         >
           {deleteCopyOf(deleting).confirmBody}
         </ConfirmDialog>
+      )}
+      {!isInScenario && isOpeningSecurityReady && (
+        <PortfolioTransactionDialog
+          baseCurrency={snapshot.baseCurrency}
+          cashAccounts={snapshot.cashAccounts}
+          gbpRates={snapshot.gbpRates}
+          holdings={snapshot.holdings}
+          initialDraft={openingTradeDraftOf(
+            openingSecurityHandoff,
+            activeSecurities,
+            activeCash,
+          )}
+          key={`opening:${openingSecurityHandoff.securityId}`}
+          onDismiss={() => {
+            pendingFocusRef.current = {
+              afterVersion: version,
+              tab: "Holdings",
+              targets: [`holding:${openingSecurityHandoff.securityId}`],
+            };
+            setOpeningSecurityHandoff(null);
+          }}
+          onSaved={(draft, nextVersion) => {
+            pendingFocusRef.current = {
+              afterVersion: nextVersion,
+              tab: "Holdings",
+              targets: [`holding:${openingSecurityHandoff.securityId}`],
+            };
+            setOpeningSecurityHandoff(null);
+            handleTransactionSaved(draft);
+          }}
+          securitiesAccounts={snapshot.securitiesAccounts}
+          today={today}
+          version={version}
+        />
       )}
       {!isInScenario && (isAddingTransaction || handoff !== null) && (
         <PortfolioTransactionDialog
