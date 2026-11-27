@@ -19,6 +19,7 @@ import {
   withMessagesAt,
   withoutField,
   withReplacedMessagesAt,
+  withTextAt,
   withWholeAt,
 } from "./protobuf";
 
@@ -493,5 +494,63 @@ describe("withReplacedMessagesAt", () => {
     ).toThrow(
       new Refusal("The data holds a number where field 13's bytes are read"),
     );
+  });
+});
+
+describe("withTextAt", () => {
+  it("replaces the first occurrence in place, drops duplicates, and preserves fixed-width and untouched fields byte for byte", () => {
+    const fixed64 = raw(0x09, 1, 2, 3, 4, 5, 6, 7, 8);
+    const fixed32 = raw(0x15, 9, 8, 7, 6);
+    const written = joined([
+      fixed64,
+      protobufOf([
+        [3, "Old"],
+        [7, "keep"],
+        [3, "Duplicate"],
+      ]),
+      fixed32,
+    ]);
+
+    expect(withTextAt(written, 3, "Gilts, £")).toStrictEqual(
+      joined([
+        fixed64,
+        protobufOf([
+          [3, "Gilts, £"],
+          [7, "keep"],
+        ]),
+        fixed32,
+      ]),
+    );
+  });
+
+  it("appends at the end when the field is absent", () => {
+    expect(withTextAt(protobufOf([[1, "id"]]), 4, "Note")).toStrictEqual(
+      protobufOf([
+        [1, "id"],
+        [4, "Note"],
+      ]),
+    );
+    expect(withTextAt(raw(), 4, "Note")).toStrictEqual(
+      protobufOf([[4, "Note"]]),
+    );
+  });
+
+  it("omits every occurrence when value is undefined or empty", () => {
+    const fixed32 = raw(0x15, 1, 2, 3, 4);
+    const written = joined([
+      protobufOf([
+        [4, "First"],
+        [1, "id"],
+        [4, "Second"],
+      ]),
+      fixed32,
+    ]);
+    const expected = joined([protobufOf([[1, "id"]]), fixed32]);
+
+    expect(withTextAt(written, 4, undefined)).toStrictEqual(expected);
+    expect(withTextAt(written, 4, "")).toStrictEqual(expected);
+    expect(withTextAt(expected, 4, undefined)).toStrictEqual(expected);
+    expect(withTextAt(expected, 4, "")).toStrictEqual(expected);
+    expect(withTextAt(raw(), 4, undefined)).toStrictEqual(raw());
   });
 });

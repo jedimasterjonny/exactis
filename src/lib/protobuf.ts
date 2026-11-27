@@ -224,6 +224,30 @@ export function withReplacedMessagesAt(
   return joined(isPlaced ? parts : [...parts, ...replacement]);
 }
 
+// The message with singular UTF-8 string field `number` replaced in
+// place (dropping duplicates) or appended at the end, omitting the
+// field when `value` is undefined or empty (proto3 default), while
+// keeping every other field byte for byte.
+export function withTextAt(
+  bytes: Uint8Array,
+  number: number,
+  value: string | undefined,
+): Uint8Array {
+  const written =
+    value === undefined || value === "" ? [] : [textField(number, value)];
+  const parts: Uint8Array[] = [];
+  let isPlaced = false;
+  for (const field of fieldsOf(bytes)) {
+    if (field.number !== number) {
+      parts.push(bytes.subarray(field.from, field.to));
+    } else if (!isPlaced) {
+      parts.push(...written);
+      isPlaced = true;
+    }
+  }
+  return joined(isPlaced ? parts : [...parts, ...written]);
+}
+
 // The message with the whole number given written under a number, in
 // the place of the first field written there and over any other, or at
 // the end where none was; and with none written there for a nought, as
