@@ -3,6 +3,12 @@
 import type { ZodError, ZodType } from "zod";
 
 import type {
+  DeletePortfolioAccount,
+  DeletePortfolioSecurity,
+  DeletePortfolioTransaction,
+  EditPortfolioAccount,
+  EditPortfolioSecurity,
+  EditPortfolioTransaction,
   NewPortfolioAccount,
   NewPortfolioSecurity,
   NewPortfolioTransaction,
@@ -15,6 +21,12 @@ import type { SavedPortfolio, SavedPortfolioMutation } from "@/store/portfolio";
 
 import {
   afterVersionSchema,
+  deletePortfolioAccountSchema,
+  deletePortfolioSecuritySchema,
+  deletePortfolioTransactionSchema,
+  editPortfolioAccountSchema,
+  editPortfolioSecuritySchema,
+  editPortfolioTransactionSchema,
   fetchPortfolioQuotesInputSchema,
   maxPortfolioBytes,
   newPortfolioAccountSchema,
@@ -29,8 +41,14 @@ import {
   appendAccount,
   appendSecurity,
   appendTransaction,
+  deleteAccount,
+  deleteSecurity,
+  deleteTransaction,
   readQuotableSecurities,
+  updateAccount,
   updateQuotes,
+  updateSecurity,
+  updateTransaction,
 } from "@/lib/portfolio-file";
 import { fetchYahooQuotes } from "@/lib/portfolio-quotes";
 import { openedScenario } from "@/lib/scenario";
@@ -93,6 +111,97 @@ export async function addPortfolioTransaction(
     { afterVersion, input, schema: newPortfolioTransactionSchema },
     (stored, parsed) => {
       const { content, id } = appendTransaction(stored.content, parsed);
+      return { content, result: { id } };
+    },
+  );
+}
+
+// Deletes an unreferenced zero-transaction cash or securities account
+// from the household's stored .portfolio file and persists the next
+// version.
+export async function deletePortfolioAccount(
+  afterVersion: number,
+  input: DeletePortfolioAccount,
+): Promise<Answer<SavedPortfolioMutation<{ readonly id: string }>>> {
+  return runPortfolioMutation(
+    { afterVersion, input, schema: deletePortfolioAccountSchema },
+    (stored, parsed) => {
+      const { content, id } = deleteAccount(stored.content, parsed);
+      return { content, result: { id } };
+    },
+  );
+}
+
+// Deletes a zero-transaction security from the household's stored
+// .portfolio file and persists the next version.
+export async function deletePortfolioSecurity(
+  afterVersion: number,
+  input: DeletePortfolioSecurity,
+): Promise<Answer<SavedPortfolioMutation<{ readonly id: string }>>> {
+  return runPortfolioMutation(
+    { afterVersion, input, schema: deletePortfolioSecuritySchema },
+    (stored, parsed) => {
+      const { content, id } = deleteSecurity(stored.content, parsed);
+      return { content, result: { id } };
+    },
+  );
+}
+
+// Deletes an existing transaction from the household's stored
+// .portfolio file and persists the next version.
+export async function deletePortfolioTransaction(
+  afterVersion: number,
+  input: DeletePortfolioTransaction,
+): Promise<Answer<SavedPortfolioMutation<{ readonly id: string }>>> {
+  return runPortfolioMutation(
+    { afterVersion, input, schema: deletePortfolioTransactionSchema },
+    (stored, parsed) => {
+      const { content, id } = deleteTransaction(stored.content, parsed);
+      return { content, result: { id } };
+    },
+  );
+}
+
+// Updates or retires an existing cash or securities account in the
+// household's stored .portfolio file and persists the next version.
+export async function editPortfolioAccount(
+  afterVersion: number,
+  input: EditPortfolioAccount,
+): Promise<Answer<SavedPortfolioMutation<{ readonly id: string }>>> {
+  return runPortfolioMutation(
+    { afterVersion, input, schema: editPortfolioAccountSchema },
+    (stored, parsed) => {
+      const { content, id } = updateAccount(stored.content, parsed);
+      return { content, result: { id } };
+    },
+  );
+}
+
+// Updates or retires an existing catalogued security in the
+// household's stored .portfolio file and persists the next version.
+export async function editPortfolioSecurity(
+  afterVersion: number,
+  input: EditPortfolioSecurity,
+): Promise<Answer<SavedPortfolioMutation<{ readonly id: string }>>> {
+  return runPortfolioMutation(
+    { afterVersion, input, schema: editPortfolioSecuritySchema },
+    (stored, parsed) => {
+      const { content, id } = updateSecurity(stored.content, parsed);
+      return { content, result: { id } };
+    },
+  );
+}
+
+// Updates an existing transaction in the household's stored .portfolio
+// file (enforcing type immutability) and persists the next version.
+export async function editPortfolioTransaction(
+  afterVersion: number,
+  input: EditPortfolioTransaction,
+): Promise<Answer<SavedPortfolioMutation<{ readonly id: string }>>> {
+  return runPortfolioMutation(
+    { afterVersion, input, schema: editPortfolioTransactionSchema },
+    (stored, parsed) => {
+      const { content, id } = updateTransaction(stored.content, parsed);
       return { content, result: { id } };
     },
   );
