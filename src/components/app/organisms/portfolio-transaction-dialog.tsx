@@ -15,9 +15,11 @@ import type { Option, OptionGroup } from "@/lib/options";
 
 import { addPortfolioTransaction } from "@/actions/portfolio";
 import { FieldRow } from "@/components/app/atoms/field-row";
+import { Note } from "@/components/app/atoms/note";
 import { DateField } from "@/components/app/molecules/date-field";
 import {
   CurrencyField,
+  ExchangeRateField,
   SharesField,
 } from "@/components/app/molecules/figure-field";
 import { SelectField } from "@/components/app/molecules/select-field";
@@ -32,6 +34,7 @@ import {
   withSyncNote,
 } from "@/data/portfolio";
 import { useSender } from "@/hooks/use-sender";
+import { formatCurrency, formatPrice } from "@/lib/money";
 import { formatDay } from "@/lib/months";
 
 export type PortfolioTransactionDraft = Partial<TransactionFormValues>;
@@ -54,6 +57,7 @@ type DeliveryCurrency = (typeof deliveryCurrencies)[number];
 interface PortfolioTransactionDialogProps {
   readonly baseCurrency: string;
   readonly cashAccounts: readonly CashAccount[];
+  readonly gbpRates?: Readonly<Record<string, number>>;
   readonly holdings: readonly Holding[];
   readonly initialDraft?: PortfolioTransactionDraft;
   readonly onDismiss: () => void;
@@ -62,6 +66,12 @@ interface PortfolioTransactionDialogProps {
   readonly suggestedCategory?: SuggestedCategory;
   readonly today: string;
   readonly version: number;
+}
+
+interface ResolvedFx {
+  readonly amount: null | number;
+  readonly error: string | undefined;
+  readonly rate: null | number;
 }
 
 interface TransactionFormValues {
@@ -104,6 +114,7 @@ const deliveryCurrencyOptions: readonly Option<DeliveryCurrency>[] =
 export function PortfolioTransactionDialog({
   baseCurrency,
   cashAccounts,
+  gbpRates,
   holdings,
   initialDraft,
   onDismiss,
@@ -127,10 +138,36 @@ export function PortfolioTransactionDialog({
     initialDraft,
     sortedHoldings,
   });
-
-  const [type, setType] = useState<TransactionType>(
-    initialDraft?.type ?? "purchase",
+  const initialType = initialDraft?.type ?? "purchase";
+  const initialDeliveryCurrency = deliveryCurrencyOf(
+    initialDraft?.currency ?? baseCurrency,
   );
+  const initialSpec = typeSpecOf(initialType);
+  const initialCurrency = currencyForType(initialSpec.accounts, {
+    baseCurrency,
+    deliveryCurrency: initialDeliveryCurrency,
+    fromCashCurrency: activeCash.find(
+      (account) => account.id === defaults.accountId,
+    )?.currency,
+  });
+  const initialFxCurrency = fxCurrencyOf({
+    accounts: initialSpec.accounts,
+    effectiveCurrency: initialCurrency,
+    hasCosts: initialSpec.hasCosts,
+    securityCurrency: sortedHoldings.find(
+      (holding) => holding.id === defaults.securityId,
+    )?.currency,
+    toCashCurrency: activeCash.find(
+      (account) => account.id === defaults.otherAccountId,
+    )?.currency,
+  });
+  const initialFxPair = fxPairKeyOf(
+    initialType,
+    initialCurrency,
+    initialFxCurrency,
+  );
+
+  const [type, setType] = useState<TransactionType>(initialType);
   const [date, setDate] = useState(initialDraft?.date ?? today);
   const [portfolioId, setPortfolioId] = useState(defaults.portfolioId);
   const [otherPortfolioId, setOtherPortfolioId] = useState(
@@ -140,7 +177,7 @@ export function PortfolioTransactionDialog({
   const [otherAccountId, setOtherAccountId] = useState(defaults.otherAccountId);
   const [securityId, setSecurityId] = useState(defaults.securityId);
   const [deliveryCurrency, setDeliveryCurrency] = useState<DeliveryCurrency>(
-    () => deliveryCurrencyOf(initialDraft?.currency ?? baseCurrency),
+    initialDeliveryCurrency,
   );
   const [shares, setShares] = useState<null | number>(
     initialDraft?.shares ?? null,
@@ -152,6 +189,10 @@ export function PortfolioTransactionDialog({
   const [taxes, setTaxes] = useState<null | number>(
     initialDraft?.taxes ?? null,
   );
+  const [fxPair, setFxPair] = useState(initialFxPair);
+  const [fxDriver, setFxDriver] = useState<"amount" | "rate">("amount");
+  const [fxTypedAmount, setFxTypedAmount] = useState<null | number>(null);
+  const [fxTypedRate, setFxTypedRate] = useState<null | number>(null);
   const [note, setNote] = useState(initialDraft?.note ?? "");
   const { isSending, send } = useSender();
 
@@ -172,11 +213,9 @@ export function PortfolioTransactionDialog({
   const toCash = activeCash.find(
     (account) => account.id === resolvedOtherAccount.id,
   );
-  const isMismatchedTransferCurrency =
-    spec.accounts === "cash-transfer" &&
-    fromCash !== undefined &&
-    toCash !== undefined &&
-    fromCash.currency !== toCash.currency;
+  const chosenSecurity = sortedHoldings.find(
+    (holding) => holding.id === resolvedSecurity.id,
+  );
 
   const effectiveCurrency = currencyForType(spec.accounts, {
     baseCurrency,
@@ -184,18 +223,31 @@ export function PortfolioTransactionDialog({
     fromCashCurrency: fromCash?.currency,
   });
 
+  const fxCurrency = fxCurrencyOf({
+    accounts: spec.accounts,
+    effectiveCurrency,
+    hasCosts: spec.hasCosts,
+    securityCurrency: chosenSecurity?.currency,
+    toCashCurrency: toCash?.currency,
+  });
+  const isAutoSterlingPence =
+    effectiveCurrency === "GBP" && fxCurrency === "GBX";
+  const hasManualFx = fxCurrency !== undefined && !isAutoSterlingPence;
+  const fxPairKey = fxPairKeyOf(type, effectiveCurrency, fxCurrency);
+
+  if (fxPair !== fxPairKey) {
+    setFxPair(fxPairKey);
+    setFxDriver("amount");
+    setFxTypedAmount(null);
+    setFxTypedRate(null);
+  }
+
   const baseSecuritiesOptions = accountOptionsOf(
     activeSecurities,
     "No securities accounts",
   );
   const baseCashOptions = cashAccountOptionsOf(activeCash);
-  const baseSecurityOptions: readonly Option<string>[] =
-    sortedHoldings.length === 0
-      ? [{ label: "No securities", value: "" }]
-      : sortedHoldings.map((holding) => ({
-          label: holding.name,
-          value: holding.id,
-        }));
+  const baseSecurityOptions = accountOptionsOf(sortedHoldings, "No securities");
   const securitySelectOptions = withEmptyPlaceholder(
     baseSecurityOptions,
     resolvedSecurity.id,
@@ -215,39 +267,36 @@ export function PortfolioTransactionDialog({
     suggestedCategory,
   });
 
-  const amountPence = amount === null ? 0 : Math.round(amount * 100);
-  const feesPence = spec.hasCosts && fees !== null ? Math.round(fees * 100) : 0;
-  const taxesPence =
-    spec.hasCosts && taxes !== null ? Math.round(taxes * 100) : 0;
-  const sharesScaled = shares === null ? 0 : Math.round(shares * 1e8);
-  const isCostsBounded = type === "purchase" || type === "inbound-delivery";
-  const hasExcessCosts =
-    isCostsBounded && amountPence >= 1 && feesPence + taxesPence > amountPence;
-  const amountError = amountErrorOf(type, hasExcessCosts);
-
-  const isValidAccounts = hasValidAccounts(spec.accounts, {
+  const {
+    amountError,
+    canSave,
+    feesPence,
+    grossSettlementPence,
+    resolvedFx,
+    taxesPence,
+  } = evaluateTransactionForm({
     accountId: resolvedAccount.id,
     activeCashCount: activeCash.length,
     activeSecuritiesCount: activeSecurities.length,
-    isMismatchedTransferCurrency,
+    amount,
+    date,
+    fees,
+    fxCurrency,
+    fxDriver,
+    fxTypedAmount,
+    fxTypedRate,
+    hasManualFx,
+    hasSecurity,
     otherAccountId: resolvedOtherAccount.id,
     otherPortfolioId: resolvedOtherPortfolio.id,
     portfolioId: resolvedPortfolio.id,
+    securityId: resolvedSecurity.id,
+    shares,
+    spec,
+    taxes,
+    type,
   });
-  const isValidAmount = spec.isAmountOptional || amountPence >= 1;
-  const isValidShares = !spec.hasShares || sharesScaled >= 1;
-  const isValidSecurity = !hasSecurity || resolvedSecurity.id !== "";
-  const canSave =
-    isIsoCalendarDate(date) &&
-    isValidAccounts &&
-    isValidAmount &&
-    isValidShares &&
-    isValidSecurity &&
-    !hasExcessCosts;
 
-  const chosenSecurity = sortedHoldings.find(
-    (holding) => holding.id === resolvedSecurity.id,
-  );
   const typeLabel = transactionTypeLabels[type];
   const title = dialogTitleOf({
     chosenSecurity,
@@ -258,6 +307,24 @@ export function PortfolioTransactionDialog({
   });
   const subjectName =
     (hasSecurity ? chosenSecurity?.name : fromCash?.name) ?? "";
+
+  function changeFxAmount(next: null | number): void {
+    setFxDriver("amount");
+    setFxTypedAmount(next);
+    setFxTypedRate(null);
+  }
+
+  function changeFxRate(next: null | number): void {
+    setFxDriver("rate");
+    setFxTypedRate(next);
+    setFxTypedAmount(null);
+  }
+
+  function clearFx(): void {
+    setFxDriver("amount");
+    setFxTypedAmount(null);
+    setFxTypedRate(null);
+  }
 
   function selectTradePortfolio(nextPortfolioId: string): void {
     setPortfolioId(nextPortfolioId);
@@ -295,37 +362,24 @@ export function PortfolioTransactionDialog({
   }
 
   function save(): void {
-    const trimmedNote = note.trim();
-    const resolvedShares = shares ?? 0;
-    const hasPortfolio =
-      spec.accounts === "securities-and-cash" ||
-      spec.accounts === "securities-and-currency" ||
-      spec.accounts === "securities-transfer";
-    const hasCash =
-      spec.accounts === "securities-and-cash" ||
-      spec.accounts === "cash-transfer" ||
-      spec.accounts === "cash-and-security" ||
-      spec.accounts === "cash-only";
-
-    const draft: NewPortfolioTransaction = {
-      ...(hasCash && { accountId: resolvedAccount.id }),
-      amount: amount ?? 0,
-      currency: effectiveCurrency,
+    const draft = buildTransactionDraft({
+      accountId: resolvedAccount.id,
+      amount,
       date,
-      fees: spec.hasCosts ? (fees ?? 0) : 0,
-      ...(trimmedNote !== "" && { note: trimmedNote }),
-      ...(spec.accounts === "cash-transfer" && {
-        otherAccountId: resolvedOtherAccount.id,
-      }),
-      ...(spec.accounts === "securities-transfer" && {
-        otherPortfolioId: resolvedOtherPortfolio.id,
-      }),
-      ...(hasPortfolio && { portfolioId: resolvedPortfolio.id }),
-      ...(hasSecurity && { securityId: resolvedSecurity.id }),
-      shares: spec.hasShares ? resolvedShares : 0,
-      taxes: spec.hasCosts ? (taxes ?? 0) : 0,
+      effectiveCurrency,
+      fees,
+      fxAmount: hasManualFx ? resolvedFx.amount : null,
+      hasSecurity,
+      note,
+      otherAccountId: resolvedOtherAccount.id,
+      otherPortfolioId: resolvedOtherPortfolio.id,
+      portfolioId: resolvedPortfolio.id,
+      securityId: resolvedSecurity.id,
+      shares,
+      spec,
+      taxes,
       type,
-    };
+    });
 
     send(async () => addPortfolioTransaction(version, draft), {
       failure: "Transaction not saved",
@@ -368,7 +422,6 @@ export function PortfolioTransactionDialog({
         cashOptions={baseCashOptions}
         deliveryCurrency={deliveryCurrency}
         isAccountMissing={resolvedAccount.isMissing}
-        isMismatchedTransferCurrency={isMismatchedTransferCurrency}
         isOtherAccountMissing={resolvedOtherAccount.isMissing}
         isOtherPortfolioMissing={resolvedOtherPortfolio.isMissing}
         isPortfolioMissing={resolvedPortfolio.isMissing}
@@ -421,66 +474,32 @@ export function PortfolioTransactionDialog({
         </FieldRow>
       )}
 
-      {spec.hasCosts ? (
-        <FieldRow layout="triple">
-          <CurrencyField
-            currency={effectiveCurrency}
-            error={amountError}
-            hint={spec.amountHint}
-            key={`${type}-${effectiveCurrency}`}
-            label={spec.amountLabel}
-            max={maxPortfolioMoney}
-            min={0}
-            onCleared={() => {
-              setAmount(null);
-            }}
-            onValueChange={setAmount}
-            onValueCommitted={setAmount}
-            value={amount}
-          />
-          <CurrencyField
-            currency={effectiveCurrency}
-            key={`fees-${effectiveCurrency}`}
-            label="Fees"
-            max={maxPortfolioMoney}
-            min={0}
-            onCleared={() => {
-              setFees(null);
-            }}
-            onValueChange={setFees}
-            onValueCommitted={setFees}
-            value={fees}
-          />
-          <CurrencyField
-            currency={effectiveCurrency}
-            key={`taxes-${effectiveCurrency}`}
-            label="Taxes"
-            max={maxPortfolioMoney}
-            min={0}
-            onCleared={() => {
-              setTaxes(null);
-            }}
-            onValueChange={setTaxes}
-            onValueCommitted={setTaxes}
-            value={taxes}
-          />
-        </FieldRow>
-      ) : (
-        <CurrencyField
-          currency={effectiveCurrency}
-          hint={spec.amountHint}
-          key={`${type}-${effectiveCurrency}`}
-          label={spec.amountLabel}
-          max={maxPortfolioMoney}
-          min={0}
-          onCleared={() => {
-            setAmount(null);
-          }}
-          onValueChange={setAmount}
-          onValueCommitted={setAmount}
-          value={amount}
-        />
-      )}
+      <AmountAndFxFields
+        amount={amount}
+        amountError={amountError}
+        effectiveCurrency={effectiveCurrency}
+        fees={fees}
+        feesPence={feesPence}
+        fxCurrency={fxCurrency}
+        gbpRates={gbpRates}
+        grossSettlementPence={grossSettlementPence}
+        hasManualFx={hasManualFx}
+        isAutoSterlingPence={isAutoSterlingPence}
+        onAmountChange={setAmount}
+        onAmountCleared={() => {
+          setAmount(null);
+        }}
+        onFeesChange={setFees}
+        onFxAmountChange={changeFxAmount}
+        onFxCleared={clearFx}
+        onFxRateChange={changeFxRate}
+        onTaxesChange={setTaxes}
+        resolvedFx={resolvedFx}
+        spec={spec}
+        taxes={taxes}
+        taxesPence={taxesPence}
+        type={type}
+      />
 
       <TextField
         defaultValue={note}
@@ -500,7 +519,6 @@ function AccountFields({
   cashOptions,
   deliveryCurrency,
   isAccountMissing,
-  isMismatchedTransferCurrency,
   isOtherAccountMissing,
   isOtherPortfolioMissing,
   isPortfolioMissing,
@@ -528,7 +546,6 @@ function AccountFields({
   readonly cashOptions: readonly Option<string>[];
   readonly deliveryCurrency: DeliveryCurrency;
   readonly isAccountMissing: boolean;
-  readonly isMismatchedTransferCurrency: boolean;
   readonly isOtherAccountMissing: boolean;
   readonly isOtherPortfolioMissing: boolean;
   readonly isPortfolioMissing: boolean;
@@ -638,7 +655,6 @@ function AccountFields({
           />
           <SelectField
             hint={transferDestinationHint(cashCount, {
-              isMismatchedCurrency: isMismatchedTransferCurrency,
               isMissing: isOtherAccountMissing,
               isSameAccount: accountId !== "" && accountId === otherAccountId,
               kind: "cash accounts",
@@ -733,16 +749,289 @@ function accountOptionsOf(
     : accounts.map((account) => ({ label: account.name, value: account.id }));
 }
 
+// Amount, fees, taxes, and cross-currency FX inputs for the active
+// transaction type. Syncs Gross value and Exchange rate loop-free on
+// cross-currency trades, pairs Amount sent and Amount received on
+// cross-currency cash transfers, and prints a calm note for automatic
+// GBP <-> GBX pence conversion.
+function AmountAndFxFields({
+  amount,
+  amountError,
+  effectiveCurrency,
+  fees,
+  feesPence,
+  fxCurrency,
+  gbpRates,
+  grossSettlementPence,
+  hasManualFx,
+  isAutoSterlingPence,
+  onAmountChange,
+  onAmountCleared,
+  onFeesChange,
+  onFxAmountChange,
+  onFxCleared,
+  onFxRateChange,
+  onTaxesChange,
+  resolvedFx,
+  spec,
+  taxes,
+  taxesPence,
+  type,
+}: {
+  readonly amount: null | number;
+  readonly amountError: string | undefined;
+  readonly effectiveCurrency: string;
+  readonly fees: null | number;
+  readonly feesPence: number;
+  readonly fxCurrency: string | undefined;
+  readonly gbpRates: Readonly<Record<string, number>> | undefined;
+  readonly grossSettlementPence: number;
+  readonly hasManualFx: boolean;
+  readonly isAutoSterlingPence: boolean;
+  readonly onAmountChange: (value: null | number) => void;
+  readonly onAmountCleared: () => void;
+  readonly onFeesChange: (value: null | number) => void;
+  readonly onFxAmountChange: (value: null | number) => void;
+  readonly onFxCleared: () => void;
+  readonly onFxRateChange: (value: null | number) => void;
+  readonly onTaxesChange: (value: null | number) => void;
+  readonly resolvedFx: ResolvedFx;
+  readonly spec: TypeSpec;
+  readonly taxes: null | number;
+  readonly taxesPence: number;
+  readonly type: TransactionType;
+}): JSX.Element {
+  const knownRate =
+    fxCurrency === undefined
+      ? undefined
+      : crossRateOf(gbpRates, effectiveCurrency, fxCurrency);
+  const fxRateHint =
+    fxCurrency === undefined
+      ? undefined
+      : fxRateHintOf({
+          effectiveCurrency,
+          fxCurrency,
+          knownRate,
+          resolvedFxRate: resolvedFx.rate,
+        });
+  const grossSettlementHint =
+    feesPence + taxesPence > 0 && grossSettlementPence >= 1
+      ? `Gross settlement ${formatCurrency(grossSettlementPence / 100, effectiveCurrency)}`
+      : undefined;
+
+  let fields: JSX.Element;
+  if (spec.hasCosts) {
+    fields = (
+      <>
+        <FieldRow layout="triple">
+          <CurrencyField
+            currency={effectiveCurrency}
+            error={amountError}
+            hint={spec.amountHint}
+            key={`${type}-${effectiveCurrency}`}
+            label={spec.amountLabel}
+            max={maxPortfolioMoney}
+            min={0}
+            onCleared={onAmountCleared}
+            onValueChange={onAmountChange}
+            onValueCommitted={onAmountChange}
+            value={amount}
+          />
+          <CurrencyField
+            currency={effectiveCurrency}
+            key={`fees-${effectiveCurrency}`}
+            label="Fees"
+            max={maxPortfolioMoney}
+            min={0}
+            onCleared={() => {
+              onFeesChange(null);
+            }}
+            onValueChange={onFeesChange}
+            onValueCommitted={onFeesChange}
+            value={fees}
+          />
+          <CurrencyField
+            currency={effectiveCurrency}
+            key={`taxes-${effectiveCurrency}`}
+            label="Taxes"
+            max={maxPortfolioMoney}
+            min={0}
+            onCleared={() => {
+              onTaxesChange(null);
+            }}
+            onValueChange={onTaxesChange}
+            onValueCommitted={onTaxesChange}
+            value={taxes}
+          />
+        </FieldRow>
+        {hasManualFx && fxCurrency !== undefined && (
+          <FieldRow layout="pair">
+            <CurrencyField
+              currency={fxCurrency}
+              error={resolvedFx.error}
+              hint={grossSettlementHint}
+              key={`fx-amount-${fxCurrency}`}
+              label={`Gross value (${fxCurrency})`}
+              max={maxPortfolioMoney}
+              min={0}
+              onCleared={onFxCleared}
+              onValueChange={onFxAmountChange}
+              onValueCommitted={onFxAmountChange}
+              value={resolvedFx.amount}
+            />
+            <ExchangeRateField
+              hint={fxRateHint}
+              key={`fx-rate-${effectiveCurrency}-${fxCurrency}`}
+              label={`Exchange rate (${effectiveCurrency} per ${fxCurrency})`}
+              max={maxPortfolioMoney}
+              min={0}
+              onCleared={onFxCleared}
+              onValueChange={onFxRateChange}
+              onValueCommitted={onFxRateChange}
+              value={resolvedFx.rate}
+            />
+          </FieldRow>
+        )}
+      </>
+    );
+  } else if (
+    spec.accounts === "cash-transfer" &&
+    hasManualFx &&
+    fxCurrency !== undefined
+  ) {
+    fields = (
+      <FieldRow layout="pair">
+        <CurrencyField
+          currency={effectiveCurrency}
+          key={`cash-transfer-from-${effectiveCurrency}`}
+          label={`Amount sent (${effectiveCurrency})`}
+          max={maxPortfolioMoney}
+          min={0}
+          onCleared={onAmountCleared}
+          onValueChange={onAmountChange}
+          onValueCommitted={onAmountChange}
+          value={amount}
+        />
+        <CurrencyField
+          currency={fxCurrency}
+          hint={fxRateHint}
+          key={`cash-transfer-to-${fxCurrency}`}
+          label={`Amount received (${fxCurrency})`}
+          max={maxPortfolioMoney}
+          min={0}
+          onCleared={onFxCleared}
+          onValueChange={onFxAmountChange}
+          onValueCommitted={onFxAmountChange}
+          value={resolvedFx.amount}
+        />
+      </FieldRow>
+    );
+  } else {
+    fields = (
+      <CurrencyField
+        currency={effectiveCurrency}
+        hint={spec.amountHint}
+        key={`${type}-${effectiveCurrency}`}
+        label={spec.amountLabel}
+        max={maxPortfolioMoney}
+        min={0}
+        onCleared={onAmountCleared}
+        onValueChange={onAmountChange}
+        onValueCommitted={onAmountChange}
+        value={amount}
+      />
+    );
+  }
+
+  return (
+    <>
+      {fields}
+      {isAutoSterlingPence && (
+        <Note>Converted automatically between GBP and GBX (pence).</Note>
+      )}
+    </>
+  );
+}
+
 function amountErrorOf(
   type: TransactionType,
-  hasExcessCosts: boolean,
+  {
+    hasExcessCosts,
+    isCrossCurrency,
+  }: { readonly hasExcessCosts: boolean; readonly isCrossCurrency: boolean },
 ): string | undefined {
   if (!hasExcessCosts) {
     return undefined;
   }
+  const comparison = isCrossCurrency ? "must be less than" : "cannot exceed";
   return type === "purchase"
-    ? "Fees and taxes cannot exceed total paid"
-    : "Fees and taxes cannot exceed total value";
+    ? `Fees and taxes ${comparison} total paid`
+    : `Fees and taxes ${comparison} total value`;
+}
+
+function buildTransactionDraft({
+  accountId,
+  amount,
+  date,
+  effectiveCurrency,
+  fees,
+  fxAmount,
+  hasSecurity,
+  note,
+  otherAccountId,
+  otherPortfolioId,
+  portfolioId,
+  securityId,
+  shares,
+  spec,
+  taxes,
+  type,
+}: {
+  readonly accountId: string;
+  readonly amount: null | number;
+  readonly date: string;
+  readonly effectiveCurrency: string;
+  readonly fees: null | number;
+  readonly fxAmount: null | number;
+  readonly hasSecurity: boolean;
+  readonly note: string;
+  readonly otherAccountId: string;
+  readonly otherPortfolioId: string;
+  readonly portfolioId: string;
+  readonly securityId: string;
+  readonly shares: null | number;
+  readonly spec: TypeSpec;
+  readonly taxes: null | number;
+  readonly type: TransactionType;
+}): NewPortfolioTransaction {
+  const trimmedNote = note.trim();
+  const resolvedShares = shares ?? 0;
+  const hasPortfolio =
+    spec.accounts === "securities-and-cash" ||
+    spec.accounts === "securities-and-currency" ||
+    spec.accounts === "securities-transfer";
+  const hasCash =
+    spec.accounts === "securities-and-cash" ||
+    spec.accounts === "cash-transfer" ||
+    spec.accounts === "cash-and-security" ||
+    spec.accounts === "cash-only";
+
+  return {
+    ...(hasCash && { accountId }),
+    amount: amount ?? 0,
+    currency: effectiveCurrency,
+    date,
+    fees: spec.hasCosts ? (fees ?? 0) : 0,
+    ...(fxAmount !== null && { fxAmount }),
+    ...(trimmedNote !== "" && { note: trimmedNote }),
+    ...(spec.accounts === "cash-transfer" && { otherAccountId }),
+    ...(spec.accounts === "securities-transfer" && { otherPortfolioId }),
+    ...(hasPortfolio && { portfolioId }),
+    ...(hasSecurity && { securityId }),
+    shares: spec.hasShares ? resolvedShares : 0,
+    taxes: spec.hasCosts ? (taxes ?? 0) : 0,
+    type,
+  };
 }
 
 function cashAccountOptionsOf(
@@ -754,6 +1043,22 @@ function cashAccountOptionsOf(
         label: `${account.name} (${account.currency})`,
         value: account.id,
       }));
+}
+
+function crossRateOf(
+  gbpRates: Readonly<Record<string, number>> | undefined,
+  effectiveCurrency: string,
+  fxCurrency: string,
+): number | undefined {
+  const effectiveGbp =
+    effectiveCurrency === "GBP" ? 1 : gbpRates?.[effectiveCurrency];
+  const foreignGbp = fxCurrency === "GBP" ? 1 : gbpRates?.[fxCurrency];
+  return effectiveGbp !== undefined &&
+    effectiveGbp > 0 &&
+    foreignGbp !== undefined &&
+    foreignGbp > 0
+    ? foreignGbp / effectiveGbp
+    : undefined;
 }
 
 function currencyForType(
@@ -843,13 +1148,196 @@ function distinctOtherId(
   return accounts.find((account) => account.id !== fromId)?.id ?? "";
 }
 
+function evaluateTransactionForm({
+  accountId,
+  activeCashCount,
+  activeSecuritiesCount,
+  amount,
+  date,
+  fees,
+  fxCurrency,
+  fxDriver,
+  fxTypedAmount,
+  fxTypedRate,
+  hasManualFx,
+  hasSecurity,
+  otherAccountId,
+  otherPortfolioId,
+  portfolioId,
+  securityId,
+  shares,
+  spec,
+  taxes,
+  type,
+}: {
+  readonly accountId: string;
+  readonly activeCashCount: number;
+  readonly activeSecuritiesCount: number;
+  readonly amount: null | number;
+  readonly date: string;
+  readonly fees: null | number;
+  readonly fxCurrency: string | undefined;
+  readonly fxDriver: "amount" | "rate";
+  readonly fxTypedAmount: null | number;
+  readonly fxTypedRate: null | number;
+  readonly hasManualFx: boolean;
+  readonly hasSecurity: boolean;
+  readonly otherAccountId: string;
+  readonly otherPortfolioId: string;
+  readonly portfolioId: string;
+  readonly securityId: string;
+  readonly shares: null | number;
+  readonly spec: TypeSpec;
+  readonly taxes: null | number;
+  readonly type: TransactionType;
+}): {
+  readonly amountError: string | undefined;
+  readonly canSave: boolean;
+  readonly feesPence: number;
+  readonly grossSettlementPence: number;
+  readonly resolvedFx: ResolvedFx;
+  readonly taxesPence: number;
+} {
+  const amountPence = amount === null ? 0 : Math.round(amount * 100);
+  const feesPence = spec.hasCosts && fees !== null ? Math.round(fees * 100) : 0;
+  const taxesPence =
+    spec.hasCosts && taxes !== null ? Math.round(taxes * 100) : 0;
+  const sharesScaled = shares === null ? 0 : Math.round(shares * 1e8);
+  const isCostsBounded = type === "purchase" || type === "inbound-delivery";
+  const isCrossCurrency = fxCurrency !== undefined;
+  const hasExcessCosts =
+    isCostsBounded &&
+    amountPence >= 1 &&
+    (isCrossCurrency
+      ? feesPence + taxesPence >= amountPence
+      : feesPence + taxesPence > amountPence);
+  const amountError = amountErrorOf(type, { hasExcessCosts, isCrossCurrency });
+  const grossSettlementPence = grossSettlementPenceOf({
+    amountPence,
+    feesPence,
+    hasCosts: spec.hasCosts,
+    isCostsBounded,
+    taxesPence,
+  });
+  const resolvedFx = resolvedFxValues({
+    fxDriver,
+    fxTypedAmount,
+    fxTypedRate,
+    grossSettlementPence,
+  });
+  const fxAmountMinor =
+    resolvedFx.amount === null ? 0 : Math.round(resolvedFx.amount * 100);
+  const isValidFx =
+    !hasManualFx ||
+    (fxAmountMinor >= 1 && fxAmountMinor <= maxPortfolioMoney * 100);
+  const isValidAccounts = hasValidAccounts(spec.accounts, {
+    accountId,
+    activeCashCount,
+    activeSecuritiesCount,
+    otherAccountId,
+    otherPortfolioId,
+    portfolioId,
+  });
+  const canSave =
+    isIsoCalendarDate(date) &&
+    isValidAccounts &&
+    (spec.isAmountOptional || amountPence >= 1) &&
+    (!spec.hasShares || sharesScaled >= 1) &&
+    (!hasSecurity || securityId !== "") &&
+    isValidFx &&
+    !hasExcessCosts;
+
+  return {
+    amountError,
+    canSave,
+    feesPence,
+    grossSettlementPence,
+    resolvedFx,
+    taxesPence,
+  };
+}
+
+function fxCurrencyOf({
+  accounts,
+  effectiveCurrency,
+  hasCosts,
+  securityCurrency,
+  toCashCurrency,
+}: {
+  readonly accounts: AccountsLayout;
+  readonly effectiveCurrency: string;
+  readonly hasCosts: boolean;
+  readonly securityCurrency: string | undefined;
+  readonly toCashCurrency: string | undefined;
+}): string | undefined {
+  if (accounts === "cash-transfer") {
+    return toCashCurrency !== undefined && toCashCurrency !== effectiveCurrency
+      ? toCashCurrency
+      : undefined;
+  }
+  return hasCosts &&
+    securityCurrency !== undefined &&
+    securityCurrency !== "" &&
+    securityCurrency !== effectiveCurrency
+    ? securityCurrency
+    : undefined;
+}
+
+function fxPairKeyOf(
+  type: TransactionType,
+  effectiveCurrency: string,
+  fxCurrency: string | undefined,
+): string {
+  return fxCurrency !== undefined &&
+    !(effectiveCurrency === "GBP" && fxCurrency === "GBX")
+    ? `${type}:${effectiveCurrency}:${fxCurrency}`
+    : "";
+}
+
+function fxRateHintOf({
+  effectiveCurrency,
+  fxCurrency,
+  knownRate,
+  resolvedFxRate,
+}: {
+  readonly effectiveCurrency: string;
+  readonly fxCurrency: string;
+  readonly knownRate: number | undefined;
+  readonly resolvedFxRate: null | number;
+}): string | undefined {
+  if (resolvedFxRate !== null && resolvedFxRate > 0) {
+    return `1 ${fxCurrency} = ${formatPrice(resolvedFxRate, effectiveCurrency)} (1 ${effectiveCurrency} = ${formatPrice(1 / resolvedFxRate, fxCurrency)})`;
+  }
+  return knownRate === undefined
+    ? undefined
+    : `Last known rate: 1 ${fxCurrency} = ${formatPrice(knownRate, effectiveCurrency)}`;
+}
+
+function grossSettlementPenceOf({
+  amountPence,
+  feesPence,
+  hasCosts,
+  isCostsBounded,
+  taxesPence,
+}: {
+  readonly amountPence: number;
+  readonly feesPence: number;
+  readonly hasCosts: boolean;
+  readonly isCostsBounded: boolean;
+  readonly taxesPence: number;
+}): number {
+  if (isCostsBounded) {
+    return Math.max(0, amountPence - feesPence - taxesPence);
+  }
+  return hasCosts ? amountPence + feesPence + taxesPence : amountPence;
+}
+
 function hasValidAccounts(
   layout: AccountsLayout,
   {
     accountId,
     activeCashCount,
     activeSecuritiesCount,
-    isMismatchedTransferCurrency,
     otherAccountId,
     otherPortfolioId,
     portfolioId,
@@ -857,7 +1345,6 @@ function hasValidAccounts(
     readonly accountId: string;
     readonly activeCashCount: number;
     readonly activeSecuritiesCount: number;
-    readonly isMismatchedTransferCurrency: boolean;
     readonly otherAccountId: string;
     readonly otherPortfolioId: string;
     readonly portfolioId: string;
@@ -872,8 +1359,7 @@ function hasValidAccounts(
         activeCashCount >= 2 &&
         accountId !== "" &&
         otherAccountId !== "" &&
-        accountId !== otherAccountId &&
-        !isMismatchedTransferCurrency
+        accountId !== otherAccountId
       );
     case "securities-and-cash":
       return portfolioId !== "" && accountId !== "";
@@ -980,6 +1466,52 @@ function requiredSelectHint(
   return isMissing ? missingHint : undefined;
 }
 
+// Computes the synced Gross value and Exchange rate pair loop-free:
+// when driving from Gross value, rounds the derived rate to 6 d.p.
+// matching ExchangeRateField so tabbing past the rate field without
+// editing never triggers Base UI blur-rounding to flip fxDriver.
+function resolvedFxValues({
+  fxDriver,
+  fxTypedAmount,
+  fxTypedRate,
+  grossSettlementPence,
+}: {
+  readonly fxDriver: "amount" | "rate";
+  readonly fxTypedAmount: null | number;
+  readonly fxTypedRate: null | number;
+  readonly grossSettlementPence: number;
+}): ResolvedFx {
+  if (fxDriver === "rate") {
+    if (grossSettlementPence < 1 || fxTypedRate === null || fxTypedRate <= 0) {
+      return { amount: null, error: undefined, rate: fxTypedRate };
+    }
+    const derived = Math.round(grossSettlementPence / fxTypedRate) / 100;
+    const isInRange = derived >= 0.01 && derived <= maxPortfolioMoney;
+    return {
+      amount: isInRange ? derived : null,
+      error: isInRange
+        ? undefined
+        : "Exchange rate produces an out-of-range amount",
+      rate: fxTypedRate,
+    };
+  }
+  const fxMinor = fxTypedAmount === null ? 0 : Math.round(fxTypedAmount * 100);
+  const roundedRate =
+    grossSettlementPence >= 1 && fxMinor >= 1
+      ? Math.round((grossSettlementPence / fxMinor) * 1e6) / 1e6
+      : null;
+  return {
+    amount: fxTypedAmount,
+    error: undefined,
+    rate:
+      roundedRate !== null &&
+      roundedRate > 0 &&
+      roundedRate <= maxPortfolioMoney
+        ? roundedRate
+        : null,
+  };
+}
+
 function resolveSelection(
   selectedId: string,
   items: readonly { readonly id: string }[],
@@ -1082,12 +1614,10 @@ function sharesHintOf(
 function transferDestinationHint(
   count: number,
   {
-    isMismatchedCurrency = false,
     isMissing,
     isSameAccount,
     kind,
   }: {
-    readonly isMismatchedCurrency?: boolean;
     readonly isMissing: boolean;
     readonly isSameAccount: boolean;
     readonly kind: "cash accounts" | "securities accounts";
@@ -1099,10 +1629,7 @@ function transferDestinationHint(
   if (isMissing) {
     return "Selected account is no longer available";
   }
-  if (isSameAccount) {
-    return "Choose a different destination account";
-  }
-  return isMismatchedCurrency ? "Transfers must share a currency" : undefined;
+  return isSameAccount ? "Choose a different destination account" : undefined;
 }
 
 function transferSourceHint(

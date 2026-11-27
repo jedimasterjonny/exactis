@@ -154,4 +154,144 @@ describe("TransactionsTable", () => {
     expect(sixth).toHaveTextContent("10 Sep 2026 · —");
     expect(seventh).toHaveTextContent("9 Sep 2026 · —");
   });
+
+  it("renders genuine cross-currency FX details and suppresses trivial GBP/GBX pence pairs", () => {
+    const fxRows: readonly PortfolioTransaction[] = [
+      {
+        accountId: "cash-isa",
+        accountName: "Northstar ISA Cash",
+        amount: 787.4,
+        currency: "GBP",
+        date: "2026-09-25",
+        fees: 0,
+        grossValue: {
+          amount: 787.4,
+          currency: "GBP",
+          exchangeRate: 0.7874,
+          fxAmount: 1000,
+          fxCurrency: "USD",
+        },
+        id: "tx-fx-buy",
+        portfolioId: "port-isa",
+        portfolioName: "Northstar ISA",
+        securityId: "sec-us",
+        securityName: "US Index ETF",
+        shares: 10,
+        taxes: 0,
+        timestamp: 1_790_200_000,
+        type: "purchase",
+      },
+      {
+        accountId: "cash-isa",
+        accountName: "Northstar ISA Cash",
+        amount: 20,
+        currency: "GBP",
+        date: "2026-09-24",
+        fees: 0,
+        grossValue: {
+          amount: 20,
+          currency: "GBP",
+          fxAmount: 25,
+          fxCurrency: "USD",
+        },
+        id: "tx-fx-div-no-rate",
+        securityId: "sec-us",
+        securityName: "US Index ETF",
+        shares: 0,
+        taxes: 0,
+        timestamp: 1_790_150_000,
+        type: "dividend",
+      },
+      {
+        accountId: "cash-isa",
+        accountName: "Northstar ISA Cash",
+        amount: 1000,
+        currency: "GBP",
+        date: "2026-09-23",
+        fees: 0,
+        grossValue: {
+          amount: 1000,
+          currency: "GBP",
+          exchangeRate: 0.7874,
+          fxAmount: 1270,
+          fxCurrency: "USD",
+        },
+        id: "tx-fx-transfer",
+        otherAccountId: "cash-usd",
+        otherAccountName: "Dollar Cash",
+        shares: 0,
+        taxes: 0,
+        timestamp: 1_790_100_000,
+        type: "cash-transfer",
+      },
+      {
+        accountId: "cash-isa",
+        accountName: "Northstar ISA Cash",
+        amount: 120,
+        currency: "GBP",
+        date: "2026-09-22",
+        fees: 0,
+        grossValue: {
+          amount: 120,
+          currency: "GBP",
+          exchangeRate: 0.01,
+          fxAmount: 12_000,
+          fxCurrency: "GBX",
+        },
+        id: "tx-gbp-gbx",
+        portfolioId: "port-isa",
+        portfolioName: "Northstar ISA",
+        securityId: "sec-uk",
+        securityName: "UK Index Fund",
+        shares: 100,
+        taxes: 0,
+        timestamp: 1_790_050_000,
+        type: "purchase",
+      },
+      {
+        accountId: "cash-isa",
+        accountName: "Northstar ISA Cash",
+        amount: 12_000,
+        currency: "GBX",
+        date: "2026-09-21",
+        fees: 0,
+        grossValue: {
+          amount: 12_000,
+          currency: "GBX",
+          exchangeRate: 100,
+          fxAmount: 120,
+          fxCurrency: "GBP",
+        },
+        id: "tx-gbx-gbp",
+        portfolioId: "port-isa",
+        portfolioName: "Northstar ISA",
+        securityId: "sec-uk",
+        securityName: "UK Index Fund",
+        shares: 100,
+        taxes: 0,
+        timestamp: 1_790_000_000,
+        type: "sale",
+      },
+    ];
+
+    render(<TransactionsTable transactions={fxRows} />);
+
+    const [, fxBuy, fxDiv, fxTransfer, gbpToGbx, gbxToGbp] =
+      screen.getAllByRole("row");
+
+    // Appears in both folded summary and unfolded Amount cell.
+    expect(screen.getAllByText("US$1,000.00 @ 0.7874")).toHaveLength(2);
+    expect(fxBuy).toHaveTextContent("US$1,000.00 @ 0.7874");
+
+    expect(screen.getAllByText("US$25.00")).toHaveLength(2);
+    expect(fxDiv).toHaveTextContent("US$25.00");
+
+    expect(screen.getAllByText("→ US$1,270.00")).toHaveLength(2);
+    expect(fxTransfer).toHaveTextContent("→ US$1,270.00");
+
+    expect(gbpToGbx).not.toHaveTextContent("12,000");
+    expect(gbpToGbx).not.toHaveTextContent("@");
+    expect(gbxToGbp).not.toHaveTextContent("£120.00");
+    expect(gbxToGbp).not.toHaveTextContent("@");
+  });
 });

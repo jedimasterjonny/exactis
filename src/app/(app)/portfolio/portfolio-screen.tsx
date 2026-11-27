@@ -477,6 +477,7 @@ function OwnedPortfolioTabs({
         <PortfolioTransactionDialog
           baseCurrency={snapshot.baseCurrency}
           cashAccounts={snapshot.cashAccounts}
+          gbpRates={snapshot.gbpRates}
           holdings={snapshot.holdings}
           key={handoff !== null ? "handoff" : "manual"}
           onDismiss={closeTransactionDialog}
