@@ -31,18 +31,74 @@ export interface CashAccount {
   readonly transactionCount: number;
 }
 
+// Input for deleting a cash or securities account from a .portfolio file.
+export interface DeletePortfolioAccount {
+  readonly id: string;
+  readonly kind: "cash" | "securities";
+}
+
+// Input for deleting a catalogued security from a .portfolio file.
+export interface DeletePortfolioSecurity {
+  readonly id: string;
+}
+
+// Input for deleting a transaction from a .portfolio file.
+export interface DeletePortfolioTransaction {
+  readonly id: string;
+}
+
+// Input for editing or retiring an existing cash or securities account
+// in a .portfolio file.
+export type EditPortfolioAccount =
+  | {
+      readonly id: string;
+      readonly isRetired: boolean;
+      readonly kind: "cash";
+      readonly name: string;
+      readonly note?: string;
+    }
+  | {
+      readonly id: string;
+      readonly isRetired: boolean;
+      readonly kind: "securities";
+      readonly name: string;
+      readonly note?: string;
+      readonly referenceAccountId?: string;
+    };
+
+// Input for editing or retiring an existing catalogued security in a
+// .portfolio file (quote currency is immutable once created).
+export interface EditPortfolioSecurity {
+  readonly categoryId?: string;
+  readonly id: string;
+  readonly isin?: string;
+  readonly isRetired: boolean;
+  readonly name: string;
+  readonly note?: string;
+  readonly ticker?: string;
+}
+
+// Input for editing an existing transaction in a .portfolio file
+// (transaction type is immutable once created).
+export interface EditPortfolioTransaction extends NewPortfolioTransaction {
+  readonly id: string;
+}
+
 // A security in the file's catalogue: its UUID, name, quote currency,
 // latest known GBP conversion rate, latest positive quote price and
-// date, optional ISIN, ticker, Asset Allocation category and note,
-// retired flag, active total share count, and per-account active share
-// breakdown.
+// date, optional ISIN, ticker, Asset Allocation category display label,
+// single-leaf classification id and split-allocation flag, optional
+// note, retired flag, raw touching transaction count, active total
+// share count, and per-account active share breakdown.
 export interface Holding {
   readonly category?: string;
+  readonly categoryId?: string;
   readonly currency: string;
   readonly gbpRate: null | number;
   readonly id: string;
   readonly isin?: string;
   readonly isRetired: boolean;
+  readonly isSplitCategory: boolean;
   readonly latestPrice: null | number;
   readonly latestPriceDate: null | string;
   readonly name: string;
@@ -50,6 +106,7 @@ export interface Holding {
   readonly shares: number;
   readonly sharesByAccount: readonly AccountShares[];
   readonly ticker?: string;
+  readonly transactionCount: number;
 }
 
 // One row prepared for the Holdings table: the security, the share count
@@ -226,8 +283,8 @@ export interface PortfolioTransaction {
 
 // A securities account as a Portfolio Performance file holds it: its
 // UUID, name, count of held securities, sterling market value to two
-// decimal places, optional note, retired flag, and optional reference
-// cash account UUID.
+// decimal places, optional note, retired flag, optional reference cash
+// account UUID, and raw touching transaction count.
 export interface SecuritiesAccount {
   readonly holdingsCount: number;
   readonly id: string;
@@ -236,6 +293,7 @@ export interface SecuritiesAccount {
   readonly name: string;
   readonly note?: string;
   readonly referenceAccountId?: string;
+  readonly transactionCount: number;
 }
 
 // Every transaction type Portfolio Performance writes in PTransaction.Type.

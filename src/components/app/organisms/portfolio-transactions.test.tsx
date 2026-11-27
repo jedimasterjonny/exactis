@@ -20,6 +20,7 @@ const activeSecuritiesAccount: SecuritiesAccount = {
   marketValue: 1250,
   name: "Northstar ISA",
   referenceAccountId: "cash-isa",
+  transactionCount: 2,
 };
 
 const retiredSecuritiesAccount: SecuritiesAccount = {
@@ -28,6 +29,7 @@ const retiredSecuritiesAccount: SecuritiesAccount = {
   isRetired: true,
   marketValue: 0,
   name: "Closed Dealing",
+  transactionCount: 1,
 };
 
 const securitiesAccounts: readonly SecuritiesAccount[] = [
@@ -66,22 +68,26 @@ const activeHoldings: readonly Holding[] = [
     gbpRate: 1,
     id: "sec-gilts",
     isRetired: false,
+    isSplitCategory: false,
     latestPrice: 50,
     latestPriceDate: "2026-09-22",
     name: "UK Gilts Fund",
     shares: 4,
     sharesByAccount: [{ portfolioId: "port-isa", shares: 4 }],
+    transactionCount: 1,
   },
   {
     currency: "GBP",
     gbpRate: 1,
     id: "sec-world",
     isRetired: false,
+    isSplitCategory: false,
     latestPrice: 125,
     latestPriceDate: "2026-09-22",
     name: "Global Equity Index",
     shares: 10,
     sharesByAccount: [{ portfolioId: "port-isa", shares: 10 }],
+    transactionCount: 1,
   },
 ];
 
@@ -90,11 +96,13 @@ const zeroShareHolding: Holding = {
   gbpRate: 1,
   id: "sec-sold",
   isRetired: false,
+  isSplitCategory: false,
   latestPrice: 80,
   latestPriceDate: "2026-06-15",
   name: "Cleared Equity Fund",
   shares: 0,
   sharesByAccount: [],
+  transactionCount: 0,
 };
 
 const holdings: readonly Holding[] = [...activeHoldings, zeroShareHolding];
@@ -324,11 +332,13 @@ describe("PortfolioTransactions", () => {
       gbpRate: 1,
       id: "sec-retired-held",
       isRetired: true,
+      isSplitCategory: false,
       latestPrice: 60,
       latestPriceDate: "2026-09-22",
       name: "Legacy Income Trust",
       shares: 3,
       sharesByAccount: [{ portfolioId: "port-isa", shares: 3 }],
+      transactionCount: 1,
     };
 
     const { rerender } = renderTransactions({

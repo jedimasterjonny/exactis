@@ -76,6 +76,7 @@ const isaSecurities: SecuritiesAccount = {
   marketValue: 42_150.25,
   name: "Brokerage ISA",
   referenceAccountId: "cash-isa",
+  transactionCount: 12,
 };
 
 const jointSecurities: SecuritiesAccount = {
@@ -85,6 +86,7 @@ const jointSecurities: SecuritiesAccount = {
   marketValue: 11_000.15,
   name: "Joint Dealing",
   referenceAccountId: "cash-isa",
+  transactionCount: 4,
 };
 
 const unlinkedSecurities: SecuritiesAccount = {
@@ -93,6 +95,7 @@ const unlinkedSecurities: SecuritiesAccount = {
   isRetired: false,
   marketValue: 5000,
   name: "Legacy Certs",
+  transactionCount: 1,
 };
 
 const retiredSecurities: SecuritiesAccount = {
@@ -102,6 +105,7 @@ const retiredSecurities: SecuritiesAccount = {
   marketValue: 100,
   name: "Closed Account",
   referenceAccountId: "cash-old",
+  transactionCount: 2,
 };
 
 describe("isIsoCalendarDate", () => {
@@ -292,6 +296,7 @@ describe("holdingsViewOf", () => {
     gbpRate: 1,
     id: "sec-world",
     isRetired: false,
+    isSplitCategory: false,
     latestPrice: 100,
     latestPriceDate: "2026-09-25",
     name: "World Equity",
@@ -300,6 +305,7 @@ describe("holdingsViewOf", () => {
       { portfolioId: "sec-isa", shares: 10 },
       { portfolioId: "sec-joint", shares: 5 },
     ],
+    transactionCount: 2,
   };
 
   const ukGilts: Holding = {
@@ -307,11 +313,13 @@ describe("holdingsViewOf", () => {
     gbpRate: 0.01,
     id: "sec-gilts",
     isRetired: false,
+    isSplitCategory: false,
     latestPrice: 25_000,
     latestPriceDate: "2026-09-25",
     name: "UK Gilts",
     shares: 2,
     sharesByAccount: [{ portfolioId: "sec-isa", shares: 2 }],
+    transactionCount: 1,
   };
 
   const alphaBond: Holding = {
@@ -319,11 +327,13 @@ describe("holdingsViewOf", () => {
     gbpRate: 1,
     id: "sec-alpha",
     isRetired: false,
+    isSplitCategory: false,
     latestPrice: 100,
     latestPriceDate: "2026-09-25",
     name: "Alpha Bond",
     shares: 5,
     sharesByAccount: [{ portfolioId: "sec-joint", shares: 5 }],
+    transactionCount: 1,
   };
 
   const unpricedFund: Holding = {
@@ -331,11 +341,13 @@ describe("holdingsViewOf", () => {
     gbpRate: 1,
     id: "sec-unpriced",
     isRetired: false,
+    isSplitCategory: false,
     latestPrice: null,
     latestPriceDate: null,
     name: "Zeta Private",
     shares: 3,
     sharesByAccount: [{ portfolioId: "sec-isa", shares: 3 }],
+    transactionCount: 1,
   };
 
   const noFxFund: Holding = {
@@ -343,11 +355,13 @@ describe("holdingsViewOf", () => {
     gbpRate: null,
     id: "sec-jpy",
     isRetired: false,
+    isSplitCategory: false,
     latestPrice: 2000,
     latestPriceDate: "2026-09-25",
     name: "Beta Japan",
     shares: 4,
     sharesByAccount: [{ portfolioId: "sec-isa", shares: 4 }],
+    transactionCount: 1,
   };
 
   const zeroShareFund: Holding = {
@@ -355,11 +369,13 @@ describe("holdingsViewOf", () => {
     gbpRate: 0.75,
     id: "sec-zero",
     isRetired: false,
+    isSplitCategory: false,
     latestPrice: 80,
     latestPriceDate: "2026-09-25",
     name: "Dormant US",
     shares: 0,
     sharesByAccount: [],
+    transactionCount: 0,
   };
 
   it("aggregates across accounts, sorts valued descending then unpriced/no-fx then zero alphabetically, and computes shown shares", () => {
@@ -487,6 +503,7 @@ describe("holdingsViewOf", () => {
       gbpRate: 1,
       id: "sec-frac",
       isRetired: false,
+      isSplitCategory: false,
       latestPrice: 10.004,
       latestPriceDate: "2026-09-25",
       name: "Fractional Blank Currency",
@@ -495,17 +512,20 @@ describe("holdingsViewOf", () => {
         { portfolioId: "sec-isa", shares: 1 },
         { portfolioId: "sec-joint", shares: 1 },
       ],
+      transactionCount: 2,
     };
     const unpricedUsd: Holding = {
       currency: "USD",
       gbpRate: 0.75,
       id: "sec-unpriced-usd",
       isRetired: false,
+      isSplitCategory: false,
       latestPrice: null,
       latestPriceDate: null,
       name: "Unpriced Dollar",
       shares: 1,
       sharesByAccount: [{ portfolioId: "sec-isa", shares: 1 }],
+      transactionCount: 1,
     };
 
     const view = holdingsViewOf([fractionalAcrossTwo, unpricedUsd], {

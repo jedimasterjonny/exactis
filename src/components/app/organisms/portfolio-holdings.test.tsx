@@ -13,6 +13,7 @@ const isa: SecuritiesAccount = {
   isRetired: false,
   marketValue: 1750,
   name: "Northstar ISA",
+  transactionCount: 2,
 };
 
 const emptyDealing: SecuritiesAccount = {
@@ -21,6 +22,7 @@ const emptyDealing: SecuritiesAccount = {
   isRetired: false,
   marketValue: 0,
   name: "Spare Dealing",
+  transactionCount: 0,
 };
 
 const gbpFund: Holding = {
@@ -29,11 +31,13 @@ const gbpFund: Holding = {
   gbpRate: 1,
   id: "sec-gbp",
   isRetired: false,
+  isSplitCategory: false,
   latestPrice: 125,
   latestPriceDate: "2026-09-22",
   name: "Global Equity Index",
   shares: 10,
   sharesByAccount: [{ portfolioId: "port-isa", shares: 10 }],
+  transactionCount: 1,
 };
 
 const usdFund: Holding = {
@@ -41,11 +45,13 @@ const usdFund: Holding = {
   gbpRate: 0.75,
   id: "sec-usd",
   isRetired: false,
+  isSplitCategory: false,
   latestPrice: 100,
   latestPriceDate: "2026-09-22",
   name: "US Equity ETF",
   shares: 5,
   sharesByAccount: [{ portfolioId: "port-isa", shares: 5 }],
+  transactionCount: 1,
 };
 
 const zeroFund: Holding = {
@@ -53,11 +59,13 @@ const zeroFund: Holding = {
   gbpRate: 1,
   id: "sec-zero",
   isRetired: false,
+  isSplitCategory: false,
   latestPrice: 50,
   latestPriceDate: null,
   name: "Sold Fund",
   shares: 0,
   sharesByAccount: [],
+  transactionCount: 0,
 };
 
 function renderHoldings(

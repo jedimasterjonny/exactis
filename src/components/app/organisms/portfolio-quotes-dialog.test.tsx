@@ -32,12 +32,14 @@ const unpricedA: Holding = {
   id: "sec-unpriced-a",
   isin: "GB00TEST0001",
   isRetired: false,
+  isSplitCategory: false,
   latestPrice: null,
   latestPriceDate: null,
   name: "Alpha Unpriced",
   shares: 10,
   sharesByAccount: [{ portfolioId: "port-isa", shares: 10 }],
   ticker: "ALPH",
+  transactionCount: 1,
 };
 
 const unpricedB: Holding = {
@@ -45,11 +47,13 @@ const unpricedB: Holding = {
   gbpRate: 1,
   id: "sec-unpriced-b",
   isRetired: false,
+  isSplitCategory: false,
   latestPrice: null,
   latestPriceDate: null,
   name: "Alpha Unpriced",
   shares: 5,
   sharesByAccount: [{ portfolioId: "port-isa", shares: 5 }],
+  transactionCount: 1,
 };
 
 const undatedPriced: Holding = {
@@ -57,12 +61,14 @@ const undatedPriced: Holding = {
   gbpRate: 0.78,
   id: "sec-undated",
   isRetired: false,
+  isSplitCategory: false,
   latestPrice: 50,
   latestPriceDate: null,
   name: "North America ETF",
   shares: 8,
   sharesByAccount: [{ portfolioId: "port-isa", shares: 8 }],
   ticker: "NAET",
+  transactionCount: 1,
 };
 
 const oldestPriced: Holding = {
@@ -70,11 +76,13 @@ const oldestPriced: Holding = {
   gbpRate: 0.01,
   id: "sec-gbx",
   isRetired: false,
+  isSplitCategory: false,
   latestPrice: 420.5,
   latestPriceDate: "2026-08-10",
   name: "UK Equity Income",
   shares: 250,
   sharesByAccount: [{ portfolioId: "port-isa", shares: 250 }],
+  transactionCount: 1,
 };
 
 const newerPricedA: Holding = {
@@ -83,11 +91,13 @@ const newerPricedA: Holding = {
   id: "sec-gbp-a",
   isin: "GB00TEST0002",
   isRetired: false,
+  isSplitCategory: false,
   latestPrice: 125,
   latestPriceDate: "2026-09-20",
   name: "Bond Index Fund",
   shares: 12,
   sharesByAccount: [{ portfolioId: "port-isa", shares: 12 }],
+  transactionCount: 1,
 };
 
 const newerPricedB: Holding = {
@@ -95,12 +105,14 @@ const newerPricedB: Holding = {
   gbpRate: 1,
   id: "sec-gbp-b",
   isRetired: false,
+  isSplitCategory: false,
   latestPrice: 210,
   latestPriceDate: "2026-09-20",
   name: "Global Equity Index",
   shares: 15,
   sharesByAccount: [{ portfolioId: "port-isa", shares: 15 }],
   ticker: "GEIDX",
+  transactionCount: 1,
 };
 
 const zeroShareHolding: Holding = {
@@ -108,11 +120,13 @@ const zeroShareHolding: Holding = {
   gbpRate: 1,
   id: "sec-zero",
   isRetired: false,
+  isSplitCategory: false,
   latestPrice: 90,
   latestPriceDate: "2026-07-01",
   name: "Sold Legacy Fund",
   shares: 0,
   sharesByAccount: [],
+  transactionCount: 0,
 };
 
 const retiredHolding: Holding = {
@@ -120,12 +134,14 @@ const retiredHolding: Holding = {
   gbpRate: 0.01,
   id: "sec-retired",
   isRetired: true,
+  isSplitCategory: false,
   latestPrice: null,
   latestPriceDate: null,
   name: "Retired Gilts Trust",
   shares: 20,
   sharesByAccount: [{ portfolioId: "port-isa", shares: 20 }],
   ticker: "RGLT",
+  transactionCount: 1,
 };
 
 function itemAt(items: readonly HTMLElement[], index: number): HTMLElement {
@@ -296,12 +312,14 @@ describe("PortfolioQuotesDialog", () => {
       gbpRate: null,
       id: "sec-index",
       isRetired: false,
+      isSplitCategory: false,
       latestPrice: 5400,
       latestPriceDate: "2026-09-20",
       name: "Index Benchmark",
       shares: 0,
       sharesByAccount: [],
       ticker: "BENCH",
+      transactionCount: 0,
     };
 
     render(
@@ -772,12 +790,14 @@ describe("PortfolioQuotesDialog", () => {
       gbpRate: 1,
       id: `sec-bulk-${String(index)}`,
       isRetired: false,
+      isSplitCategory: false,
       latestPrice: 100,
       latestPriceDate: "2026-09-20",
       name: `Fund ${String(index).padStart(2, "0")}`,
       shares: 1,
       sharesByAccount: [{ portfolioId: "port-isa", shares: 1 }],
       ticker: `F${String(index)}.L`,
+      transactionCount: 1,
     }));
     vi.mocked(fetchPortfolioQuotes)
       .mockResolvedValueOnce(
@@ -915,12 +935,14 @@ describe("PortfolioQuotesDialog", () => {
       gbpRate: 1,
       id: `sec-cancel-${String(index)}`,
       isRetired: false,
+      isSplitCategory: false,
       latestPrice: 100,
       latestPriceDate: "2026-09-20",
       name: `Fund ${String(index).padStart(2, "0")}`,
       shares: 1,
       sharesByAccount: [{ portfolioId: "port-isa", shares: 1 }],
       ticker: `C${String(index)}.L`,
+      transactionCount: 1,
     }));
 
     // 1. In-flight fetch disables Save and inactive toggle; unmounting mid-fetch cancels chunk 2 and suppresses stray toasts.
