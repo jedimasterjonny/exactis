@@ -1,5 +1,5 @@
 import type { Milestone } from "@/data/milestones";
-import type { Path, Plan } from "@/data/plan";
+import type { Markets, Plan } from "@/data/plan";
 import type { Future, Outcome } from "@/engine/futures";
 
 import { ageOf, ownerNamed, yearOf } from "@/data/milestones";
@@ -50,7 +50,7 @@ interface Mark {
 // months, the plan's milestones, the plan, and the plan at its own
 // rates read as a future.
 interface Told {
-  readonly markets: Required<Path>;
+  readonly markets: Markets;
   readonly milestones: readonly Milestone[];
   readonly outcome: Outcome;
   readonly place: number;

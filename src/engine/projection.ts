@@ -8,12 +8,12 @@ import type { CashFlow, Earned, Fed, Paid, Schedule } from "@/engine/cash-flow";
 import { isAsset, isPension } from "@/data/accounts";
 import { isReached, retiresOn, retiringAt, timed } from "@/data/milestones";
 import {
+  accountRateIn,
   ageIn,
   endYear,
   holderOf,
   pricesIn,
   rateFrom,
-  rateIn,
   retirementYear,
   risenBy,
 } from "@/data/plan";
@@ -1148,12 +1148,18 @@ function landedWith(
 }
 
 // The month's own figure for an account following the plan rate, along
-// a path holding the months, held to losing no more than everything as
-// the rate is; none for any other account, or along any other path.
+// a path holding the months, reading its bespoke path where the plan
+// carries a bespoke rate for it, held to losing no more than everything
+// as the rate is; none for any other account, or along any other path.
 function monthIn(account: Account, plan: Plan, at: Month): number | undefined {
-  const month = isOnPlanRate(account)
-    ? plan.path?.months?.[monthsBetween({ month: 0, year: plan.from }, at)]
-    : undefined;
+  if (!isOnPlanRate(account)) {
+    return undefined;
+  }
+  const index = monthsBetween({ month: 0, year: plan.from }, at);
+  const month =
+    plan.accountRates?.[account.id] === undefined
+      ? plan.path?.months?.[index]
+      : plan.path?.accounts?.[account.id]?.months?.[index];
   if (month !== undefined && month < -1) {
     throw new Error(rules.beyondLoss);
   }
@@ -1434,7 +1440,7 @@ function paidOff(account: Account, flow: CashFlow): number {
 // here and a month's in monthIn.
 function rateOf(account: Account, plan: Plan, year: number): number {
   const rate = isOnPlanRate(account)
-    ? rateIn(plan, year)
+    ? accountRateIn(account, plan, year)
     : rateFrom(account, plan);
   if (rate < -1) {
     throw new Error(rules.beyondLoss);

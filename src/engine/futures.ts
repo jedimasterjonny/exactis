@@ -5,7 +5,7 @@ import type {
   Milestone,
   MilestoneValues,
 } from "@/data/milestones";
-import type { Path, Plan, Spread } from "@/data/plan";
+import type { Markets, Path, Plan, Spread } from "@/data/plan";
 import type { Schedule } from "@/engine/cash-flow";
 import type { MonthsOn, ProjectionPoint, Run } from "@/engine/projection";
 
@@ -597,18 +597,21 @@ export function marketsOf({
   spread,
 }: {
   readonly future: number;
-  readonly plan: Pick<Plan, "byYear" | "inflation" | "rate" | "years">;
+  readonly plan: Pick<
+    Plan,
+    "accountRates" | "byYear" | "inflation" | "rate" | "years"
+  >;
   readonly seed?: number;
   readonly spread: Spread;
-}): Required<Path> {
+}): Markets {
   const yearsSeed = seed + future * step;
   const years = pathOf(plan, spread, normalsFrom(yearsSeed));
-  const { months = [] } = monthsOver(
+  const { months = [], ...rest } = monthsOver(
     years,
     spread,
     normalsFrom(yearsSeed + 2 ** 31),
   );
-  return { ...years, months };
+  return { ...rest, months };
 }
 
 // The months of a month end carried along each future of the markets,
@@ -683,17 +686,41 @@ export function monthsOver(
   spread: Spread,
   normal: () => number,
 ): Path {
-  return {
-    ...path,
-    months: path.rate.flatMap((rate, offset) => {
-      const draws = Array.from({ length: 12 }, () => normal());
-      const mean = draws.reduce((sum, draw) => sum + draw, 0) / 12;
-      const by = (spread.byYear?.[offset] ?? spread.rate) / Math.sqrt(12);
-      return draws.map((draw) =>
-        Math.expm1(Math.log1p(rate) / 12 + by * (draw - mean)),
-      );
+  const yearly = path.rate.map((rate) => {
+    const draws = Array.from({ length: 12 }, () => normal());
+    const mean = draws.reduce((sum, draw) => sum + draw, 0) / 12;
+    return { draws, mean, rate };
+  });
+  const months = yearly.flatMap(({ draws, mean, rate }, offset) =>
+    yearMonths(draws, mean, {
+      by: (spread.byYear?.[offset] ?? spread.rate) / Math.sqrt(12),
+      rate,
     }),
-  };
+  );
+  if (path.accounts === undefined) {
+    return { ...path, months };
+  }
+  const accounts = Object.fromEntries(
+    Object.entries(path.accounts).map(([key, accountPath]) => {
+      const id = Number(key);
+      return [
+        id,
+        {
+          ...accountPath,
+          months: yearly.flatMap(({ draws, mean }, offset) => {
+            const accountRate = accountPath.rate[offset];
+            return accountRate === undefined
+              ? []
+              : yearMonths(draws, mean, {
+                  by: accountSpreadAt(spread, id, offset) / Math.sqrt(12),
+                  rate: accountRate,
+                });
+          }),
+        },
+      ];
+    }),
+  );
+  return { ...path, accounts, months };
 }
 
 // What a future comes to on the lines given. A future kept going only
@@ -762,22 +789,43 @@ export function outcomesOf(
 // two move together, and each year apart from the last, so a decade of
 // high prices is rarer here than the past has known.
 export function pathOf(
-  plan: Pick<Plan, "byYear" | "inflation" | "rate" | "years">,
+  plan: Pick<Plan, "accountRates" | "byYear" | "inflation" | "rate" | "years">,
   spread: Spread,
   normal: () => number,
 ): Path {
-  const drawn = (rate: number, by: number): number =>
-    (1 + rate) * Math.exp(by * normal()) - 1;
-  const years = Array.from({ length: plan.years }, (_, offset) => ({
-    inflation: drawn(plan.inflation, spread.inflation),
-    rate: drawn(
-      plan.byYear?.[offset] ?? plan.rate,
-      spread.byYear?.[offset] ?? spread.rate,
-    ),
-  }));
+  const entries = Object.entries(plan.accountRates ?? {}).map(
+    ([key, bespoke]) => ({ bespoke, id: Number(key), rate: [] as number[] }),
+  );
+  const inflation: number[] = [];
+  const rate: number[] = [];
+  for (let offset = 0; offset < plan.years; offset += 1) {
+    const zInflation = normal();
+    const zRate = normal();
+    inflation.push(
+      (1 + plan.inflation) * Math.exp(spread.inflation * zInflation) - 1,
+    );
+    rate.push(
+      (1 + (plan.byYear?.[offset] ?? plan.rate)) *
+        Math.exp((spread.byYear?.[offset] ?? spread.rate) * zRate) -
+        1,
+    );
+    for (const entry of entries) {
+      entry.rate.push(
+        (1 + (entry.bespoke.byYear?.[offset] ?? entry.bespoke.rate)) *
+          Math.exp(accountSpreadAt(spread, entry.id, offset) * zRate) -
+          1,
+      );
+    }
+  }
+  if (entries.length === 0) {
+    return { inflation, rate };
+  }
   return {
-    inflation: years.map(({ inflation }) => inflation),
-    rate: years.map(({ rate }) => rate),
+    accounts: Object.fromEntries(
+      entries.map(({ id, rate: accountRate }) => [id, { rate: accountRate }]),
+    ),
+    inflation,
+    rate,
   };
 }
 
@@ -872,6 +920,19 @@ export function yearsIn(
       year,
     };
   });
+}
+
+// The log-spread for a bespoke account in a year, falling back to the
+// account's own rate spread, the plan's glide spread for the year, and
+// the plan's own spread.
+function accountSpreadAt(spread: Spread, id: number, offset: number): number {
+  const bespoke = spread.accountSpreads?.[id];
+  return (
+    bespoke?.byYear?.[offset] ??
+    bespoke?.rate ??
+    spread.byYear?.[offset] ??
+    spread.rate
+  );
 }
 
 // A value between one falling short and one lasting, or an end past the
@@ -1070,5 +1131,17 @@ function wilsonOf(share: number, count: number): number {
   return (
     (z / (1 + z ** 2 / count)) *
     Math.sqrt((share * (1 - share)) / count + z ** 2 / (4 * count ** 2))
+  );
+}
+
+// Twelve monthly returns sharing a year's drawn rate over the twelve
+// normal draws given at the monthly log-spread given.
+function yearMonths(
+  draws: readonly number[],
+  mean: number,
+  { by, rate }: { readonly by: number; readonly rate: number },
+): number[] {
+  return draws.map((draw) =>
+    Math.expm1(Math.log1p(rate) / 12 + by * (draw - mean)),
   );
 }

@@ -2405,6 +2405,97 @@ describe("project", () => {
     ).toStrictEqual([20000, 11000, 13200, 13860]);
   });
 
+  // Two £20,000 savings on the plan rate: the first carries a bespoke
+  // glide path (10% in 2026, 8% in 2027) and a 6% fallback rate, while
+  // the second stays on the global plan rate (5%). A bespoke path overrides
+  // its annual and monthly figures without affecting the unlinked saving,
+  // and fixed-rate accounts and debts ignore accountRates.
+  it("carries a saving with a bespoke rate at its own rate, glide path, and monthly path, leaving unlinked savings on the plan rate", () => {
+    const bespoke: Account = { ...flatIsa, growth: { kind: "plan" }, id: 6 };
+    const unlinked: Account = {
+      ...flatIsa,
+      growth: { kind: "plan" },
+      id: 7,
+      name: "Unlinked ISA",
+    };
+    const fixed: Account = {
+      ...flatIsa,
+      growth: { kind: "fixed", rate: 0.02 },
+      id: 8,
+      name: "Fixed ISA",
+    };
+    const bespokePlan = {
+      ...plan,
+      accountRates: {
+        6: { byYear: [0.1, 0.08], rate: 0.06 },
+        8: { rate: 0.2 },
+      },
+      years: 3,
+    };
+
+    expect(
+      project(
+        [bespoke, unlinked, fixed],
+        { expenses: [], income: [] },
+        bespokePlan,
+      ).map(({ balances }) => balances),
+    ).toStrictEqual([
+      { 6: 20000, 7: 20000, 8: 20000 },
+      { 6: 22000, 7: 21000, 8: 20400 },
+      { 6: 23760, 7: 22050, 8: 20808 },
+      { 6: 25186, 7: 23153, 8: 21224 },
+    ]);
+
+    const globalMonths = [...Array.from({ length: 10 }, () => 0), 0.1, 0];
+    const bespokeMonths = [...Array.from({ length: 10 }, () => 0), 0.2, -0.25];
+    expect(
+      project(
+        [bespoke, unlinked],
+        { expenses: [], income: [] },
+        {
+          ...bespokePlan,
+          month: 10,
+          path: {
+            accounts: { 6: { months: bespokeMonths, rate: [0.3, 0.2] } },
+            inflation: [0, 0],
+            months: globalMonths,
+            rate: [0.05, 0.05],
+          },
+          years: 2,
+        },
+      ).map(({ balances }) => balances),
+    ).toStrictEqual([
+      { 6: 20000, 7: 20000 },
+      { 6: 18000, 7: 22000 },
+      { 6: 21600, 7: 23100 },
+    ]);
+
+    expect(() =>
+      project(
+        [bespoke],
+        { expenses: [], income: [] },
+        { ...plan, accountRates: { 6: { rate: -1.1 } }, years: 1 },
+      ),
+    ).toThrow("A rate loses no more than everything");
+    expect(() =>
+      project(
+        [bespoke],
+        { expenses: [], income: [] },
+        {
+          ...plan,
+          accountRates: { 6: { rate: 0.08 } },
+          path: {
+            accounts: { 6: { months: [-1.1], rate: [0.08] } },
+            inflation: [0],
+            months: [0],
+            rate: [0.05],
+          },
+          years: 1,
+        },
+      ),
+    ).toThrow("A rate loses no more than everything");
+  });
+
   // The mortgage on the plan rate and the home on its own are carried
   // the same whatever the path says the plan rate comes to, in a year
   // or in a month.
