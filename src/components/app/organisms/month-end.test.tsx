@@ -1,9 +1,17 @@
 import type { RenderResult } from "@testing-library/react";
 import type { ComponentProps } from "react";
 
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { MonthEndPortfolio } from "@/lib/portfolio-balances";
 
 import { closeBalances } from "@/actions/accounts";
 import { Toaster } from "@/components/kit/toast";
@@ -688,5 +696,290 @@ describe("MonthEnd", () => {
 
     expect(field("Stocks & shares ISA")).toHaveValue("£274,711");
     expect(notes()).not.toContain(restored);
+  });
+
+  it("prefills linked savings from Portfolio without auto-checking, manages focus and announcements, preserves typed/checked rows, and respects warnings and historical months", async () => {
+    vi.mocked(closeBalances).mockResolvedValue(
+      saved({ asOf: { month: 8, year: 2026 }, isRecorded: true }),
+    );
+    const portfolio: MonthEndPortfolio = {
+      byAccountId: {
+        // Current account (id 3): expected £16,900 -> matches Portfolio coincidentally (£16,900) with neutral cash info.
+        3: {
+          balance: 16_900,
+          hasHoldings: false,
+          kind: "ready",
+          lastTransactionDate: "2026-08-15",
+          oldestQuoteDate: null,
+          portfolioName: "Current Cash",
+          warnings: [],
+        },
+        // Stocks & shares ISA (id 2): expected £274,711 -> stale quote warning (£276,541).
+        [isa.id]: {
+          balance: 276_541,
+          breakdown: "£274,711 + £1,830 cash",
+          hasHoldings: true,
+          kind: "ready",
+          lastTransactionDate: "2026-09-20",
+          oldestQuoteDate: "2026-09-23",
+          portfolioName: "Northstar ISA",
+          warnings: [],
+        },
+        // Workplace pension (id 6): expected £397,603 -> fresh warning-free £401,250 with breakdown + FX info.
+        [pension.id]: {
+          balance: 401_250,
+          breakdown: "£400,000 + £1,250 cash",
+          fxNote: "Latest transaction FX rate",
+          hasHoldings: true,
+          kind: "ready",
+          lastTransactionDate: "2026-09-20",
+          oldestQuoteDate: "2026-09-25",
+          portfolioName: "Workplace SIPP",
+          warnings: [],
+        },
+      },
+    };
+
+    const view = drawWorksheet({ portfolio });
+    const sheet = screen.getByRole("region", { name: /^Balances on/ });
+    const savings = within(sheet).getByRole("group", { name: "Savings" });
+
+    // Opening note mentions prefill without an Oxford comma when portfolio is present.
+    expect(notes()).toContain(
+      "Each balance opens at what the plan expected. Check it, prefill from Portfolio or type the statement's figure; only checked balances are saved.",
+    );
+
+    // Coincidental match hides Use £… and joins match label + neutral cash info with ·.
+    expect(
+      within(savings).getByText(
+        "Matches Portfolio · check to confirm · Last transaction 15 Aug 2026",
+      ),
+    ).toBeInTheDocument();
+
+    // Warned Use £… button exposes its Caution note via aria-describedby.
+    const warnedUseButton = within(savings).getByRole("button", {
+      name: "Use £276,541 for Stocks & shares ISA",
+    });
+    expect(warnedUseButton).toHaveAccessibleDescription(
+      "Caution: Oldest quote 23 Sep 2026",
+    );
+
+    // Switching to a historical month before typing anything suppresses prefill cleanly, and returning restores both buttons.
+    expect(
+      within(savings).getByRole("button", { name: "Prefill from Portfolio" }),
+    ).toBeInTheDocument();
+    fireEvent.change(select("Month"), { target: { value: "7" } });
+    expect(notes()).toContain(
+      "Portfolio holds current balances, not 25 Aug 2026's, so prefill is off for this month.",
+    );
+    expect(
+      within(savings).queryByRole("button", { name: /^Use £/u }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(savings).queryByRole("button", { name: "Prefill from Portfolio" }),
+    ).not.toBeInTheDocument();
+    fireEvent.change(select("Month"), { target: { value: "8" } });
+    expect(
+      within(savings).getByRole("button", { name: "Prefill from Portfolio" }),
+    ).toBeInTheDocument();
+
+    // Group prefill applies ONLY warning-free untouched non-matching rows (pension), leaves ISA (stale warning) alone, never auto-checks, announces politely, and focuses first prefilled Check button.
+    fireEvent.click(
+      within(savings).getByRole("button", { name: "Prefill from Portfolio" }),
+    );
+    expect(field("Workplace pension")).toHaveValue("£401,250");
+    expect(
+      within(savings).getByRole("button", { name: "Check Workplace pension" }),
+    ).toHaveAttribute("aria-pressed", "false");
+    expect(
+      within(savings).getByRole("button", { name: "Check Workplace pension" }),
+    ).toHaveFocus();
+    expect(field("Stocks & shares ISA")).toHaveValue("£274,711");
+    expect(within(sheet).getByRole("status")).toHaveTextContent(
+      "Prefilled 1 balance from Portfolio. Check each balance to confirm.",
+    );
+    expect(
+      within(savings).queryByRole("button", { name: "Prefill from Portfolio" }),
+    ).not.toBeInTheDocument();
+
+    // Clicking Save after prefilling without checking sends balances: [] and clears announcement.
+    fireEvent.click(within(sheet).getByRole("button", { name: "Save" }));
+    expect(closeBalances).toHaveBeenCalledExactlyOnceWith({
+      asOf: { month: 8, year: 2026 },
+      balances: [],
+    });
+    await screen.findByRole("dialog", { name: "Balances updated" });
+    await waitFor(() => {
+      expect(within(sheet).getByRole("status")).toBeEmptyDOMElement();
+    });
+
+    // Checking the matching row flips copy to "Matches Portfolio" and clears any status announcement.
+    fireEvent.click(
+      within(savings).getByRole("button", { name: "Prefill from Portfolio" }),
+    );
+    expect(within(sheet).getByRole("status")).toHaveTextContent(
+      "Prefilled 1 balance from Portfolio. Check each balance to confirm.",
+    );
+    fireEvent.click(
+      within(savings).getByRole("button", { name: "Check Current account" }),
+    );
+    expect(
+      within(savings).getByText(
+        "Matches Portfolio · Last transaction 15 Aug 2026",
+      ),
+    ).toBeInTheDocument();
+    expect(within(sheet).getByRole("status")).toBeEmptyDOMElement();
+
+    // Checking ISA first at £274,711 then clicking per-row Use £276,541 updates value, unchecks ISA, announces, and moves focus to Check Stocks & shares ISA.
+    fireEvent.click(
+      within(savings).getByRole("button", {
+        name: "Check Stocks & shares ISA",
+      }),
+    );
+    expect(
+      within(savings).getByRole("button", {
+        name: "Check Stocks & shares ISA",
+      }),
+    ).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(
+      within(savings).getByRole("button", {
+        name: "Use £276,541 for Stocks & shares ISA",
+      }),
+    );
+    expect(field("Stocks & shares ISA")).toHaveValue("£276,541");
+    expect(
+      within(savings).getByRole("button", {
+        name: "Check Stocks & shares ISA",
+      }),
+    ).toHaveAttribute("aria-pressed", "false");
+    expect(
+      within(savings).getByRole("button", {
+        name: "Check Stocks & shares ISA",
+      }),
+    ).toHaveFocus();
+    expect(within(sheet).getByRole("status")).toHaveTextContent(
+      "Stocks & shares ISA set to £276,541. Check to confirm.",
+    );
+
+    // Typing a custom figure clears announcement.
+    commit(field("Current account"), "17,500");
+    expect(within(sheet).getByRole("status")).toBeEmptyDOMElement();
+    // Uncheck custom Current account and type+uncheck unlinked Home so all typedForMonth branches are exercised on historical switch.
+    fireEvent.click(
+      within(savings).getByRole("button", { name: "Check Current account" }),
+    );
+    commit(field("Home"), "425,000");
+    fireEvent.click(within(sheet).getByRole("button", { name: "Check Home" }));
+    // Check ISA so its prefilled £276,541 is confirmed, while pension (£401,250) stays prefilled-but-unchecked.
+    fireEvent.click(
+      within(savings).getByRole("button", {
+        name: "Check Stocks & shares ISA",
+      }),
+    );
+
+    // Reloading preserves prefilled-but-unchecked figures via sessionStorage.
+    const reloaded = reload(view, { portfolio });
+    expect(field("Workplace pension")).toHaveValue("£401,250");
+    expect(
+      within(reloaded).getByRole("button", { name: "Check Workplace pension" }),
+    ).toHaveAttribute("aria-pressed", "false");
+    expect(field("Stocks & shares ISA")).toHaveValue("£276,541");
+
+    // Switching to a historical month reverts unchecked prefilled pension back to August's expected balance, while keeping checked ISA and manually typed custom figures intact.
+    fireEvent.change(select("Month"), { target: { value: "7" } });
+    expect(notes()).toContain(
+      "Portfolio holds current balances, not 25 Aug 2026's, so prefill is off for this month.",
+    );
+    expect(field("Workplace pension")).toHaveValue("£391,640");
+    expect(field("Stocks & shares ISA")).toHaveValue("£276,541");
+    expect(field("Current account")).toHaveValue("£17,500");
+    expect(field("Home")).toHaveValue("£425,000");
+    expect(within(reloaded).getByRole("status")).toBeEmptyDOMElement();
+
+    fireEvent.click(
+      within(reloaded).getByRole("button", { name: "Start again" }),
+    );
+    expect(field("Workplace pension")).toHaveValue("£397,603");
+    expect(field("Stocks & shares ISA")).toHaveValue("£274,711");
+  });
+
+  it("renders incomplete Portfolio status without a prefill button, elides matching account names, and keeps already-typed rows untouched on group prefill", () => {
+    const portfolio: MonthEndPortfolio = {
+      byAccountId: {
+        3: {
+          balance: 18_000,
+          hasHoldings: false,
+          kind: "ready",
+          lastTransactionDate: "2026-09-20",
+          oldestQuoteDate: null,
+          portfolioName: "Current Cash",
+          warnings: [],
+        },
+        [isa.id]: {
+          kind: "incomplete",
+          portfolioName: "Northstar ISA",
+          reason: "1 holding unpriced",
+        },
+        [pension.id]: {
+          kind: "incomplete",
+          portfolioName: "Workplace pension",
+          reason: "Retired",
+        },
+      },
+    };
+
+    const sheet = openWorksheet({ portfolio });
+    const savings = within(sheet).getByRole("group", { name: "Savings" });
+
+    expect(
+      within(savings).getByText(
+        "Northstar ISA in Portfolio: 1 holding unpriced",
+      ),
+    ).toBeInTheDocument();
+    expect(within(savings).getByText("Portfolio: Retired")).toBeInTheDocument();
+
+    // Typing a custom figure on Current account keeps it untouched when Prefill from Portfolio is absent.
+    commit(field("Current account"), "17,200");
+    expect(
+      within(savings).queryByRole("button", { name: "Prefill from Portfolio" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps already-typed rows untouched when Prefill from Portfolio runs on other savings", () => {
+    const portfolio: MonthEndPortfolio = {
+      byAccountId: {
+        3: {
+          balance: 18_000,
+          hasHoldings: false,
+          kind: "ready",
+          lastTransactionDate: "2026-09-20",
+          oldestQuoteDate: null,
+          portfolioName: "Current Cash",
+          warnings: [],
+        },
+        [pension.id]: {
+          balance: 401_250,
+          hasHoldings: true,
+          kind: "ready",
+          lastTransactionDate: "2026-09-20",
+          oldestQuoteDate: "2026-09-25",
+          portfolioName: "Workplace SIPP",
+          warnings: [],
+        },
+      },
+    };
+
+    const sheet = openWorksheet({ portfolio });
+    const savings = within(sheet).getByRole("group", { name: "Savings" });
+
+    commit(field("Workplace pension"), "399,000");
+    fireEvent.click(
+      within(savings).getByRole("button", { name: "Prefill from Portfolio" }),
+    );
+    expect(field("Workplace pension")).toHaveValue("£399,000");
+    expect(field("Current account")).toHaveValue("£18,000");
+    expect(
+      within(savings).getByRole("button", { name: "Check Current account" }),
+    ).toHaveAttribute("aria-pressed", "false");
   });
 });

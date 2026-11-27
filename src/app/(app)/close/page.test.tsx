@@ -190,6 +190,7 @@ function detail(name: string): HTMLElement {
 // A stored owned portfolio feed consistent with syncedTargets, fresh
 // for August 2026's close by default.
 function feedOf({
+  accounts = { cash: [], securities: [] },
   categories = syncedTargets.categories,
   latestQuoteDate = "2026-08-25",
   latestTransactionDate = "2026-08-24",
@@ -197,6 +198,7 @@ function feedOf({
   savedOn = "2026-08-25",
   targets: answer,
 }: {
+  readonly accounts?: PortfolioFeed["accounts"];
   readonly categories?: readonly Target[];
   readonly latestQuoteDate?: null | string;
   readonly latestTransactionDate?: null | string;
@@ -206,7 +208,7 @@ function feedOf({
 } = {}): OwnedFeed {
   return {
     feed: {
-      accounts: { cash: [], securities: [] },
+      accounts,
       handoff: { securitiesAccounts: [], securitiesByCategory: {} },
       latestQuoteDate,
       latestTransactionDate,
@@ -1914,5 +1916,100 @@ describe("Track record", () => {
       "61",
       formatGbp(carried),
     ]);
+  });
+
+  it("prefills linked balances on open close and ?update even when targets are refused, while scenarios skip the portfolio feed", async () => {
+    const linkedHousehold: Kept = {
+      ...syncedKept,
+      accounts: syncedKept.accounts.map((account) =>
+        account.id === 2 ? { ...account, portfolio: "Northstar ISA" } : account,
+      ),
+    };
+    const refusedPortfolio = feedOf({
+      accounts: {
+        cash: [],
+        securities: [
+          {
+            foreignCurrencies: [],
+            hasUncurrenciedHoldings: false,
+            holdingsCount: 1,
+            id: "port-isa",
+            isRetired: false,
+            lastTransactionDate: "2026-09-20",
+            marketValueGbp: 276_541,
+            name: "Northstar ISA",
+            noFxCurrencies: [],
+            oldestQuoteDate: "2026-09-25",
+            referenceCash: null,
+            unpricedCount: 0,
+          },
+        ],
+      },
+      latestQuoteDate: "2026-09-25",
+      latestTransactionDate: "2026-09-20",
+      savedOn: "2026-09-25",
+      targets: refused("The file has no Asset Allocation taxonomy, only none"),
+    });
+
+    // Open close on 4 Oct 2026 (closing Sep 2026) offers Portfolio prefill even with refused targets.
+    await renderClose({
+      day: "2026-10-04",
+      household: linkedHousehold,
+      portfolio: refusedPortfolio,
+    });
+    expect(
+      screen.getByRole("button", { name: "Prefill from Portfolio" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "Use £276,541 for Stocks & shares ISA",
+      }),
+    ).toBeInTheDocument();
+
+    // ?update on an already-closed month also wires Portfolio prefill.
+    vi.clearAllMocks();
+    await renderClose({
+      address: { update: "" },
+      day: "2026-09-15",
+      household: linkedHousehold,
+      portfolio: feedOf({
+        accounts: {
+          cash: [],
+          securities: [
+            {
+              foreignCurrencies: [],
+              hasUncurrenciedHoldings: false,
+              holdingsCount: 1,
+              id: "port-isa",
+              isRetired: false,
+              lastTransactionDate: "2026-08-20",
+              marketValueGbp: 273_400,
+              name: "Northstar ISA",
+              noFxCurrencies: [],
+              oldestQuoteDate: "2026-08-25",
+              referenceCash: null,
+              unpricedCount: 0,
+            },
+          ],
+        },
+      }),
+    });
+    expect(
+      screen.getByRole("button", {
+        name: "Use £273,400 for Stocks & shares ISA",
+      }),
+    ).toBeInTheDocument();
+
+    // Scenario open still blocks /close and skips getPortfolioFeed().
+    vi.clearAllMocks();
+    await renderClose({
+      day: "2026-10-04",
+      household: linkedHousehold,
+      scenario: "Retire early",
+    });
+    expect(getPortfolioFeed).not.toHaveBeenCalled();
+    expect(
+      screen.getByText("A month is closed in the household"),
+    ).toBeInTheDocument();
   });
 });

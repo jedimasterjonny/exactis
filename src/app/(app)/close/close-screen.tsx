@@ -14,6 +14,7 @@ import type { Targets } from "@/data/targets";
 import type { Answer } from "@/lib/answer";
 import type { KeptClose, Landed, Passed } from "@/lib/landed";
 import type { Group, Moved, RateSource, Standing } from "@/lib/moved";
+import type { MonthEndPortfolio } from "@/lib/portfolio-balances";
 import type { PortfolioFreshness } from "@/lib/sources";
 import type { SinceClose } from "@/store/household";
 
@@ -117,6 +118,7 @@ interface CloseScreenProps {
   readonly isUpdating: boolean;
   readonly month: Month;
   readonly portfolio: ClosePortfolio | null;
+  readonly portfolioBalances?: MonthEndPortfolio | undefined;
   readonly since: null | SinceClose;
   readonly today: string;
 }
@@ -207,6 +209,7 @@ export function CloseScreen({
   isUpdating,
   month: due,
   portfolio,
+  portfolioBalances,
   since,
   today,
 }: CloseScreenProps): JSX.Element {
@@ -254,6 +257,7 @@ export function CloseScreen({
           isUpdating={isUpdating}
           month={due}
           plan={plan}
+          portfolio={portfolioBalances}
           schedule={schedule}
           sources={
             <SourcePulls

@@ -2,15 +2,16 @@
 
 import type { JSX } from "react";
 
-import { Square, SquareCheck } from "lucide-react";
+import { Square, SquareCheck, TriangleAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useSyncExternalStore } from "react";
+import { useId, useRef, useState, useSyncExternalStore } from "react";
 import * as z from "zod";
 
 import type { Account } from "@/data/accounts";
 import type { Plan } from "@/data/plan";
 import type { Month } from "@/data/schedule";
 import type { Schedule } from "@/engine/cash-flow";
+import type { MonthEndPortfolio } from "@/lib/portfolio-balances";
 import type { Slot } from "@/lib/slot";
 
 import { closeBalances } from "@/actions/accounts";
@@ -38,6 +39,7 @@ import {
   monthsBetween,
 } from "@/lib/months";
 import { monthEnd, subsectionLabel } from "@/lib/nav";
+import { evaluatePrefillForMonth } from "@/lib/portfolio-balances";
 
 // The worksheet while it is open: the month the balances are being
 // closed onto, the balances checked, and the figures typed, by the
@@ -62,9 +64,17 @@ interface MonthEndProps {
   readonly isUpdating: boolean;
   readonly month: Month;
   readonly plan: Plan;
+  readonly portfolio?: MonthEndPortfolio | undefined;
   readonly schedule: Schedule;
   readonly sources?: Slot;
   readonly today: string;
+}
+
+type PortfolioRowEvaluation = ReturnType<typeof evaluatePrefillForMonth>;
+
+interface PrefillTarget {
+  readonly account: Account;
+  readonly balance: number;
 }
 
 // What a row says of a balance: what it was, what the months were
@@ -154,6 +164,7 @@ export function MonthEnd({
   isUpdating,
   month,
   plan,
+  portfolio,
   schedule,
   sources,
   today,
@@ -164,6 +175,7 @@ export function MonthEnd({
     typed: new Map(),
   });
   const stored = useSyncExternalStore(subscribe, readDraft, noDraft);
+  const [announcement, setAnnouncement] = useState("");
   const [held, setHeld] = useState<Held | null>(null);
   const shown = held ?? restoredOf(stored, month);
   const isShown = shown !== null && isBound(shown, accounts);
@@ -197,6 +209,7 @@ export function MonthEnd({
       month,
       touched: [],
     };
+    setAnnouncement("");
     setHeld(dropped);
     keep(dropped);
   }
@@ -209,17 +222,20 @@ export function MonthEnd({
       <CardContent className="grid gap-4">
         {sources}
         <Worksheet
+          announcement={announcement}
           checked={checked}
           draft={draft}
           from={from}
           isRestored={isRestored}
           month={month}
           onAmend={amend}
+          onAnnounce={setAnnouncement}
           onDrop={() => {
             drop();
             document.querySelector<HTMLElement>("h1")?.focus();
           }}
           plan={plan}
+          portfolio={portfolio}
           rows={rows}
           today={today}
         />
@@ -285,13 +301,22 @@ function attempt<T>(touch: () => T): T | undefined {
 // them apart by colour alone, and not at all under the pointer, which
 // turns either ink.
 function Balance({
+  onBindCheckButton,
   onCheck,
+  onPrefill,
   onType,
+  portfolioStatus,
   row,
   today,
 }: {
+  readonly onBindCheckButton: (
+    id: number,
+    element: HTMLButtonElement | null,
+  ) => void;
   readonly onCheck: (account: Account, isChecked: boolean) => void;
+  readonly onPrefill: (account: Account, balance: number) => void;
   readonly onType: (account: Account, value: number) => void;
+  readonly portfolioStatus: PortfolioRowEvaluation | undefined;
   readonly row: Row;
   readonly today: string;
 }): JSX.Element {
@@ -307,27 +332,146 @@ function Balance({
     isChecked ? `${pounds(now - account.balance - paid)} moved` : since,
   ];
   return (
-    <Field hint={facts.join(" · ")} label={account.name}>
-      <div className="flex gap-2">
-        <div className="min-w-0 flex-1">
-          <MoneyInput
-            onValueCommitted={(value) => {
-              onType(account, value);
+    <div className="grid content-start gap-1">
+      <Field hint={facts.join(" · ")} label={account.name}>
+        <div className="flex gap-2">
+          <div className="min-w-0 flex-1">
+            <MoneyInput
+              onValueCommitted={(value) => {
+                onType(account, value);
+              }}
+              value={now}
+            />
+          </div>
+          <RowAction
+            aria-pressed={isChecked}
+            className={isChecked ? "text-positive" : "text-muted-foreground"}
+            icon={isChecked ? SquareCheck : Square}
+            name={`Check ${account.name}`}
+            onClick={() => {
+              onCheck(account, !isChecked);
             }}
-            value={now}
+            ref={(element) => {
+              onBindCheckButton(account.id, element);
+            }}
           />
         </div>
-        <RowAction
-          aria-pressed={isChecked}
-          className={isChecked ? "text-positive" : "text-muted-foreground"}
-          icon={isChecked ? SquareCheck : Square}
-          name={`Check ${account.name}`}
-          onClick={() => {
-            onCheck(account, !isChecked);
-          }}
+      </Field>
+      {portfolioStatus !== undefined && (
+        <PortfolioRowStatus
+          onPrefill={onPrefill}
+          row={row}
+          status={portfolioStatus}
         />
+      )}
+    </div>
+  );
+}
+
+// One group of balances (Savings, Property & vehicles, or Loans &
+// debts): its header with Check the rest or warning-free Prefill from
+// Portfolio, optional Portfolio group note, and balance rows.
+function BalanceGroup({
+  draft,
+  held,
+  isStated,
+  month,
+  name,
+  onBindCheckButton,
+  onCheck,
+  onCheckRest,
+  onPrefillGroup,
+  onPrefillRow,
+  onType,
+  portfolio,
+  today,
+}: {
+  readonly draft: Draft;
+  readonly held: readonly Row[];
+  readonly isStated: boolean;
+  readonly month: Month;
+  readonly name: string;
+  readonly onBindCheckButton: (
+    id: number,
+    element: HTMLButtonElement | null,
+  ) => void;
+  readonly onCheck: (account: Account, isChecked: boolean) => void;
+  readonly onCheckRest: (ids: readonly number[]) => void;
+  readonly onPrefillGroup: (
+    targets: readonly PrefillTarget[],
+    firstId: number,
+  ) => void;
+  readonly onPrefillRow: (account: Account, balance: number) => void;
+  readonly onType: (account: Account, value: number) => void;
+  readonly portfolio: MonthEndPortfolio | undefined;
+  readonly today: string;
+}): JSX.Element {
+  const unchecked = held.filter(({ isChecked }) => !isChecked);
+  const statuses = new Map(
+    held.map((row) => [
+      row.account.id,
+      portfolioStatusOf(row.account.id, portfolio, {
+        asOf: draft.asOf,
+        due: month,
+      }),
+    ]),
+  );
+  const prefillable = isStated
+    ? prefillCandidatesOf(held, draft, statuses)
+    : [];
+  const [firstPrefillable] = prefillable;
+  const isHistorical =
+    isStated &&
+    portfolio !== undefined &&
+    monthsBetween(draft.asOf, month) !== 0;
+
+  return (
+    <div aria-label={name} className="grid gap-3" role="group">
+      <div className="flex min-h-6 flex-wrap items-center justify-between gap-x-4 gap-y-2 pointer-coarse:min-h-11">
+        <h3 className="label text-muted-foreground">{name}</h3>
+        {!isStated && unchecked.length > 0 && (
+          <Button
+            onClick={() => {
+              onCheckRest(unchecked.map(({ account }) => account.id));
+            }}
+            size="xs"
+            variant="outline"
+          >
+            Check the rest
+          </Button>
+        )}
+        {firstPrefillable !== undefined && (
+          <Button
+            onClick={() => {
+              onPrefillGroup(prefillable, firstPrefillable.account.id);
+            }}
+            size="xs"
+            variant="outline"
+          >
+            Prefill from Portfolio
+          </Button>
+        )}
       </div>
-    </Field>
+      {isHistorical && (
+        <Note>
+          {`Portfolio holds current balances, not ${formatDay(cutOf(draft.asOf))}'s, so prefill is off for this month.`}
+        </Note>
+      )}
+      <div className="grid gap-4 sm:grid-cols-2">
+        {held.map((row) => (
+          <Balance
+            key={row.account.id}
+            onBindCheckButton={onBindCheckButton}
+            onCheck={onCheck}
+            onPrefill={onPrefillRow}
+            onType={onType}
+            portfolioStatus={statuses.get(row.account.id)}
+            row={row}
+            today={today}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -381,11 +525,123 @@ function noDraft(): null {
   return null;
 }
 
+// Portfolio balance prefill button, match confirmation, neutral info,
+// and caution warnings rendered beneath a linked saving's Field.
+function PortfolioRowStatus({
+  onPrefill,
+  row,
+  status,
+}: {
+  readonly onPrefill: (account: Account, balance: number) => void;
+  readonly row: Row;
+  readonly status: PortfolioRowEvaluation;
+}): JSX.Element | null {
+  const warningId = useId();
+  if (status.kind === "historical") {
+    return null;
+  }
+  if (status.kind === "incomplete") {
+    const label =
+      status.portfolioName === row.account.name
+        ? `Portfolio: ${status.reason}`
+        : `${status.portfolioName} in Portfolio: ${status.reason}`;
+    return (
+      <p className="flex items-start gap-1.5 text-xs text-caution">
+        <TriangleAlert aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+        <span className="min-w-0 wrap-anywhere">
+          <span className="sr-only">Caution:</span> {label}
+        </span>
+      </p>
+    );
+  }
+  const isMatching = row.now === status.balance;
+  const matchLabel = row.isChecked
+    ? "Matches Portfolio"
+    : "Matches Portfolio · check to confirm";
+  return (
+    <div className="grid gap-1">
+      <div className="flex min-h-6 flex-wrap items-center gap-x-2 gap-y-1 text-xs pointer-coarse:min-h-11">
+        {isMatching ? (
+          <span className="text-muted-foreground">
+            {[matchLabel, ...status.info].join(" · ")}
+          </span>
+        ) : (
+          <>
+            <Button
+              aria-describedby={
+                status.warnings.length > 0 ? warningId : undefined
+              }
+              aria-label={`Use ${formatGbp(status.balance)} for ${row.account.name}`}
+              onClick={() => {
+                onPrefill(row.account, status.balance);
+              }}
+              size="xs"
+              variant="outline"
+            >
+              {`Use ${formatGbp(status.balance)}`}
+            </Button>
+            {status.info.length > 0 && (
+              <span className="text-muted-foreground">
+                {status.info.join(" · ")}
+              </span>
+            )}
+          </>
+        )}
+      </div>
+      {status.warnings.length > 0 && (
+        <p
+          className="flex items-start gap-1.5 text-xs text-caution"
+          id={warningId}
+        >
+          <TriangleAlert aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+          <span className="min-w-0 wrap-anywhere">
+            <span className="sr-only">Caution:</span>{" "}
+            {status.warnings.join(" · ")}
+          </span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+function portfolioStatusOf(
+  accountId: number,
+  portfolio: MonthEndPortfolio | undefined,
+  months: { readonly asOf: Month; readonly due: Month },
+): PortfolioRowEvaluation | undefined {
+  const entry = portfolio?.byAccountId[accountId];
+  return entry === undefined
+    ? undefined
+    : evaluatePrefillForMonth(entry, months);
+}
+
 // A sum that can come to a fraction of a pound either side of nothing,
 // to the pound, nothing written as nothing rather than as minus nothing.
 function pounds(amount: number): string {
   const whole = Math.round(amount);
   return formatGbp(whole === 0 ? 0 : whole);
+}
+
+function prefillCandidatesOf(
+  held: readonly Row[],
+  draft: Draft,
+  statuses: ReadonlyMap<number, PortfolioRowEvaluation | undefined>,
+): readonly PrefillTarget[] {
+  const prefillable: PrefillTarget[] = [];
+  for (const row of held) {
+    const status = statuses.get(row.account.id);
+    if (
+      status?.kind !== "ready" ||
+      !status.canGroupPrefill ||
+      draft.typed.has(row.account.id) ||
+      draft.checked.has(row.account.id) ||
+      row.now === status.balance
+    ) {
+      continue;
+    }
+    prefillable.push({ account: row.account, balance: status.balance });
+  }
+  return prefillable;
 }
 
 // The draft the tab kept, as text, or none.
@@ -458,39 +714,98 @@ function typedAs(account: Account, value: number): number {
   return account.kind === "debt" ? negated(Math.abs(value)) : value;
 }
 
+// Drops unchecked Portfolio-prefilled balances when switching to a
+// historical month so current Portfolio figures never carry onto an
+// earlier cut, while preserving checked and manually typed figures.
+function typedForMonth(
+  draft: Draft,
+  nextAsOf: Month,
+  {
+    due,
+    portfolio,
+  }: { readonly due: Month; readonly portfolio: MonthEndPortfolio | undefined },
+): ReadonlyMap<number, number> {
+  if (
+    portfolio === undefined ||
+    monthsBetween(nextAsOf, due) === 0 ||
+    draft.typed.size === 0
+  ) {
+    return draft.typed;
+  }
+  const nextTyped = new Map(draft.typed);
+  for (const [id, typedValue] of nextTyped) {
+    const entry = portfolio.byAccountId[id];
+    if (
+      !draft.checked.has(id) &&
+      entry?.kind === "ready" &&
+      entry.balance === typedValue
+    ) {
+      nextTyped.delete(id);
+    }
+  }
+  return nextTyped;
+}
+
 // The worksheet between the card's header and its footer: the month,
 // the note that the draft was restored, where it was, with the press
 // that starts again, a field a balance in its group, and the balances
 // the month leaves, given every row and the rows checked among them.
 function Worksheet({
+  announcement,
   checked,
   draft,
   from,
   isRestored,
   month,
   onAmend,
+  onAnnounce,
   onDrop,
   plan,
+  portfolio,
   rows,
   today,
 }: {
+  readonly announcement: string;
   readonly checked: readonly Row[];
   readonly draft: Draft;
   readonly from: Month;
   readonly isRestored: boolean;
   readonly month: Month;
   readonly onAmend: (draft: Draft) => void;
+  readonly onAnnounce: (message: string) => void;
   readonly onDrop: () => void;
   readonly plan: Plan;
+  readonly portfolio: MonthEndPortfolio | undefined;
   readonly rows: readonly Row[];
   readonly today: string;
 }): JSX.Element {
+  const checkButtonRef = useRef(new Map<number, HTMLButtonElement>());
   const was = rows.reduce((sum, { account }) => sum + account.balance, 0);
   const paid = checked.reduce((sum, row) => sum + row.paid, 0);
   const moved = checked.reduce(
     (sum, row) => sum + row.now - row.account.balance - row.paid,
     0,
   );
+
+  function bindCheckButton(
+    id: number,
+    element: HTMLButtonElement | null,
+  ): void {
+    if (element === null) {
+      checkButtonRef.current.delete(id);
+    } else {
+      checkButtonRef.current.set(id, element);
+    }
+  }
+
+  function changeAsOf(nextAsOf: Month): void {
+    onAnnounce("");
+    onAmend({
+      ...draft,
+      asOf: nextAsOf,
+      typed: typedForMonth(draft, nextAsOf, { due: month, portfolio }),
+    });
+  }
 
   function check(account: Account, isChecked: boolean): void {
     const next = new Set(draft.checked);
@@ -499,10 +814,45 @@ function Worksheet({
     } else {
       next.delete(account.id);
     }
+    onAnnounce("");
     onAmend({ ...draft, checked: next });
   }
 
+  function checkRest(ids: readonly number[]): void {
+    onAmend({ ...draft, checked: new Set([...draft.checked, ...ids]) });
+  }
+
+  function prefillGroup(
+    targets: readonly PrefillTarget[],
+    firstId: number,
+  ): void {
+    const nextTyped = new Map(draft.typed);
+    for (const { account, balance } of targets) {
+      nextTyped.set(account.id, balance);
+    }
+    onAmend({ ...draft, typed: nextTyped });
+    onAnnounce(
+      `Prefilled ${counted(targets.length, "balance")} from Portfolio. Check each balance to confirm.`,
+    );
+    checkButtonRef.current.get(firstId)?.focus();
+  }
+
+  function prefillRow(account: Account, balance: number): void {
+    const nextChecked = new Set(draft.checked);
+    nextChecked.delete(account.id);
+    onAmend({
+      ...draft,
+      checked: nextChecked,
+      typed: new Map(draft.typed).set(account.id, balance),
+    });
+    onAnnounce(
+      `${account.name} set to ${formatGbp(balance)}. Check to confirm.`,
+    );
+    checkButtonRef.current.get(account.id)?.focus();
+  }
+
   function type(account: Account, value: number): void {
+    onAnnounce("");
     onAmend({
       ...draft,
       checked: new Set(draft.checked).add(account.id),
@@ -516,7 +866,7 @@ function Worksheet({
         <MonthField
           label="Month"
           onValueChange={(picked) => {
-            onAmend({ ...draft, asOf: { ...draft.asOf, month: picked } });
+            changeAsOf({ ...draft.asOf, month: picked });
           }}
           value={draft.asOf.month}
         />
@@ -525,7 +875,7 @@ function Worksheet({
           max={month.year}
           min={plan.born}
           onValueCommitted={(year) => {
-            onAmend({ ...draft, asOf: { ...draft.asOf, year } });
+            changeAsOf({ ...draft.asOf, year });
           }}
           value={draft.asOf.year}
         />
@@ -542,52 +892,35 @@ function Worksheet({
         </div>
       )}
       <Note>
-        Each balance opens at what the plan expected. Check it or type the
-        statement&apos;s figure; only checked balances are saved.
+        {portfolio === undefined
+          ? "Each balance opens at what the plan expected. Check it or type the statement's figure; only checked balances are saved."
+          : "Each balance opens at what the plan expected. Check it, prefill from Portfolio or type the statement's figure; only checked balances are saved."}
       </Note>
+      {portfolio !== undefined && (
+        <p className="sr-only" role="status">
+          {announcement}
+        </p>
+      )}
       {balanceGroups.map(({ holds, isStated, name }) => {
         const held = rows.filter(({ account }) => holds(account));
-        const unchecked = held.filter(({ isChecked }) => !isChecked);
         return (
           held.length > 0 && (
-            <div
-              aria-label={name}
-              className="grid gap-3"
+            <BalanceGroup
+              draft={draft}
+              held={held}
+              isStated={isStated}
               key={name}
-              role="group"
-            >
-              <div className="flex min-h-6 items-center justify-between gap-4">
-                <h3 className="label text-muted-foreground">{name}</h3>
-                {!isStated && unchecked.length > 0 && (
-                  <Button
-                    onClick={() => {
-                      onAmend({
-                        ...draft,
-                        checked: new Set([
-                          ...draft.checked,
-                          ...unchecked.map(({ account }) => account.id),
-                        ]),
-                      });
-                    }}
-                    size="xs"
-                    variant="outline"
-                  >
-                    Check the rest
-                  </Button>
-                )}
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {held.map((row) => (
-                  <Balance
-                    key={row.account.id}
-                    onCheck={check}
-                    onType={type}
-                    row={row}
-                    today={today}
-                  />
-                ))}
-              </div>
-            </div>
+              month={month}
+              name={name}
+              onBindCheckButton={bindCheckButton}
+              onCheck={check}
+              onCheckRest={checkRest}
+              onPrefillGroup={prefillGroup}
+              onPrefillRow={prefillRow}
+              onType={type}
+              portfolio={portfolio}
+              today={today}
+            />
           )
         );
       })}
