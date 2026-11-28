@@ -68,7 +68,7 @@
     "eslint-plugin-jsx-a11y": "6.10.2",
     "eslint-plugin-perfectionist": "5.14.0",
     "eslint-plugin-regexp": "3.3.3",
-    "eslint-plugin-sonarjs": "4.2.2",
+    "eslint-plugin-sonarjs": "4.2.3",
     "eslint-plugin-testing-library": "7.16.3",
     "jsdom": "31.0.1",
     "knip": "6.48.0",
