@@ -74,7 +74,7 @@
     "knip": "6.48.0",
     "lint-staged": "17.6.2",
     "next-devtools-mcp": "0.4.0",
-    "oxlint": "1.94.0",
+    "oxlint": "1.95.0",
     "prettier": "3.10.1",
     "prettier-plugin-tailwindcss": "0.8.1",
     "shadcn": "4.23.0",
